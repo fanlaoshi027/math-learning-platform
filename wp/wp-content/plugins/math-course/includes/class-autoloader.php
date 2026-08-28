@@ -8,65 +8,40 @@ defined('ABSPATH') || exit;
 class Autoloader
 {
 
-
     public static function register()
     {
-
         spl_autoload_register(
-            function($class){
+            function ($class) {
 
                 $prefix = 'MathCourse\\';
 
-
-                if(
-                    strpos($class,$prefix)!==0
-                ){
-
+                if (strpos($class, $prefix) !== 0) {
                     return;
-
                 }
 
+                $relative = substr($class, strlen($prefix));
 
-                $relative = substr(
-                    $class,
-                    strlen($prefix)
-                );
+                $parts = explode('\\', $relative);
+                $class_name = array_pop($parts);
 
+                // MathCourse\\Admin\\Menu
+                // -> includes/Admin/class-menu.php
+                $directory = MATHCOURSE_PATH . 'includes/';
 
-                $file = str_replace(
-                    '\\',
-                    '/',
-                    $relative
-                );
+                if (!empty($parts)) {
+                    $directory .= implode('/', $parts) . '/';
+                }
 
+                $file = 'class-' . strtolower(
+                    str_replace('_', '-', $class_name)
+                ) . '.php';
 
-                $file = strtolower(
-                    str_replace(
-                        '_',
-                        '-',
-                        $file
-                    )
-                );
+                $path = $directory . $file;
 
-
-                $path =
-                MATHCOURSE_PATH .
-                'includes/class-' .
-                $file .
-                '.php';
-
-
-                if(
-                    file_exists($path)
-                ){
-
+                if (file_exists($path)) {
                     require_once $path;
-
                 }
-
             }
         );
-
     }
-
 }
