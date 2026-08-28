@@ -4,13 +4,7 @@ namespace MathCourse\Video;
 
 defined('ABSPATH') || exit;
 
-/**
- * Protected REST endpoints used by the MathCourse player.
- *
- * This layer intentionally does not expose the physical media URL. It only
- * issues a short-lived token after the current user has passed the existing
- * Lesson access check.
- */
+/** Protected REST endpoints used by the MathCourse player. */
 class Video_Endpoints
 {
     private $token;
@@ -42,12 +36,6 @@ class Video_Endpoints
                         return absint($value) > 0;
                     },
                 ),
-                'lesson_id' => array(
-                    'required' => false,
-                    'validate_callback' => static function ($value) {
-                        return absint($value) > 0;
-                    },
-                ),
             ),
         ));
     }
@@ -59,14 +47,13 @@ class Video_Endpoints
         }
 
         $video_id = absint($request['video_id']);
-        $lesson_id = absint($request->get_param('lesson_id'));
+        $video = $this->video_service->get_video_by_id($video_id);
 
-        $video = $this->video_service->get_video($video_id);
         if (!$video) {
             return new \WP_Error('mathcourse_video_not_found', '视频不存在。', array('status' => 404));
         }
 
-        if ($lesson_id && !$this->lesson_access->can_view($lesson_id)) {
+        if (!$this->lesson_access->can_view((int) $video->lesson_id)) {
             return new \WP_Error('mathcourse_lesson_forbidden', '无权访问该课程内容。', array('status' => 403));
         }
 
