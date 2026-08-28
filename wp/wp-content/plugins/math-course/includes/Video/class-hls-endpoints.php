@@ -4,22 +4,18 @@ namespace MathCourse\Video;
 
 defined('ABSPATH') || exit;
 
-/**
- * Protected HLS endpoint scaffold.
- *
- * It deliberately validates the signed token before any media path is exposed.
- * Physical file/segment streaming is added only after the storage contract is
- * finalized, so a missing configuration fails closed.
- */
+/** Protected HLS manifest endpoint. */
 class HLS_Endpoints
 {
     private $token;
     private $video_service;
+    private $storage;
 
-    public function __construct(Token $token, $video_service)
+    public function __construct(Token $token, $video_service, HLS_Storage $storage)
     {
         $this->token = $token;
         $this->video_service = $video_service;
+        $this->storage = $storage;
     }
 
     public function register()
@@ -33,10 +29,6 @@ class HLS_Endpoints
             'methods' => 'GET',
             'callback' => array($this, 'manifest'),
             'permission_callback' => '__return_true',
-            'args' => array(
-                'video_id' => array('required' => true),
-                'token' => array('required' => true),
-            ),
         ));
     }
 
@@ -51,12 +43,28 @@ class HLS_Endpoints
         }
 
         $video = $this->video_service->get_video_by_id($video_id);
-        if (!$video) {
-            return new \WP_Error('mathcourse_video_not_found', '视频不存在。', array('status' => 404));
+        $path = $this->storage->manifest_path($video);
+        if (!$video || !$path) {
+            return new \WP_Error('mathcourse_hls_not_configured', '该视频尚未配置受保护的 HLS 资源。', array('status' => 404));
         }
 
-        // The current database stores a legacy video_url. Do not expose it
-        // until the protected HLS storage contract is in place.
-        return new \WP_Error('mathcourse_hls_not_configured', '该视频尚未配置受保护的 HLS 资源。', array('status' => 404));
+        $content = file_get_contents($path);
+        if ($content === false || trim($content) === '') {
+            return new \WP_Error('mathcourse_manifest_read_failed', '无法读取视频播放清单。', array('status' => 500));
+        }
+
+        // Rewrite the AES key URI so the physical key file never appears in
+        // the manifest. The same signed token is forwarded to the key endpoint.
+        $key_url = rest_url('mathcourse/v1/video/' . $video_id . '/key');
+        $key_url = add_query_arg('token', rawurlencode($token), $key_url);
+        $content = preg_replace('/URI="[^"]*"/i', 'URI="' . esc_url_raw($key_url) . '"', $content, 1);
+
+        // Segment URLs remain relative to the protected HLS storage for now;
+        // segment proxying will be added before production deployment.
+        $response = new \WP_REST_Response($content, 200);
+        $response->header('Content-Type', 'application/vnd.apple.mpegurl');
+        $response->header('Cache-Control', 'private, no-store, max-age=0');
+        $response->header('X-Content-Type-Options', 'nosniff');
+        return $response;
     }
 }
