@@ -18,16 +18,32 @@ class Plugin
             new Admin\Menu();
         }
 
+        $access_service = null;
         if (class_exists('MathCourse\\Access\\Access_Service')) {
-            new Access\Access_Service();
+            $access_service = new Access\Access_Service();
         }
 
         if (class_exists('MathCourse\\Tutor\\Hooks')) {
             new Tutor\Hooks();
         }
 
+        $video_service = null;
+        if (class_exists('MathCourse\\Video\\Video_Service')) {
+            $video_service = new Video\Video_Service();
+        }
+
         if (class_exists('MathCourse\\Video\\Player')) {
             new Video\Player();
+        }
+
+        // Token REST endpoint is loaded only when all required services exist.
+        if ($video_service && $access_service && class_exists('MathCourse\\Video\\Token') && class_exists('MathCourse\\Video\\Video_Endpoints')) {
+            $endpoints = new Video\Video_Endpoints(
+                new Video\Token(),
+                $video_service,
+                $access_service
+            );
+            $endpoints->register();
         }
     }
 
