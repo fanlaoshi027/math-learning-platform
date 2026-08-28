@@ -10,44 +10,98 @@ document.addEventListener('DOMContentLoaded', function () {
         let config;
         try { config = JSON.parse(configNode.textContent || '{}'); }
         catch (e) { if (message) message.textContent = '播放器配置无效。'; return; }
+        if (!config.tokenUrl || !config.videoId || !config.manifestUrl) return;
 
-        if (!config.tokenUrl || !config.videoId) return;
+        let token = null;
+        let tokenExpiresAt = 0;
+        let hls = null;
+        let retryTimer = null;
 
-        const tokenUrl = new URL(config.tokenUrl, window.location.origin);
-        if (config.lessonId) tokenUrl.searchParams.set('lesson_id', String(config.lessonId));
+        function setMessage(text) {
+            if (message) message.textContent = text || '';
+        }
 
-        fetch(tokenUrl.toString(), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(function (response) {
-                if (!response.ok) return response.json().catch(function () { return {}; }).then(function (d) { throw new Error(d.message || '视频授权失败。'); });
-                return response.json();
-            })
-            .then(function (data) {
-                if (!data.token) throw new Error('服务器未返回播放令牌。');
-                player.dataset.mathcourseToken = data.token;
-                player.dataset.mathcourseTokenExpiresIn = String(data.expires_in || 1800);
+        function getToken(force) {
+            if (!force && token && Date.now() < tokenExpiresAt - 30000) {
+                return Promise.resolve(token);
+            }
+            const url = new URL(config.tokenUrl, window.location.origin);
+            if (config.lessonId) url.searchParams.set('lesson_id', String(config.lessonId));
+            return fetch(url.toString(), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                .then(function (response) {
+                    if (!response.ok) return response.json().catch(function () { return {}; }).then(function (d) { throw new Error(d.message || '视频授权失败。'); });
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data.token) throw new Error('服务器未返回播放令牌。');
+                    token = data.token;
+                    tokenExpiresAt = Date.now() + ((parseInt(data.expires_in, 10) || 1800) * 1000);
+                    player.dataset.mathcourseTokenExpiresIn = String(data.expires_in || 1800);
+                    return token;
+                });
+        }
 
-                const manifestUrl = new URL(config.manifestUrl || '', window.location.origin);
-                manifestUrl.searchParams.set('token', data.token);
-                player.dataset.mathcourseManifest = manifestUrl.toString();
+        function buildManifestUrl(value) {
+            const url = new URL(config.manifestUrl, window.location.origin);
+            url.searchParams.set('token', value);
+            return url.toString();
+        }
 
-                if (player.canPlayType('application/vnd.apple.mpegurl')) {
-                    player.src = manifestUrl.toString();
-                    player.load();
-                    return;
-                }
+        function destroyHls() {
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+        }
 
-                if (window.Hls && window.Hls.isSupported()) {
-                    const hls = new window.Hls({ enableWorker: true });
-                    hls.loadSource(manifestUrl.toString());
-                    hls.attachMedia(player);
-                    player._mathcourseHls = hls;
-                    return;
-                }
+        function startPlayback(value) {
+            const manifestUrl = buildManifestUrl(value);
+            player.dataset.mathcourseManifest = manifestUrl;
+            setMessage('');
 
+            if (player.canPlayType('application/vnd.apple.mpegurl')) {
+                player.src = manifestUrl;
+                player.load();
+                return;
+            }
+
+            if (window.Hls && window.Hls.isSupported()) {
+                destroyHls();
+                hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+                hls.loadSource(manifestUrl);
+                hls.attachMedia(player);
+                player._mathcourseHls = hls;
+                hls.on(window.Hls.Events.ERROR, function (event, data) {
+                    if (!data || !data.fatal) return;
+                    if (data.response && (data.response.code === 401 || data.response.code === 403)) {
+                        retryAuthorization();
+                        return;
+                    }
+                    if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                        hls.recoverMediaError();
+                    } else {
+                        setMessage('视频播放失败，请稍后重试。');
+                    }
+                });
+            } else {
                 throw new Error('当前浏览器不支持 HLS 视频播放。');
-            })
+            }
+        }
+
+        function retryAuthorization() {
+            if (retryTimer) return;
+            retryTimer = window.setTimeout(function () {
+                retryTimer = null;
+                getToken(true).then(startPlayback).catch(function (error) {
+                    setMessage(error.message || '视频授权已失效。');
+                });
+            }, 300);
+        }
+
+        getToken(false)
+            .then(startPlayback)
             .catch(function (error) {
-                if (message) message.textContent = error.message || '无法取得视频播放授权。';
+                setMessage(error.message || '无法取得视频播放授权。');
                 player.setAttribute('data-mathcourse-error', '1');
             });
     });
