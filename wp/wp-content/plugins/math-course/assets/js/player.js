@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let tokenExpiresAt = 0;
         let hls = null;
         let retryTimer = null;
-        let hlsScriptPromise = null;
 
         function setMessage(text) {
             if (message) message.textContent = text || '';
@@ -37,24 +36,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     tokenExpiresAt = Date.now() + ((parseInt(data.expires_in, 10) || 1800) * 1000);
                     return token;
                 });
-        }
-
-        function loadHlsScript() {
-            if (window.Hls) return Promise.resolve(window.Hls);
-            if (hlsScriptPromise) return hlsScriptPromise;
-            const src = config.hlsJsUrl || 'https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js';
-            hlsScriptPromise = new Promise(function (resolve, reject) {
-                const script = document.createElement('script');
-                script.src = src;
-                script.async = true;
-                script.onload = function () {
-                    if (window.Hls) resolve(window.Hls);
-                    else reject(new Error('HLS 播放组件加载失败。'));
-                };
-                script.onerror = function () { reject(new Error('HLS 播放组件加载失败。')); };
-                document.head.appendChild(script);
-            });
-            return hlsScriptPromise;
         }
 
         function buildManifestUrl(value) {
@@ -81,24 +62,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 return Promise.resolve();
             }
 
-            return loadHlsScript().then(function (Hls) {
-                if (!Hls.isSupported()) throw new Error('当前浏览器不支持 HLS 视频播放。');
-                destroyHls();
-                hls = new Hls({ enableWorker: true, lowLatencyMode: false });
-                hls.loadSource(manifestUrl);
-                hls.attachMedia(player);
-                player._mathcourseHls = hls;
-                hls.on(Hls.Events.ERROR, function (event, data) {
-                    if (!data || !data.fatal) return;
-                    if (data.response && (data.response.code === 401 || data.response.code === 403)) {
-                        retryAuthorization();
-                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        hls.recoverMediaError();
-                    } else {
-                        setMessage('视频播放失败，请稍后重试。');
-                    }
-                });
+            // HLS.js is deliberately NOT loaded from a CDN. The WordPress
+            // plugin enqueues the bundled local vendor asset before player.js.
+            if (!window.Hls) {
+                throw new Error('本地 HLS 播放组件未安装。');
+            }
+            if (!window.Hls.isSupported()) {
+                throw new Error('当前浏览器不支持 HLS 视频播放。');
+            }
+
+            destroyHls();
+            hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+            hls.loadSource(manifestUrl);
+            hls.attachMedia(player);
+            player._mathcourseHls = hls;
+            hls.on(window.Hls.Events.ERROR, function (event, data) {
+                if (!data || !data.fatal) return;
+                if (data.response && (data.response.code === 401 || data.response.code === 403)) {
+                    retryAuthorization();
+                } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                    hls.recoverMediaError();
+                } else {
+                    setMessage('视频播放失败，请稍后重试。');
+                }
             });
+            return Promise.resolve();
         }
 
         function retryAuthorization() {
