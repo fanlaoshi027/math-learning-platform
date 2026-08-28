@@ -4,18 +4,17 @@ namespace MathCourse\Video;
 
 defined('ABSPATH') || exit;
 
-/**
- * Controlled AES-128 key delivery.
- * The key material is stored outside the public player configuration and is
- * only returned after the video token has been validated.
- */
 class Key
 {
     private $token;
+    private $video_service;
+    private $storage;
 
-    public function __construct(Token $token)
+    public function __construct(Token $token, $video_service, HLS_Storage $storage)
     {
         $this->token = $token;
+        $this->video_service = $video_service;
+        $this->storage = $storage;
     }
 
     public function register()
@@ -29,10 +28,7 @@ class Key
             'methods' => 'GET',
             'callback' => array($this, 'serve'),
             'permission_callback' => '__return_true',
-            'args' => array(
-                'video_id' => array('required' => true),
-                'token' => array('required' => true),
-            ),
+            'args' => array('video_id' => array('required' => true), 'token' => array('required' => true)),
         ));
     }
 
@@ -40,14 +36,25 @@ class Key
     {
         $video_id = absint($request['video_id']);
         $token = sanitize_text_field(wp_unslash($request->get_param('token')));
-        $payload = $this->token->verify($token, $video_id, get_current_user_id());
-
-        if (!$payload) {
+        if (!$this->token->verify($token, $video_id, get_current_user_id())) {
             return new \WP_Error('mathcourse_invalid_token', '播放令牌无效或已过期。', array('status' => 403));
         }
 
-        // Key storage will be wired to the video record in the next HLS step.
-        // Do not return a guessed/default key: fail closed until real key data exists.
-        return new \WP_Error('mathcourse_key_not_configured', '该视频尚未配置加密密钥。', array('status' => 404));
+        $video = $this->video_service->get_video_by_id($video_id);
+        $path = $this->storage->key_path($video);
+        if (!$path) {
+            return new \WP_Error('mathcourse_key_not_configured', '该视频尚未配置加密密钥。', array('status' => 404));
+        }
+
+        $key = file_get_contents($path);
+        if ($key === false || strlen($key) !== 16) {
+            return new \WP_Error('mathcourse_invalid_key', '视频加密密钥配置无效。', array('status' => 500));
+        }
+
+        return new \WP_REST_Response($key, 200, array(
+            'Content-Type' => 'application/octet-stream',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ));
     }
 }
