@@ -53,14 +53,22 @@ class HLS_Endpoints
             return new \WP_Error('mathcourse_manifest_read_failed', '无法读取视频播放清单。', array('status' => 500));
         }
 
-        // Rewrite the AES key URI so the physical key file never appears in
-        // the manifest. The same signed token is forwarded to the key endpoint.
-        $key_url = rest_url('mathcourse/v1/video/' . $video_id . '/key');
-        $key_url = add_query_arg('token', rawurlencode($token), $key_url);
+        $key_url = add_query_arg(
+            'token', $token,
+            rest_url('mathcourse/v1/video/' . $video_id . '/key')
+        );
         $content = preg_replace('/URI="[^"]*"/i', 'URI="' . esc_url_raw($key_url) . '"', $content, 1);
 
-        // Segment URLs remain relative to the protected HLS storage for now;
-        // segment proxying will be added before production deployment.
+        // Do not expose a public segment URL. Until the segment proxy exists,
+        // reject manifests that contain direct media-segment references.
+        $lines = preg_split('/\r\n|\r|\n/', $content);
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed !== '' && $trimmed[0] !== '#' && strpos($trimmed, 'mathcourse/v1/video/') === false) {
+                return new \WP_Error('mathcourse_hls_segments_not_protected', '该 HLS 清单包含尚未受保护的视频分片。', array('status' => 503));
+            }
+        }
+
         $response = new \WP_REST_Response($content, 200);
         $response->header('Content-Type', 'application/vnd.apple.mpegurl');
         $response->header('Cache-Control', 'private, no-store, max-age=0');
