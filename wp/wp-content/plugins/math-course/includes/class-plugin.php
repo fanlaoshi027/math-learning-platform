@@ -48,8 +48,40 @@ class Plugin
     private function load_assets()
     {
         add_action('wp_enqueue_scripts', function () {
-            wp_enqueue_style('mathcourse', MATHCOURSE_URL . 'assets/css/mathcourse.css', array(), MATHCOURSE_VERSION);
-            wp_enqueue_script('mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array(), MATHCOURSE_VERSION, true);
+            $css = MATHCOURSE_PATH . 'assets/css/mathcourse.css';
+            $player = MATHCOURSE_PATH . 'assets/js/player.js';
+            $hls = MATHCOURSE_PATH . 'assets/vendor/hls/hls.min.js';
+
+            if (file_exists($css)) {
+                wp_enqueue_style(
+                    'mathcourse',
+                    MATHCOURSE_URL . 'assets/css/mathcourse.css',
+                    array(),
+                    filemtime($css)
+                );
+            }
+
+            // All runtime JavaScript is served by this WordPress installation.
+            // No CDN or external script is used.
+            if (file_exists($hls)) {
+                wp_enqueue_script(
+                    'mathcourse-hls',
+                    MATHCOURSE_URL . 'assets/vendor/hls/hls.min.js',
+                    array(),
+                    MATHCOURSE_VERSION,
+                    true
+                );
+            }
+
+            if (file_exists($player)) {
+                wp_enqueue_script(
+                    'mathcourse-player',
+                    MATHCOURSE_URL . 'assets/js/player.js',
+                    array('mathcourse-hls'),
+                    filemtime($player),
+                    true
+                );
+            }
         });
     }
 }
