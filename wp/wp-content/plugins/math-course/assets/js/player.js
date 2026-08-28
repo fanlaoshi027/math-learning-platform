@@ -16,15 +16,14 @@ document.addEventListener('DOMContentLoaded', function () {
         let tokenExpiresAt = 0;
         let hls = null;
         let retryTimer = null;
+        let hlsScriptPromise = null;
 
         function setMessage(text) {
             if (message) message.textContent = text || '';
         }
 
         function getToken(force) {
-            if (!force && token && Date.now() < tokenExpiresAt - 30000) {
-                return Promise.resolve(token);
-            }
+            if (!force && token && Date.now() < tokenExpiresAt - 30000) return Promise.resolve(token);
             const url = new URL(config.tokenUrl, window.location.origin);
             if (config.lessonId) url.searchParams.set('lesson_id', String(config.lessonId));
             return fetch(url.toString(), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
@@ -36,9 +35,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (!data.token) throw new Error('服务器未返回播放令牌。');
                     token = data.token;
                     tokenExpiresAt = Date.now() + ((parseInt(data.expires_in, 10) || 1800) * 1000);
-                    player.dataset.mathcourseTokenExpiresIn = String(data.expires_in || 1800);
                     return token;
                 });
+        }
+
+        function loadHlsScript() {
+            if (window.Hls) return Promise.resolve(window.Hls);
+            if (hlsScriptPromise) return hlsScriptPromise;
+            const src = config.hlsJsUrl || 'https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js';
+            hlsScriptPromise = new Promise(function (resolve, reject) {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = function () {
+                    if (window.Hls) resolve(window.Hls);
+                    else reject(new Error('HLS 播放组件加载失败。'));
+                };
+                script.onerror = function () { reject(new Error('HLS 播放组件加载失败。')); };
+                document.head.appendChild(script);
+            });
+            return hlsScriptPromise;
         }
 
         function buildManifestUrl(value) {
@@ -48,10 +64,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function destroyHls() {
-            if (hls) {
-                hls.destroy();
-                hls = null;
-            }
+            if (hls) hls.destroy();
+            hls = null;
+            player._mathcourseHls = null;
         }
 
         function startPlayback(value) {
@@ -60,49 +75,48 @@ document.addEventListener('DOMContentLoaded', function () {
             setMessage('');
 
             if (player.canPlayType('application/vnd.apple.mpegurl')) {
+                destroyHls();
                 player.src = manifestUrl;
                 player.load();
-                return;
+                return Promise.resolve();
             }
 
-            if (window.Hls && window.Hls.isSupported()) {
+            return loadHlsScript().then(function (Hls) {
+                if (!Hls.isSupported()) throw new Error('当前浏览器不支持 HLS 视频播放。');
                 destroyHls();
-                hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+                hls = new Hls({ enableWorker: true, lowLatencyMode: false });
                 hls.loadSource(manifestUrl);
                 hls.attachMedia(player);
                 player._mathcourseHls = hls;
-                hls.on(window.Hls.Events.ERROR, function (event, data) {
+                hls.on(Hls.Events.ERROR, function (event, data) {
                     if (!data || !data.fatal) return;
                     if (data.response && (data.response.code === 401 || data.response.code === 403)) {
                         retryAuthorization();
-                        return;
-                    }
-                    if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                         hls.recoverMediaError();
                     } else {
                         setMessage('视频播放失败，请稍后重试。');
                     }
                 });
-            } else {
-                throw new Error('当前浏览器不支持 HLS 视频播放。');
-            }
+            });
         }
 
         function retryAuthorization() {
             if (retryTimer) return;
             retryTimer = window.setTimeout(function () {
                 retryTimer = null;
-                getToken(true).then(startPlayback).catch(function (error) {
+                const wasPlaying = !player.paused;
+                getToken(true).then(startPlayback).then(function () {
+                    if (wasPlaying) player.play().catch(function () {});
+                }).catch(function (error) {
                     setMessage(error.message || '视频授权已失效。');
                 });
             }, 300);
         }
 
-        getToken(false)
-            .then(startPlayback)
-            .catch(function (error) {
-                setMessage(error.message || '无法取得视频播放授权。');
-                player.setAttribute('data-mathcourse-error', '1');
-            });
+        getToken(false).then(startPlayback).catch(function (error) {
+            setMessage(error.message || '无法取得视频播放授权。');
+            player.setAttribute('data-mathcourse-error', '1');
+        });
     });
 });
