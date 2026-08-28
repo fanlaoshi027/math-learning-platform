@@ -32,18 +32,28 @@ class Plugin
             $video_service = new Video\Video_Service();
         }
 
+        $token = null;
+        if (class_exists('MathCourse\\Video\\Token')) {
+            $token = new Video\Token();
+        }
+
         if (class_exists('MathCourse\\Video\\Player')) {
             new Video\Player();
         }
 
-        // Token REST endpoint is loaded only when all required services exist.
-        if ($video_service && $access_service && class_exists('MathCourse\\Video\\Token') && class_exists('MathCourse\\Video\\Video_Endpoints')) {
-            $endpoints = new Video\Video_Endpoints(
-                new Video\Token(),
-                $video_service,
-                $access_service
-            );
-            $endpoints->register();
+        if ($video_service && $access_service && $token) {
+            if (class_exists('MathCourse\\Video\\Video_Endpoints')) {
+                $endpoints = new Video\Video_Endpoints($token, $video_service, $access_service);
+                $endpoints->register();
+            }
+
+            if (class_exists('MathCourse\\Video\\Key')) {
+                (new Video\Key($token))->register();
+            }
+
+            if (class_exists('MathCourse\\Video\\HLS_Endpoints')) {
+                (new Video\HLS_Endpoints($token, $video_service))->register();
+            }
         }
     }
 
