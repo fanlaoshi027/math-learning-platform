@@ -1,102 +1,40 @@
 <?php
 /*
 Plugin Name: MathCourse
-Plugin URI:
 Description: 数学课程管理系统
 Version: 1.0.0
 Author:
-Author URI:
 Text Domain: mathcourse
 */
 
 defined('ABSPATH') || exit;
 
+define('MATHCOURSE_VERSION', '1.0.0');
+define('MATHCOURSE_PATH', plugin_dir_path(__FILE__));
+define('MATHCOURSE_URL', plugin_dir_url(__FILE__));
 
-/*
-|--------------------------------------------------------------------------
-| 基础常量
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'MATHCOURSE_VERSION',
-    '1.0.0'
-);
-
-
-define(
-    'MATHCOURSE_PATH',
-    plugin_dir_path(__FILE__)
-);
-
-
-define(
-    'MATHCOURSE_URL',
-    plugin_dir_url(__FILE__)
-);
-
-
-
-/*
-|--------------------------------------------------------------------------
-| 自动加载
-|--------------------------------------------------------------------------
-*/
-
-require_once MATHCOURSE_PATH .
-'includes/class-autoloader.php';
-
-
+require_once MATHCOURSE_PATH . 'includes/class-autoloader.php';
 \MathCourse\Autoloader::register();
 
+register_activation_hook(__FILE__, function () {
+    // WordPress 会把激活期间的任何直接输出显示为“意外输出”。
+    // 捕获并丢弃激活流程中的非预期输出，同时记录到 PHP error log 便于排查。
+    ob_start();
 
-
-/*
-|--------------------------------------------------------------------------
-| 插件激活
-|--------------------------------------------------------------------------
-*/
-
-register_activation_hook(
-    __FILE__,
-    function(){
-
-        if(
-            class_exists(
-                '\MathCourse\Database\Install'
-            )
-        ){
-
+    try {
+        if (class_exists('\\MathCourse\\Database\\Install')) {
             \MathCourse\Database\Install::activate();
-
         }
-
-    }
-);
-
-
-
-/*
-|--------------------------------------------------------------------------
-| 插件启动
-|--------------------------------------------------------------------------
-*/
-
-add_action(
-    'plugins_loaded',
-    function(){
-
-        if(
-            class_exists(
-                '\MathCourse\Plugin'
-            )
-        ){
-
-            $plugin = new \MathCourse\Plugin();
-
-            $plugin->run();
-
+    } finally {
+        $output = ob_get_clean();
+        if ($output !== '' && function_exists('error_log')) {
+            error_log('MathCourse activation unexpected output: ' . $output);
         }
-
     }
-);
+});
+
+add_action('plugins_loaded', function () {
+    if (class_exists('\\MathCourse\\Plugin')) {
+        (new \MathCourse\Plugin())->run();
+    }
+});
