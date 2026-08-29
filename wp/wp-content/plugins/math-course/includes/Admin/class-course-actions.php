@@ -44,6 +44,7 @@ class Course_Actions {
 
 			update_post_meta( $course_id, '_mathcourse_type', 'topic' );
 			update_post_meta( $course_id, '_mathcourse_grade', '' );
+			$this->apply_mathcourse_tutor_defaults( $course_id );
 
 			$url = add_query_arg(
 				array( 'page' => 'mathcourse-course-edit', 'course_id' => $course_id ),
@@ -66,5 +67,18 @@ class Course_Actions {
 				wp_trash_post( $course_id );
 			}
 		}
+	}
+
+	/**
+	 * MathCourse 自己负责授权，因此新建课程时把 Tutor LMS 的价格类型固定为 paid。
+	 * 课程是否公开展示由 MathCourse 课程中心决定，不依赖 Tutor 的 Free Course 权限。
+	 */
+	private function apply_mathcourse_tutor_defaults( $course_id ) {
+		$course_id = absint( $course_id );
+		if ( ! $course_id ) {
+			return;
+		}
+
+		update_post_meta( $course_id, '_tutor_course_price_type', 'paid' );
 	}
 }
