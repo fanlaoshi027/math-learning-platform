@@ -4,18 +4,91 @@ namespace MathCourse\Admin;
 
 defined('ABSPATH') || exit;
 
+use MathCourse\Access\Access_Service;
 
-class Access_Page
-{
-
-
-    public function render()
-    {
+class Access_Page {
 
 
-        if(
-            !current_user_can('manage_options')
-        ){
+    /**
+     * 渲染授权页面
+     */
+    public function render() {
+
+
+        if (!current_user_can('manage_options')) {
+
+            return;
+
+        }
+
+
+        $service = new Access_Service();
+
+
+        /*
+         * 处理授权操作
+         */
+        $this->handle_action($service);
+
+
+
+        echo '<div class="wrap">';
+
+        echo '<h1>学员授权管理</h1>';
+
+
+
+        echo '<form method="get">';
+
+        echo '<input type="hidden" name="page" value="mathcourse-access">';
+
+
+        echo '<input 
+            type="text"
+            name="s"
+            value="' .
+            esc_attr(
+                $_GET['s'] ?? ''
+            )
+            . '"
+            placeholder="搜索用户名/邮箱">';
+
+
+
+        echo '<button class="button">搜索</button>';
+
+
+        echo '</form>';
+
+
+
+        echo '<hr>';
+
+
+
+        $this->render_table($service);
+
+
+
+        echo '</div>';
+
+    }
+
+
+
+
+    /**
+     * 处理授权动作
+     */
+    private function handle_action($service) {
+
+
+
+        if (
+            empty($_GET['action_type']) ||
+            empty($_GET['user_id']) ||
+            empty($_GET['course_id'])
+        ) {
 
             return;
 
@@ -23,163 +96,300 @@ class Access_Page
 
 
 
-        if(
-            isset($_POST['mathcourse_access_save'])
-        ){
+        if (
+            !isset($_GET['_wpnonce']) ||
+            !wp_verify_nonce(
+                $_GET['_wpnonce'],
+                'mathcourse_access_action'
+            )
+        ) {
 
-            check_admin_referer(
-                'mathcourse_access_action',
-                'mathcourse_access_nonce'
-            );
-
-
-            $this->save();
+            return;
 
         }
 
 
-        ?>
 
-        <div class="wrap">
-
-            <h1>
-                课程授权
-            </h1>
+        $user_id =
+            absint($_GET['user_id']);
 
 
-            <form method="post">
-
-
-                <?php
-
-                wp_nonce_field(
-                    'mathcourse_access_action',
-                    'mathcourse_access_nonce'
-                );
-
-                ?>
-
-
-                <table class="form-table">
-
-
-                    <tr>
-
-                        <th>
-                            学生ID
-                        </th>
-
-                        <td>
-
-                            <input
-                            type="number"
-                            name="user_id"
-                            required>
-
-                        </td>
-
-                    </tr>
+        $course_id =
+            absint($_GET['course_id']);
 
 
 
-                    <tr>
-
-                        <th>
-                            课程ID
-                        </th>
-
-                        <td>
-
-                            <input
-                            type="number"
-                            name="course_id"
-                            required>
-
-                        </td>
-
-                    </tr>
+        if (
+            $_GET['action_type']
+            ===
+            'grant'
+        ) {
 
 
-                </table>
+            $service->grant(
+                $user_id,
+                $course_id
+            );
+
+
+        }
 
 
 
-                <?php
-
-                submit_button(
-                    '开通课程',
-                    'primary',
-                    'mathcourse_access_save'
-                );
-
-                ?>
+        if (
+            $_GET['action_type']
+            ===
+            'revoke'
+        ) {
 
 
-            </form>
+            $service->revoke(
+                $user_id,
+                $course_id
+            );
 
 
-        </div>
-
-
-        <?php
+        }
 
 
     }
 
 
 
-    private function save()
-    {
 
 
-        global $wpdb;
-
-
-        $table =
-        $wpdb->prefix .
-        'mathcourse_access';
+    /**
+     * 表格
+     */
+    private function render_table($service) {
 
 
 
-        $wpdb->replace(
+        $keyword =
+            sanitize_text_field(
+                $_GET['s'] ?? ''
+            );
 
-            $table,
 
-            array(
 
-                'user_id'=>absint(
-                    $_POST['user_id']
-                ),
+        $users =
+            get_users(
+                array(
+                    'search' =>
+                        $keyword
+                        ?
+                        '*' . $keyword . '*'
+                        :
+                        '*',
 
-                'course_id'=>absint(
-                    $_POST['course_id']
-                ),
-
-                'status'=>'active',
-
-                'created_at'=>current_time(
-                    'mysql'
+                    'number'=>20
                 )
-
-            ),
-
-            array(
-                '%d',
-                '%d',
-                '%s',
-                '%s'
-            )
-
-        );
+            );
 
 
 
-        echo '<div class="notice notice-success">';
+        echo '<table class="widefat striped">';
 
-        echo '课程授权成功';
 
-        echo '</div>';
+        echo '<thead>';
 
+        echo '<tr>';
+
+        echo '<th>学员</th>';
+
+        echo '<th>课程</th>';
+
+        echo '<th>状态</th>';
+
+        echo '<th>操作</th>';
+
+        echo '</tr>';
+
+        echo '</thead>';
+
+
+
+        echo '<tbody>';
+
+
+
+        foreach ($users as $user) {
+
+
+            $courses =
+                get_posts(
+                    array(
+                        'post_type'=>'courses',
+                        'posts_per_page'=>20
+                    )
+                );
+
+
+
+            foreach ($courses as $course) {
+
+
+
+                $info =
+                    $service->get_access_info(
+                        $user->ID,
+                        $course->ID
+                    );
+
+
+
+                echo '<tr>';
+
+
+
+                echo '<td>';
+
+                echo esc_html(
+                    $user->display_name
+                );
+
+                echo '<br>';
+
+                echo '<small>';
+
+                echo esc_html(
+                    $user->user_email
+                );
+
+                echo '</small>';
+
+                echo '</td>';
+
+
+
+
+                echo '<td>';
+
+                echo esc_html(
+                    $course->post_title
+                );
+
+                echo '</td>';
+
+
+
+
+                echo '<td>';
+
+                echo esc_html(
+                    $info['status']
+                );
+
+                echo '</td>';
+
+
+
+
+                echo '<td>';
+
+
+
+                $nonce =
+                    wp_create_nonce(
+                        'mathcourse_access_action'
+                    );
+
+
+
+                if (
+                    $info['access']
+                ) {
+
+
+                    echo '<a class="button" href="' .
+                        esc_url(
+                            add_query_arg(
+                                array(
+                                    'page'
+                                    =>
+                                    'mathcourse-access',
+
+                                    'action_type'
+                                    =>
+                                    'revoke',
+
+                                    'user_id'
+                                    =>
+                                    $user->ID,
+
+                                    'course_id'
+                                    =>
+                                    $course->ID,
+
+                                    '_wpnonce'
+                                    =>
+                                    $nonce
+                                )
+                            )
+                        )
+                        .
+                        '">
+                        取消授权
+                        </a>';
+
+
+
+                } else {
+
+
+
+                    echo '<a class="button button-primary" href="' .
+                        esc_url(
+                            add_query_arg(
+                                array(
+                                    'page'
+                                    =>
+                                    'mathcourse-access',
+
+                                    'action_type'
+                                    =>
+                                    'grant',
+
+                                    'user_id'
+                                    =>
+                                    $user->ID,
+
+                                    'course_id'
+                                    =>
+                                    $course->ID,
+
+                                    '_wpnonce'
+                                    =>
+                                    $nonce
+                                )
+                            )
+                        )
+                        .
+                        '">
+                        授权
+                        </a>';
+
+
+
+                }
+
+
+
+                echo '</td>';
+
+
+
+                echo '</tr>';
+
+            }
+
+        }
+
+
+
+        echo '</tbody>';
+
+        echo '</table>';
 
     }
 
