@@ -2,7 +2,7 @@
 Theme Name: Math Course Theme
 Theme URI: https://fanlaoshishu.com
 Description: 樊老师数学专用学习平台主题
-Version: 0.1.0
+Version: 0.1.1
 Author: Fan Laoshi
 */
 
@@ -10,16 +10,87 @@ Author: Fan Laoshi
     --mc-blue:#0b2a4a;
     --mc-orange:#ff8a2b;
     --mc-bg:#f5f8fb;
+    --mc-text:#142235;
+    --mc-muted:#667085;
+    --mc-border:#e5eaf0;
+    --mc-white:#fff;
 }
 
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{
     margin:0;
     background:var(--mc-bg);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--mc-text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
 }
+a{color:inherit;text-decoration:none}
 
 .mc-container{
-    max-width:1200px;
+    width:min(1200px,calc(100% - 40px));
     margin:auto;
-    padding:24px;
+}
+
+.mc-site-header{
+    background:#fff;
+    border-bottom:1px solid var(--mc-border);
+    position:sticky;
+    top:0;
+    z-index:50;
+}
+.mc-site-header__inner{
+    min-height:68px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+}
+.mc-brand{display:inline-flex;align-items:center;gap:10px;font-weight:800;color:var(--mc-blue)}
+.mc-brand__mark{
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+    background:var(--mc-blue);color:#fff;font-size:17px;
+}
+.mc-brand__text{font-size:18px}
+.mc-site-nav{display:flex;align-items:center;gap:22px;font-size:14px;color:#475467}
+.mc-site-nav a:hover{color:var(--mc-blue)}
+.mc-site-nav__login{padding:9px 15px;border-radius:9px;background:var(--mc-blue);color:#fff!important}
+
+.mc-home{min-height:calc(100vh - 68px)}
+.mc-hero{background:linear-gradient(135deg,#0b2a4a 0%,#123e68 100%);color:#fff;padding:76px 0 70px}
+.mc-eyebrow{margin:0 0 10px;color:#ffb77d;font-size:14px;font-weight:700;letter-spacing:.08em}
+.mc-hero h1{margin:0;font-size:clamp(34px,5vw,54px);line-height:1.15;letter-spacing:-.03em}
+.mc-hero p:last-child{margin:16px 0 0;font-size:18px;color:rgba(255,255,255,.78)}
+.mc-home-courses{padding:38px 0 64px}
+
+.mathcourse-directory__empty{
+    min-height:140px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:28px;
+    background:#fff;
+    border:1px solid var(--mc-border);
+    border-radius:16px;
+    color:var(--mc-muted);
+    text-align:center;
+}
+.mathcourse-directory__empty strong{color:var(--mc-text);font-size:17px}
+
+.mc-site-footer{background:#fff;border-top:1px solid var(--mc-border)}
+.mc-site-footer__inner{
+    min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+    color:#98a2b3;font-size:12px;
+}
+
+@media (max-width:700px){
+    .mc-container{width:min(100% - 24px,1200px)}
+    .mc-site-header__inner{min-height:60px}
+    .mc-brand__text{font-size:16px}
+    .mc-site-nav{gap:10px}
+    .mc-site-nav>a:not(.mc-site-nav__login){display:none}
+    .mc-hero{padding:54px 0 50px}
+    .mc-hero p:last-child{font-size:16px}
+    .mc-site-footer__inner{padding:12px 0;flex-direction:column;justify-content:center}
 }
