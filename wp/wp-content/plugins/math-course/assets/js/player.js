@@ -6,15 +6,14 @@ const players = document.querySelectorAll('.mathcourse-player');
 
 players.forEach(function(player){
 
-    player.controls = true;
-
     const lessonId = player.dataset.lessonId;
 
     if(!lessonId){
         return;
     }
 
-    const storageKey = 'mathcourse_lesson_' + lessonId;
+    const storageKey = 'mathcourse_lesson_' + lessonId + '_time';
+
 
     // 恢复本地播放位置
     player.addEventListener('loadedmetadata', function(){
@@ -25,7 +24,7 @@ players.forEach(function(player){
 
             const time = parseInt(saved,10);
 
-            if(time > 0 && time < player.duration - 10){
+            if(time > 0 && time < player.duration - 5){
                 player.currentTime = time;
             }
         }
@@ -33,7 +32,8 @@ players.forEach(function(player){
     });
 
 
-    // 本地保存播放秒数，不上传服务器
+    // 播放秒数只保存浏览器本地
+    // 不上传服务器
     player.addEventListener('timeupdate', function(){
 
         localStorage.setItem(
@@ -44,7 +44,7 @@ players.forEach(function(player){
     });
 
 
-    // 播放完成，只通知完成状态
+    // 完成只记录完成状态
     player.addEventListener('ended', function(){
 
         localStorage.removeItem(storageKey);
