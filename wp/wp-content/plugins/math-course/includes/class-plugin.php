@@ -11,6 +11,7 @@ class Plugin {
     private function load_modules() {
         if (class_exists('MathCourse\\Admin\\Menu')) new Admin\Menu();
         if (class_exists('MathCourse\\Admin\\Course_Actions')) new Admin\Course_Actions();
+        if (class_exists('MathCourse\\Admin\\Course_Sort')) new Admin\Course_Sort();
         if (class_exists('MathCourse\\Course\\Meta')) new Course\Meta();
         if (class_exists('MathCourse\\Course\\Lesson_Meta')) new Course\Lesson_Meta();
         if (class_exists('MathCourse\\Course\\Course_Service')) new Course\Course_Service();
