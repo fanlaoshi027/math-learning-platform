@@ -12,6 +12,7 @@ class Plugin {
         if (class_exists('MathCourse\\Admin\\Menu')) new Admin\Menu();
         if (class_exists('MathCourse\\Admin\\Course_Actions')) new Admin\Course_Actions();
         if (class_exists('MathCourse\\Course\\Meta')) new Course\Meta();
+        if (class_exists('MathCourse\\Course\\Lesson_Meta')) new Course\Lesson_Meta();
         if (class_exists('MathCourse\\Course\\Course_Service')) new Course\Course_Service();
         if (class_exists('MathCourse\\Access\\Access_Service')) new Access\Access_Service();
         if (class_exists('MathCourse\\Progress\\Progress_Service')) new Progress\Progress_Service();
