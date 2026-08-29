@@ -10,35 +10,21 @@ class Access_Service {
         return $wpdb->prefix . 'mathcourse_access';
     }
 
-    /**
-     * 明确的 MathCourse 课程授权，不包含免费课程。
-     */
     public function has_access($user_id, $course_id) {
         $info = $this->get_access_info($user_id, $course_id);
         return !empty($info['access']);
     }
 
     /**
-     * Tutor LMS 课程是否为免费课程。
-     * Tutor LMS 4.x 使用 _tutor_course_price_type，free/paid/subscription 为价格类型。
+     * Tutor LMS 免费课程判断。
      */
     public function is_free_course($course_id) {
         $course_id = absint($course_id);
-
-        if (!$course_id) {
-            return false;
-        }
-
-        return 'free' === get_post_meta($course_id, '_tutor_course_price_type', true);
+        return $course_id && 'free' === get_post_meta($course_id, '_tutor_course_price_type', true);
     }
 
     /**
-     * 学员是否可以进入课程完整内容。
-     *
-     * 规则：
-     * 1. 有 MathCourse 授权：可以观看；
-     * 2. 免费课程：登录后可以观看；
-     * 3. 未授权的付费课程：不能观看完整内容。
+     * 登录学员可以完整学习：MathCourse 授权课程或 Tutor 免费课程。
      */
     public function can_access_course($user_id, $course_id) {
         $user_id   = absint($user_id);
@@ -69,11 +55,7 @@ class Access_Service {
 
         $row = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT status, expires_at
-                 FROM {$this->table()}
-                 WHERE user_id=%d
-                 AND course_id=%d
-                 LIMIT 1",
+                "SELECT status, expires_at FROM {$this->table()} WHERE user_id=%d AND course_id=%d LIMIT 1",
                 $user_id,
                 $course_id
             )
@@ -86,7 +68,7 @@ class Access_Service {
         $result['status'] = $row->status;
         $result['expires_at'] = $row->expires_at;
 
-        if ($row->status !== 'active') {
+        if ('active' !== $row->status) {
             return $result;
         }
 
@@ -128,10 +110,7 @@ class Access_Service {
         return false !== $wpdb->update(
             $this->table(),
             array('status' => 'revoked'),
-            array(
-                'user_id'   => absint($user_id),
-                'course_id' => absint($course_id),
-            ),
+            array('user_id' => absint($user_id), 'course_id' => absint($course_id)),
             array('%s'),
             array('%d', '%d')
         );
@@ -139,20 +118,14 @@ class Access_Service {
 
     public function get_user_courses($user_id) {
         $user_id = absint($user_id);
-
         if (!$user_id) {
             return array();
         }
 
         global $wpdb;
-
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT *
-                 FROM {$this->table()}
-                 WHERE user_id=%d
-                 AND status='active'
-                 ORDER BY granted_at DESC",
+                "SELECT * FROM {$this->table()} WHERE user_id=%d AND status='active' ORDER BY granted_at DESC",
                 $user_id
             )
         );
@@ -160,10 +133,14 @@ class Access_Service {
         return $rows ?: array();
     }
 
+    /**
+     * 试看权限完全由 MathCourse 课时属性控制。
+     */
     public function can_preview($course_id, $lesson_id) {
+        $course_id = absint($course_id);
         $lesson_id = absint($lesson_id);
 
-        if (!$lesson_id) {
+        if (!$course_id || !$lesson_id) {
             return false;
         }
 
@@ -171,22 +148,24 @@ class Access_Service {
     }
 
     /**
-     * 播放器统一权限入口。
-     * 登录用户的未授权付费课程即使课时标记试看，也不开放试看；游客仍可观看指定试看课时。
+     * 播放规则：
+     * - 已授权/免费登录学员：所有已发布课时；
+     * - 游客：仅明确标记“允许试看”的课时；
+     * - 已登录但未授权学员：同样可以观看“允许试看”的课时，其余课时锁定。
      */
     public function can_watch_lesson($user_id, $course_id, $lesson_id) {
         $user_id   = absint($user_id);
         $course_id = absint($course_id);
         $lesson_id = absint($lesson_id);
 
-        if ($this->can_access_course($user_id, $course_id)) {
+        if (!$course_id || !$lesson_id) {
+            return false;
+        }
+
+        if ($user_id && $this->can_access_course($user_id, $course_id)) {
             return true;
         }
 
-        if (!$user_id && $this->can_preview($course_id, $lesson_id)) {
-            return true;
-        }
-
-        return false;
+        return $this->can_preview($course_id, $lesson_id);
     }
 }
