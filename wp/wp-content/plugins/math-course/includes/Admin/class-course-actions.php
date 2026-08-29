@@ -6,9 +6,6 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Handles course actions before the admin page outputs anything.
- *
- * Redirects must happen before WordPress (or another plugin) sends output.
- * This keeps wp_safe_redirect() from triggering "headers already sent".
  */
 class Course_Actions {
 
@@ -17,11 +14,7 @@ class Course_Actions {
 	}
 
 	public function handle() {
-		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		if ( ! function_exists( 'tutor' ) ) {
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) || ! function_exists( 'tutor' ) ) {
 			return;
 		}
 
@@ -53,10 +46,7 @@ class Course_Actions {
 			update_post_meta( $course_id, '_mathcourse_grade', '' );
 
 			$url = add_query_arg(
-				array(
-					'page'      => 'create-course',
-					'course_id' => $course_id,
-				),
+				array( 'page' => 'mathcourse-course-edit', 'course_id' => $course_id ),
 				admin_url( 'admin.php' )
 			);
 
@@ -66,17 +56,13 @@ class Course_Actions {
 
 		if ( 'trash' === $action ) {
 			$course_id = isset( $_GET['course_id'] ) ? absint( $_GET['course_id'] ) : 0;
-
 			if ( ! $course_id ) {
 				return;
 			}
 
 			check_admin_referer( 'mathcourse_trash_course_' . $course_id );
 
-			if (
-				tutor()->course_post_type === get_post_type( $course_id ) &&
-				current_user_can( 'delete_post', $course_id )
-			) {
+			if ( tutor()->course_post_type === get_post_type( $course_id ) && current_user_can( 'delete_post', $course_id ) ) {
 				wp_trash_post( $course_id );
 			}
 		}
