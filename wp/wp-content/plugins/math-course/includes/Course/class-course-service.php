@@ -39,10 +39,13 @@ class Course_Service {
     }
 
     /**
-     * 获取课时视频数据
+     * 获取课时视频数据，并在服务层完成课程归属与观看权限判断。
      */
     public function get_lesson_video($lesson_id, $user_id = 0) {
-        $preview = $this->tutor->is_preview_lesson($lesson_id);
+        $lesson_id = absint($lesson_id);
+        $user_id   = absint($user_id);
+
+        $preview   = $this->tutor->is_preview_lesson($lesson_id);
         $course_id = $this->tutor->get_lesson_course_id($lesson_id);
 
         $accessible = $preview;
@@ -51,11 +54,12 @@ class Course_Service {
         }
 
         return array(
-            'id' => (int) $lesson_id,
-            'video_id' => get_post_meta($lesson_id, '_mathcourse_video_id', true),
-            'hls_url' => $accessible ? get_post_meta($lesson_id, '_mathcourse_hls_url', true) : '',
-            'preview' => $preview,
-            'accessible' => $accessible,
+            'id'        => $lesson_id,
+            'course_id' => $course_id,
+            'video_id'  => get_post_meta($lesson_id, '_mathcourse_video_id', true),
+            'hls_url'   => $accessible ? get_post_meta($lesson_id, '_mathcourse_hls_url', true) : '',
+            'preview'   => $preview,
+            'accessible'=> $accessible,
         );
     }
 
