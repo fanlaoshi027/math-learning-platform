@@ -18,10 +18,6 @@ class Course_Service {
         $this->progress = new Progress_Service();
     }
 
-    /**
-     * 获取课程基础信息
-     * Tutor LMS 作为课程数据源
-     */
     public function get_course($course_id) {
         $course = $this->tutor->get_course($course_id);
 
@@ -30,16 +26,16 @@ class Course_Service {
         }
 
         return array(
-            'id' => (int) $course->ID,
+            'id'    => (int) $course->ID,
             'title' => get_the_title($course),
-            'type' => get_post_meta($course->ID, '_mathcourse_type', true),
+            'type'  => get_post_meta($course->ID, '_mathcourse_type', true),
             'grade' => get_post_meta($course->ID, '_mathcourse_grade', true),
             'cover' => get_post_meta($course->ID, '_mathcourse_cover', true),
         );
     }
 
     /**
-     * 获取课时视频数据，并在服务层完成课程归属与观看权限判断。
+     * 获取课时视频数据，并在服务层统一完成课程权限判断。
      */
     public function get_lesson_video($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
@@ -47,28 +43,18 @@ class Course_Service {
 
         $preview   = $this->tutor->is_preview_lesson($lesson_id);
         $course_id = $this->tutor->get_lesson_course_id($lesson_id);
-
-        $accessible = $preview;
-        if ($user_id && $course_id) {
-            $accessible = $this->access->has_access($user_id, $course_id) || $preview;
-        }
+        $accessible = $this->access->can_watch_lesson($user_id, $course_id, $lesson_id);
 
         return array(
-            'id'        => $lesson_id,
-            'course_id' => $course_id,
-            'video_id'  => get_post_meta($lesson_id, '_mathcourse_video_id', true),
-            'hls_url'   => $accessible ? get_post_meta($lesson_id, '_mathcourse_hls_url', true) : '',
-            'preview'   => $preview,
-            'accessible'=> $accessible,
+            'id'         => $lesson_id,
+            'course_id'  => $course_id,
+            'video_id'   => get_post_meta($lesson_id, '_mathcourse_video_id', true),
+            'hls_url'    => $accessible ? get_post_meta($lesson_id, '_mathcourse_hls_url', true) : '',
+            'preview'    => $preview,
+            'accessible' => $accessible,
         );
     }
 
-    /**
-     * 获取课程目录。
-     *
-     * 课程完成状态统一由 MathCourse Progress_Service 提供，避免前台目录
-     * 同时读取 Tutor LMS 原生完成状态和 MathCourse 自己的完成状态。
-     */
     public function get_course_directory($course_id, $user_id = 0) {
         $course = $this->tutor->get_course($course_id);
 
@@ -76,35 +62,40 @@ class Course_Service {
             return null;
         }
 
-        $user_id      = absint($user_id);
-        $course_access = $user_id ? $this->access->has_access($user_id, $course->ID) : false;
-
-        $topics = array();
+        $user_id       = absint($user_id);
+        $course_access = $user_id ? $this->access->can_access_course($user_id, $course->ID) : false;
+        $course_free   = $this->access->is_free_course($course->ID);
+        $topics        = array();
 
         foreach ($this->tutor->get_topics($course->ID) as $topic) {
             $lessons = array();
 
             foreach ($this->tutor->get_lessons($topic->ID) as $lesson) {
-                $completed_lesson = $user_id ? $this->progress->is_completed($user_id, $lesson->ID) : false;
-                $preview          = $this->tutor->is_preview_lesson($lesson->ID);
-                $accessible       = $course_access || $preview;
+                $completed_lesson = $course_access && $user_id
+                    ? $this->progress->is_completed($user_id, $lesson->ID)
+                    : false;
+                $preview = $this->tutor->is_preview_lesson($lesson->ID);
+
+                // 登录用户：只有授权课程或免费课程可进入。
+                // 游客：只允许进入明确标记为“试看”的课时。
+                $accessible = $course_access || (!$user_id && $preview);
 
                 $lessons[] = array(
-                    'id' => (int) $lesson->ID,
-                    'title' => get_the_title($lesson),
-                    'page_number' => $this->tutor->get_lesson_page_number($lesson->ID),
-                    'video_id' => $this->tutor->get_lesson_video_id($lesson->ID),
-                    'hls_url' => $accessible ? get_post_meta($lesson->ID, '_mathcourse_hls_url', true) : '',
-                    'url' => $accessible ? get_permalink($lesson) : '',
-                    'completed' => $completed_lesson,
-                    'preview' => $preview,
-                    'accessible' => $accessible,
+                    'id'           => (int) $lesson->ID,
+                    'title'        => get_the_title($lesson),
+                    'page_number'  => $this->tutor->get_lesson_page_number($lesson->ID),
+                    'video_id'     => $this->tutor->get_lesson_video_id($lesson->ID),
+                    'hls_url'      => $accessible ? get_post_meta($lesson->ID, '_mathcourse_hls_url', true) : '',
+                    'url'          => $accessible ? get_permalink($lesson) : '',
+                    'completed'    => $completed_lesson,
+                    'preview'      => $preview,
+                    'accessible'   => $accessible,
                 );
             }
 
             $topics[] = array(
-                'id' => (int) $topic->ID,
-                'title' => get_the_title($topic),
+                'id'      => (int) $topic->ID,
+                'title'   => get_the_title($topic),
                 'lessons' => $lessons,
             );
         }
@@ -112,22 +103,23 @@ class Course_Service {
         $progress = $course_access && $user_id
             ? $this->progress->get_course_progress($course->ID, $user_id)
             : array(
-                'completed' => 0,
-                'total' => 0,
-                'percent' => 0,
-                'last_lesson_id' => 0,
-                'last_time' => 0,
+                'completed'       => 0,
+                'total'           => 0,
+                'percent'         => 0,
+                'last_lesson_id'  => 0,
+                'last_time'       => 0,
             );
 
         return array(
-            'id' => (int) $course->ID,
-            'title' => get_the_title($course),
-            'type' => get_post_meta($course->ID, '_mathcourse_type', true),
-            'grade' => get_post_meta($course->ID, '_mathcourse_grade', true),
-            'cover' => get_post_meta($course->ID, '_mathcourse_cover', true),
-            'topics' => $topics,
-            'access' => $course_access,
-            'progress' => $progress,
+            'id'          => (int) $course->ID,
+            'title'       => get_the_title($course),
+            'type'        => get_post_meta($course->ID, '_mathcourse_type', true),
+            'grade'       => get_post_meta($course->ID, '_mathcourse_grade', true),
+            'cover'       => get_post_meta($course->ID, '_mathcourse_cover', true),
+            'is_free'     => $course_free,
+            'topics'      => $topics,
+            'access'      => $course_access,
+            'progress'    => $progress,
         );
     }
 }
