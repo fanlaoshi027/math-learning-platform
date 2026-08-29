@@ -20,7 +20,7 @@ class Order_Manager {
 
 		wp_enqueue_script(
 			'mathcourse-order',
-			MATHCOURSE_URL . 'assets/js/admin-order.js',
+			MATHCOURSE_URL . 'assets/admin-course-sort.js',
 			array(),
 			MATHCOURSE_VERSION,
 			true
