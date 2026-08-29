@@ -16,15 +16,15 @@ class Access_Service {
     }
 
     /**
-     * Tutor LMS 免费课程判断。
+     * MathCourse 的课程权限以“授权”为准。
+     * Tutor LMS 的 Public Course / Free Course 不再直接赋予完整观看权限。
      */
     public function is_free_course($course_id) {
-        $course_id = absint($course_id);
-        return $course_id && 'free' === get_post_meta($course_id, '_tutor_course_price_type', true);
+        return false;
     }
 
     /**
-     * 登录学员可以完整学习：MathCourse 授权课程或 Tutor 免费课程。
+     * 登录学员只有在 MathCourse 获得授权后，才能完整学习课程。
      */
     public function can_access_course($user_id, $course_id) {
         $user_id   = absint($user_id);
@@ -34,7 +34,7 @@ class Access_Service {
             return false;
         }
 
-        return $this->has_access($user_id, $course_id) || $this->is_free_course($course_id);
+        return $this->has_access($user_id, $course_id);
     }
 
     public function get_access_info($user_id, $course_id) {
@@ -148,10 +148,10 @@ class Access_Service {
     }
 
     /**
-     * 播放规则：
-     * - 已授权/免费登录学员：所有已发布课时；
-     * - 游客：仅明确标记“允许试看”的课时；
-     * - 已登录但未授权学员：同样可以观看“允许试看”的课时，其余课时锁定。
+     * 最终播放权限：
+     * 1. 已授权学员：全部已发布课时；
+     * 2. 未授权学员/游客：只有 MathCourse 标记为“允许试看”的课时；
+     * 3. Tutor LMS Public/Private/Free 设置不会绕过上述规则。
      */
     public function can_watch_lesson($user_id, $course_id, $lesson_id) {
         $user_id   = absint($user_id);
