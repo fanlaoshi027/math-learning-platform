@@ -5,6 +5,7 @@ namespace MathCourse\Progress;
 defined( 'ABSPATH' ) || exit;
 
 use MathCourse\Access\Access_Service;
+use MathCourse\Course\Course_Service;
 
 /**
  * Lesson completion AJAX endpoint.
@@ -37,8 +38,8 @@ class Progress_Ajax {
 		}
 
 		$lesson = get_post( $lesson_id );
-		if ( ! $lesson || tutor()->lesson_post_type !== $lesson->post_type ) {
-			wp_send_json_error( array( 'message' => 'invalid lesson' ), 400 );
+		if ( ! $lesson || tutor()->lesson_post_type !== $lesson->post_type || 'publish' !== $lesson->post_status ) {
+			wp_send_json_error( array( 'message' => 'invalid or unpublished lesson' ), 400 );
 		}
 
 		$topic = get_post( $lesson->post_parent );
@@ -47,12 +48,13 @@ class Progress_Ajax {
 		}
 
 		$course = get_post( $course_id );
-		if ( ! $course || tutor()->course_post_type !== $course->post_type ) {
-			wp_send_json_error( array( 'message' => 'invalid course' ), 400 );
+		if ( ! $course || tutor()->course_post_type !== $course->post_type || 'publish' !== $course->post_status ) {
+			wp_send_json_error( array( 'message' => 'invalid or unpublished course' ), 400 );
 		}
 
 		$access = new Access_Service();
-		if ( ! $access->has_access( $user_id, $course_id ) ) {
+		// 免费课程也属于可学习课程，不能只检查 MathCourse 的付费授权表。
+		if ( ! $access->can_access_course( $user_id, $course_id ) ) {
 			wp_send_json_error( array( 'message' => 'course access required' ), 403 );
 		}
 
@@ -65,11 +67,14 @@ class Progress_Ajax {
 
 		update_user_meta( $user_id, 'mc_last_completed_course', $course_id );
 
+		$course_progress = $progress->get_course_progress( $course_id, $user_id );
+
 		wp_send_json_success(
 			array(
 				'lesson_id' => $lesson_id,
 				'course_id' => $course_id,
 				'completed' => true,
+				'progress'  => $course_progress,
 			)
 		);
 	}
