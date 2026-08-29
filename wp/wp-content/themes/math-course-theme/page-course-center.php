@@ -18,8 +18,8 @@ get_header();
 
         <div class="mc-course-grid">
             <?php
-            if (shortcode_exists('math_course_center')) {
-                echo do_shortcode('[math_course_center]');
+            if (shortcode_exists('mathcourse_course_directory')) {
+                echo do_shortcode('[mathcourse_course_directory]');
             } else {
                 echo '<p>课程中心插件未启用</p>';
             }
