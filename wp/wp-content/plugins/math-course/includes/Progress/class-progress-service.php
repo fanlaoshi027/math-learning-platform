@@ -20,9 +20,6 @@ class Progress_Service {
         $this->access = new Access_Service();
     }
 
-    /**
-     * 获取指定学员的课程进度。
-     */
     public function get_course_progress( $course_id, $user_id = 0 ) {
         $course_id = absint( $course_id );
         $user_id   = absint( $user_id );
@@ -34,9 +31,6 @@ class Progress_Service {
         return $this->calculate_progress( $course_id, $user_id, false );
     }
 
-    /**
-     * 后台使用：不要求学员拥有当前课程授权，统计全部已创建课时。
-     */
     public function get_admin_course_progress( $course_id, $user_id ) {
         $course_id = absint( $course_id );
         $user_id   = absint( $user_id );
@@ -51,8 +45,8 @@ class Progress_Service {
     /**
      * 标记课时完成。
      *
-     * 重复提交同一个课时视为成功，避免 update_user_meta() 在数据未变化时
-     * 返回 false 导致前端误判为“保存失败”。
+     * 只有当前学员已经获得该课时所属课程的权限时才能写入完成状态。
+     * 重复提交同一个课时视为成功，保持接口幂等。
      */
     public function complete_lesson( $user_id, $lesson_id ) {
         $user_id   = absint( $user_id );
@@ -62,9 +56,13 @@ class Progress_Service {
             return false;
         }
 
+        $course_id = $this->get_lesson_course_id( $lesson_id );
+        if ( ! $course_id || ! $this->access->has_access( $user_id, $course_id ) ) {
+            return false;
+        }
+
         $completed = $this->get_completed_lessons( $user_id );
 
-        // 已完成：幂等处理，直接视为成功。
         if ( in_array( $lesson_id, $completed, true ) ) {
             return true;
         }
@@ -94,9 +92,6 @@ class Progress_Service {
         return true;
     }
 
-    /**
-     * 取消完成状态。
-     */
     public function uncomplete_lesson( $user_id, $lesson_id ) {
         $user_id   = absint( $user_id );
         $lesson_id = absint( $lesson_id );
@@ -137,9 +132,6 @@ class Progress_Service {
         return true;
     }
 
-    /**
-     * 判断课时是否完成。
-     */
     public function is_completed( $user_id, $lesson_id ) {
         return in_array(
             absint( $lesson_id ),
@@ -148,9 +140,6 @@ class Progress_Service {
         );
     }
 
-    /**
-     * 获取指定用户最后完成的课时 ID。
-     */
     public function get_last_completed_lesson( $user_id, $course_id = 0 ) {
         $completed = $this->get_completed_lessons( $user_id );
 
@@ -181,9 +170,6 @@ class Progress_Service {
         return $this->find_latest_lesson( $course_completed, $times );
     }
 
-    /**
-     * 获取指定课时的完成时间戳。
-     */
     public function get_lesson_completed_time( $user_id, $lesson_id ) {
         $times = $this->get_completed_times( $user_id );
         $lesson_id = absint( $lesson_id );
@@ -292,9 +278,7 @@ class Progress_Service {
     }
 
     /**
-     * 按当前 MathCourse 编辑器实际使用的结构获取课程课时：
-     * Course → topics → Tutor Lesson。
-     *
+     * 按 Course → topics → Tutor Lesson 结构获取课程课时。
      * 学员前台只统计已发布课时；后台可以选择把草稿/私密课时一起统计。
      */
     private function get_course_lessons( $course_id, $include_unpublished = false ) {
@@ -345,5 +329,33 @@ class Progress_Service {
         }
 
         return $lessons;
+    }
+
+    /**
+     * 根据 Tutor Lesson → Topic → Course 关系解析所属课程。
+     */
+    private function get_lesson_course_id( $lesson_id ) {
+        $lesson_id = absint( $lesson_id );
+
+        if ( ! $lesson_id || ! function_exists( 'tutor' ) || empty( tutor()->lesson_post_type ) ) {
+            return 0;
+        }
+
+        $lesson = get_post( $lesson_id );
+        if ( ! $lesson || tutor()->lesson_post_type !== $lesson->post_type ) {
+            return 0;
+        }
+
+        $topic = get_post( $lesson->post_parent );
+        if ( ! $topic || 'topics' !== $topic->post_type ) {
+            return 0;
+        }
+
+        $course = get_post( $topic->post_parent );
+        if ( ! $course || tutor()->course_post_type !== $course->post_type ) {
+            return 0;
+        }
+
+        return (int) $course->ID;
     }
 }
