@@ -11,7 +11,6 @@ class Menu {
     }
 
     public function register_menu() {
-
         add_menu_page(
             'MathCourse',
             '数学课程',
@@ -22,50 +21,11 @@ class Menu {
             30
         );
 
-        add_submenu_page(
-            'mathcourse',
-            '课程管理',
-            '课程管理',
-            'manage_options',
-            'mathcourse-courses',
-            array( $this, 'courses_page' )
-        );
-
-        add_submenu_page(
-            'mathcourse',
-            '课程授权',
-            '学员授权',
-            'manage_options',
-            'mathcourse-access',
-            array( $this, 'access_page' )
-        );
-
-        add_submenu_page(
-            'mathcourse',
-            '学习进度',
-            '学习进度',
-            'manage_options',
-            'mathcourse-progress',
-            array( $this, 'progress_page' )
-        );
-
-        add_submenu_page(
-            'mathcourse',
-            '设置',
-            '系统设置',
-            'manage_options',
-            'mathcourse-settings',
-            array( $this, 'settings_page' )
-        );
-
-        add_submenu_page(
-            null,
-            '编辑课程',
-            '编辑课程',
-            'manage_options',
-            'mathcourse-course-edit',
-            array( $this, 'course_edit_page' )
-        );
+        add_submenu_page( 'mathcourse', '课程管理', '课程管理', 'manage_options', 'mathcourse-courses', array( $this, 'courses_page' ) );
+        add_submenu_page( 'mathcourse', '课程授权', '学员授权', 'manage_options', 'mathcourse-access', array( $this, 'access_page' ) );
+        add_submenu_page( 'mathcourse', '学习进度', '学习进度', 'manage_options', 'mathcourse-progress', array( $this, 'progress_page' ) );
+        add_submenu_page( 'mathcourse', '设置', '系统设置', 'manage_options', 'mathcourse-settings', array( $this, 'settings_page' ) );
+        add_submenu_page( null, '编辑课程', '编辑课程', 'manage_options', 'mathcourse-course-edit', array( $this, 'course_edit_page' ) );
     }
 
     public function dashboard() {
@@ -91,7 +51,9 @@ class Menu {
     }
 
     public function progress_page() {
-        echo '<div class="wrap"><h1>学习进度</h1><p>查看学员课程完成情况</p></div>';
+        if ( class_exists( 'MathCourse\\Admin\\Progress_Page' ) ) {
+            ( new Progress_Page() )->render();
+        }
     }
 
     public function settings_page() {
