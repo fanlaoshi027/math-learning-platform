@@ -52,6 +52,32 @@ class Adapter {
         return get_post_meta(absint($lesson_id), '_mathcourse_preview', true) === 'yes';
     }
 
+    /**
+     * 统一课程完成进度接口
+     * 主题和业务层不直接调用 Tutor LMS
+     */
+    public function get_course_progress($course_id, $user_id = 0) {
+        $user_id = $user_id ? absint($user_id) : get_current_user_id();
+
+        $total = 0;
+        $completed = 0;
+
+        foreach ($this->get_topics($course_id) as $topic) {
+            foreach ($this->get_lessons($topic->ID) as $lesson) {
+                $total++;
+                if ($this->is_lesson_completed($lesson->ID, $user_id)) {
+                    $completed++;
+                }
+            }
+        }
+
+        return array(
+            'completed' => $completed,
+            'total' => $total,
+            'percent' => $total ? round(($completed / $total) * 100) : 0,
+        );
+    }
+
     public function is_lesson_completed($lesson_id, $user_id = 0) {
         $user_id = $user_id ? absint($user_id) : get_current_user_id();
         if (!$user_id || !function_exists('tutor_utils')) {
