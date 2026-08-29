@@ -47,9 +47,7 @@ class Player {
 			}
 
 			$atts['url'] = $video['hls_url'];
-			if ( ! $course_id ) {
-				$course_id = absint( get_post_meta( $lesson_id, '_mathcourse_course_id', true ) );
-			}
+			$course_id  = absint( $video['course_id'] );
 		}
 
 		if ( empty( $atts['url'] ) ) {
