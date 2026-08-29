@@ -16,12 +16,128 @@ class Course_Directory {
     public function render($atts = array()) {
         $atts = shortcode_atts(array('course_id' => 0), $atts, 'mathcourse_course_directory');
         $course_id = absint($atts['course_id']);
-        if (!$course_id && function_exists('tutor') && is_singular(tutor()->course_post_type)) {
-            $course_id = get_the_ID();
-        }
-        if (!$course_id) return '<p>未指定课程。</p>';
 
-        $data = $this->service->get_course_directory($course_id, get_current_user_id());
+        if ($course_id) {
+            return $this->render_single_course($course_id);
+        }
+
+        return $this->render_course_center();
+    }
+
+    private function render_course_center() {
+        if (!function_exists('tutor')) {
+            return '<p>课程系统暂不可用。</p>';
+        }
+
+        $user_id = get_current_user_id();
+        $course_post_type = tutor()->course_post_type;
+        $courses = get_posts(array(
+            'post_type'      => $course_post_type,
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => array('menu_order' => 'ASC', 'date' => 'DESC'),
+        ));
+
+        if (empty($courses)) {
+            return '<p class="mathcourse-directory__empty">目前还没有已发布课程。</p>';
+        }
+
+        $cards = array();
+        foreach ($courses as $course) {
+            $data = $this->service->get_course_directory($course->ID, $user_id);
+            if (!$data) {
+                continue;
+            }
+
+            $has_access = !empty($data['access']);
+            $progress = isset($data['progress']) ? $data['progress'] : array(
+                'completed' => 0,
+                'total' => 0,
+                'percent' => 0,
+                'last_lesson_id' => 0,
+                'last_time' => 0,
+            );
+
+            $continue_lesson = $this->find_continue_lesson($data);
+            $cards[] = array(
+                'data' => $data,
+                'access' => $has_access,
+                'progress' => $progress,
+                'continue' => $continue_lesson,
+            );
+        }
+
+        // 已授权课程优先显示，授权课程内部按课程排序保持稳定。
+        usort($cards, function ($a, $b) {
+            return (int) $b['access'] <=> (int) $a['access'];
+        });
+
+        ob_start(); ?>
+        <div class="mathcourse-center">
+            <div class="mathcourse-center__grid">
+                <?php foreach ($cards as $card) :
+                    $data = $card['data'];
+                    $progress = $card['progress'];
+                    $continue = $card['continue'];
+                    $has_access = $card['access'];
+                    $cover = !empty($data['cover']) ? $data['cover'] : '';
+                    ?>
+                    <article class="mathcourse-center__card">
+                        <a class="mathcourse-center__cover" href="<?php echo esc_url(get_permalink($data['id'])); ?>">
+                            <?php if ($cover) : ?>
+                                <img src="<?php echo esc_url($cover); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy">
+                            <?php else : ?>
+                                <span class="mathcourse-center__cover-placeholder">数学课程</span>
+                            <?php endif; ?>
+                        </a>
+                        <div class="mathcourse-center__body">
+                            <div class="mathcourse-center__meta">
+                                <?php if (!empty($data['grade'])) : ?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif; ?>
+                                <?php if (!empty($data['type'])) : ?><span><?php echo esc_html($data['type'] === 'supplementary' ? '教辅配套课' : '专题课程'); ?></span><?php endif; ?>
+                            </div>
+                            <h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2>
+
+                            <?php if ($has_access) : ?>
+                                <div class="mathcourse-center__progress-text">
+                                    <span>学习进度</span>
+                                    <strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong>
+                                    <em><?php echo esc_html($progress['percent']); ?>%</em>
+                                </div>
+                                <div class="mathcourse-center__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr($progress['percent']); ?>">
+                                    <span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span>
+                                </div>
+                                <?php if ($continue && !empty($continue['url'])) : ?>
+                                    <a class="mathcourse-center__button" href="<?php echo esc_url($continue['url']); ?>">
+                                        <?php echo !empty($progress['completed']) ? '继续学习' : '开始学习'; ?>
+                                        <span>→</span>
+                                    </a>
+                                <?php else : ?>
+                                    <a class="mathcourse-center__button" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
+                                <?php endif; ?>
+                            <?php else : ?>
+                                <div class="mathcourse-center__locked">未授权 · 可查看课程</div>
+                                <a class="mathcourse-center__button is-outline" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+
+    private function render_single_course($course_id) {
+        if (!function_exists('tutor')) {
+            return '<p>课程系统暂不可用。</p>';
+        }
+
+        if (!is_singular() || !is_admin()) {
+            $data = $this->service->get_course_directory($course_id, get_current_user_id());
+        } else {
+            $data = $this->service->get_course_directory($course_id, get_current_user_id());
+        }
+
         if (!$data) return '<p>课程不存在或课程系统暂不可用。</p>';
 
         $progress = isset($data['progress']) ? $data['progress'] : array(
@@ -33,27 +149,7 @@ class Course_Directory {
         );
         $is_logged_in = is_user_logged_in();
         $has_access = !empty($data['access']);
-
-        // 对已授权学员：优先进入第一节未完成课时；全部完成后进入最后完成课时。
-        // 未授权访客：进入第一节可试看课时。
-        $continue_lesson = null;
-        $last_completed_lesson = null;
-
-        foreach ($data['topics'] as $topic) {
-            foreach ($topic['lessons'] as $lesson) {
-                if ($lesson['completed'] && $has_access) {
-                    $last_completed_lesson = $lesson;
-                }
-
-                if (!$continue_lesson && $lesson['accessible'] && (!$has_access || !$lesson['completed'])) {
-                    $continue_lesson = $lesson;
-                }
-            }
-        }
-
-        if ($has_access && !$continue_lesson && $last_completed_lesson) {
-            $continue_lesson = $last_completed_lesson;
-        }
+        $continue_lesson = $this->find_continue_lesson($data);
 
         ob_start(); ?>
         <div class="mathcourse-directory" data-course-id="<?php echo esc_attr($data['id']); ?>">
@@ -122,5 +218,41 @@ class Course_Directory {
             <?php endforeach; ?>
         </div>
         <?php return ob_get_clean();
+    }
+
+    private function find_continue_lesson($data) {
+        $has_access = !empty($data['access']);
+        $continue_lesson = null;
+        $last_completed_lesson = null;
+
+        foreach ($data['topics'] as $topic) {
+            foreach ($topic['lessons'] as $lesson) {
+                if ($lesson['completed'] && $has_access) {
+                    $last_completed_lesson = $lesson;
+                }
+                if (!$continue_lesson && $lesson['accessible'] && (!$has_access || !$lesson['completed'])) {
+                    $continue_lesson = $lesson;
+                }
+            }
+        }
+
+        if ($has_access && !$continue_lesson && $last_completed_lesson) {
+            $continue_lesson = $last_completed_lesson;
+        }
+
+        return $continue_lesson;
+    }
+
+    private function grade_label($grade) {
+        $labels = array(
+            '7' => '七年级',
+            '8' => '八年级',
+            '9' => '九年级',
+            '10' => '高一',
+            '11' => '高二',
+            '12' => '高三',
+        );
+
+        return isset($labels[(string) $grade]) ? $labels[(string) $grade] : (string) $grade;
     }
 }
