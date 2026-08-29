@@ -12,9 +12,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const storageKey = 'mathcourse_lesson_' + lessonId + '_time';
         let player = element;
         let completionSent = false;
+        let restorePending = true;
 
-        // Video.js 接管播放器后，事件仍绑定到同一个 video 元素；原生 HLS
-        // 在 Safari 等浏览器中也可以直接工作。
         if (window.videojs && element.classList.contains('video-js')) {
             try {
                 player = window.videojs(element);
@@ -24,15 +23,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function getCurrentTime() {
-            return typeof player.currentTime === 'function'
-                ? Number(player.currentTime())
-                : Number(player.currentTime);
+            return typeof player.currentTime === 'function' ? Number(player.currentTime()) : Number(player.currentTime);
         }
 
         function getDuration() {
-            return typeof player.duration === 'function'
-                ? Number(player.duration())
-                : Number(player.duration);
+            return typeof player.duration === 'function' ? Number(player.duration()) : Number(player.duration);
         }
 
         function on(target, eventName, callback) {
@@ -43,42 +38,70 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        on(player, 'loadedmetadata', function () {
-            const saved = localStorage.getItem(storageKey);
-            const duration = getDuration();
+        function setCurrentTime(time) {
+            if (typeof player.currentTime === 'function') {
+                player.currentTime(time);
+            } else {
+                player.currentTime = time;
+            }
+        }
 
-            if (!saved || !Number.isFinite(duration) || duration <= 0) {
+        function restorePosition() {
+            if (!restorePending) {
                 return;
             }
 
-            const time = parseInt(saved, 10);
-            if (time > 0 && time < duration - 5) {
-                try {
-                    if (typeof player.currentTime === 'function') {
-                        player.currentTime(time);
-                    } else {
-                        player.currentTime = time;
-                    }
-                } catch (error) {
-                    // 媒体尚未准备好时，部分浏览器会拒绝设置 currentTime。
-                }
+            const saved = localStorage.getItem(storageKey);
+            const duration = getDuration();
+            const time = saved ? parseInt(saved, 10) : 0;
+
+            if (!saved || !Number.isFinite(duration) || duration <= 0 || !Number.isFinite(time) || time <= 0) {
+                return;
             }
-        });
+
+            // 留出最后 5 秒，避免上次异常退出已经接近结束却被当成未完成。
+            if (time >= duration - 5) {
+                localStorage.removeItem(storageKey);
+                restorePending = false;
+                return;
+            }
+
+            try {
+                setCurrentTime(time);
+                restorePending = false;
+            } catch (error) {
+                // 某些浏览器需要等媒体真正可 seek 后再恢复。
+            }
+        }
+
+        // Safari/HLS 有时 loadedmetadata 时 duration 尚未稳定，因此同时监听 durationchange/canplay。
+        on(player, 'loadedmetadata', restorePosition);
+        on(player, 'durationchange', restorePosition);
+        on(player, 'canplay', restorePosition);
 
         // 播放位置只保存在当前浏览器，不上传服务器。
         on(player, 'timeupdate', function () {
             const currentTime = getCurrentTime();
+            const duration = getDuration();
+
             if (currentTime > 0 && Number.isFinite(currentTime)) {
                 localStorage.setItem(storageKey, String(Math.floor(currentTime)));
             }
+
+            // 防止部分浏览器没有可靠触发 ended 时永远无法完成。
+            // 只有明确达到视频末尾才提交，且仍由服务器最终决定是否成功。
+            if (!completionSent && Number.isFinite(duration) && duration > 0 && currentTime >= duration - 0.5) {
+                submitCompletion();
+            }
         });
 
-        on(player, 'ended', function () {
+        on(player, 'ended', submitCompletion);
+
+        function submitCompletion() {
             if (completionSent) {
                 return;
             }
 
-            // 没有课程 ID 时不能安全提交完成记录。
             if (!courseId || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) {
                 return;
             }
@@ -107,20 +130,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         throw new Error('progress rejected');
                     }
 
-                    // 只有服务器确认完成后才清除本地播放位置。
                     localStorage.removeItem(storageKey);
 
                     document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', {
                         detail: {
                             lessonId: lessonId,
-                            courseId: courseId
+                            courseId: courseId,
+                            progress: result.data && result.data.progress ? result.data.progress : null
                         }
                     }));
 
                     document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', {
                         detail: {
                             lessonId: lessonId,
-                            courseId: courseId
+                            courseId: courseId,
+                            progress: result.data && result.data.progress ? result.data.progress : null
                         }
                     }));
                 })
@@ -128,6 +152,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     completionSent = false;
                     console.warn('MathCourse: unable to save lesson completion.', error);
                 });
-        });
+        }
     });
 });
