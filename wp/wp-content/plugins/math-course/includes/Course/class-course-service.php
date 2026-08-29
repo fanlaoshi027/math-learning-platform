@@ -43,7 +43,7 @@ class Course_Service {
                 $lessons[] = array(
                     'id' => (int) $lesson->ID,
                     'title' => get_the_title($lesson),
-                    'url' => get_permalink($lesson),
+                    'url' => $accessible ? get_permalink($lesson) : '',
                     'completed' => $completed_lesson,
                     'preview' => $preview,
                     'accessible' => $accessible,
