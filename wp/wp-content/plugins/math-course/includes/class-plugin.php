@@ -14,6 +14,7 @@ class Plugin {
         if (class_exists('MathCourse\\Course\\Meta')) new Course\Meta();
         if (class_exists('MathCourse\\Course\\Course_Service')) new Course\Course_Service();
         if (class_exists('MathCourse\\Access\\Access_Service')) new Access\Access_Service();
+        if (class_exists('MathCourse\\Progress\\Progress_Service')) new Progress\Progress_Service();
         if (class_exists('MathCourse\\Tutor\\Hooks')) new Tutor\Hooks();
         if (class_exists('MathCourse\\Tutor\\Adapter')) new Tutor\Adapter();
         if (class_exists('MathCourse\\Admin\\Order_Manager')) new Admin\Order_Manager();
