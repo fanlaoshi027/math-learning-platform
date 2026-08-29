@@ -11,21 +11,14 @@ class Player
     {
         add_shortcode(
             'mathcourse_video',
-            array(
-                $this,
-                'render'
-            )
+            array($this,'render')
         );
 
         add_action(
             'wp_enqueue_scripts',
-            array(
-                $this,
-                'assets'
-            )
+            array($this,'assets')
         );
     }
-
 
     public function assets()
     {
@@ -56,18 +49,19 @@ class Player
             'mathcourse-player',
             'mathcoursePlayer',
             array(
-                'ajax_url' => admin_url('admin-ajax.php')
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('mathcourse_progress_nonce')
             )
         );
     }
-
 
     public function render($atts)
     {
         $atts = shortcode_atts(
             array(
                 'url' => '',
-                'lesson_id' => 0
+                'lesson_id' => 0,
+                'course_id' => 0
             ),
             $atts
         );
@@ -77,6 +71,7 @@ class Player
         }
 
         $lesson_id = absint($atts['lesson_id']);
+        $course_id = absint($atts['course_id']);
 
         ob_start();
         ?>
@@ -87,7 +82,8 @@ class Player
             controls
             preload="metadata"
             playsinline
-            data-lesson-id="<?php echo esc_attr($lesson_id); ?>">
+            data-lesson-id="<?php echo esc_attr($lesson_id); ?>"
+            data-course-id="<?php echo esc_attr($course_id); ?>">
 
             <source
                 src="<?php echo esc_url($atts['url']); ?>"
