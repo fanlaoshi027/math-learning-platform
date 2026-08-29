@@ -104,7 +104,7 @@ class Course_Sort {
 
         foreach ( $lesson_order as $topic_key => $lesson_ids ) {
             $topic_id = absint( $topic_key );
-            if ( ! isset( $valid_topic_map[ $topic_id ] || ! is_array( $lesson_ids ) ) ) {
+            if ( ! isset( $valid_topic_map[ $topic_id ] ) || ! is_array( $lesson_ids ) ) {
                 continue;
             }
 
@@ -120,7 +120,7 @@ class Course_Sort {
             $valid_lesson_map = array_fill_keys( array_map( 'absint', $valid_lessons ), true );
 
             $position = 0;
-            foreach ( (array) $lesson_ids as $lesson_id ) {
+            foreach ( $lesson_ids as $lesson_id ) {
                 $lesson_id = absint( $lesson_id );
                 if ( ! isset( $valid_lesson_map[ $lesson_id ] ) ) {
                     continue;
