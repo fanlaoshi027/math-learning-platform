@@ -24,19 +24,61 @@ class Course_Directory {
         $data = $this->service->get_course_directory($course_id, get_current_user_id());
         if (!$data) return '<p>课程不存在或课程系统暂不可用。</p>';
 
-        $progress = isset($data['progress']) ? $data['progress'] : array('completed' => 0, 'total' => 0, 'percent' => 0);
+        $progress = isset($data['progress']) ? $data['progress'] : array(
+            'completed' => 0,
+            'total' => 0,
+            'percent' => 0,
+            'last_lesson_id' => 0,
+            'last_time' => 0,
+        );
         $is_logged_in = is_user_logged_in();
         $has_access = !empty($data['access']);
+
+        // 对已授权学员：优先进入第一节未完成课时；全部完成后进入最后完成课时。
+        // 未授权访客：进入第一节可试看课时。
+        $continue_lesson = null;
+        $last_completed_lesson = null;
+
+        foreach ($data['topics'] as $topic) {
+            foreach ($topic['lessons'] as $lesson) {
+                if ($lesson['completed'] && $has_access) {
+                    $last_completed_lesson = $lesson;
+                }
+
+                if (!$continue_lesson && $lesson['accessible'] && (!$has_access || !$lesson['completed'])) {
+                    $continue_lesson = $lesson;
+                }
+            }
+        }
+
+        if ($has_access && !$continue_lesson && $last_completed_lesson) {
+            $continue_lesson = $last_completed_lesson;
+        }
 
         ob_start(); ?>
         <div class="mathcourse-directory" data-course-id="<?php echo esc_attr($data['id']); ?>">
             <div class="mathcourse-directory__header">
-                <h1><?php echo esc_html($data['title']); ?></h1>
-                <?php if ($has_access) : ?>
-                    <div class="mathcourse-directory__progress" aria-label="课程进度">
-                        <div class="mathcourse-directory__progress-text">学习进度 <?php echo esc_html($progress['percent']); ?>%（<?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?>）</div>
-                        <div class="mathcourse-directory__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div>
-                    </div>
+                <div class="mathcourse-directory__heading">
+                    <h1><?php echo esc_html($data['title']); ?></h1>
+                    <?php if ($has_access) : ?>
+                        <div class="mathcourse-directory__progress" aria-label="课程进度">
+                            <div class="mathcourse-directory__progress-text">
+                                学习进度 <?php echo esc_html($progress['percent']); ?>%
+                                <span>（<?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?>）</span>
+                            </div>
+                            <div class="mathcourse-directory__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr($progress['percent']); ?>">
+                                <span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <?php if ($continue_lesson && !empty($continue_lesson['url'])) : ?>
+                    <a class="mathcourse-directory__continue" href="<?php echo esc_url($continue_lesson['url']); ?>">
+                        <span><?php echo $has_access && !empty($progress['completed']) ? '继续学习' : '开始学习'; ?></span>
+                        <strong><?php echo esc_html($continue_lesson['title']); ?></strong>
+                        <span class="mathcourse-directory__continue-arrow">→</span>
+                    </a>
                 <?php endif; ?>
             </div>
 
@@ -57,21 +99,21 @@ class Course_Directory {
             <?php endif; ?>
 
             <?php foreach ($data['topics'] as $index => $topic) : ?>
-                <section class="mathcourse-topic">
-                    <h2><span><?php echo esc_html($index + 1); ?></span><?php echo esc_html($topic['title']); ?></h2>
-                    <div class="mathcourse-lessons">
+                <section class="mathcourse-directory__topic">
+                    <h2 class="mathcourse-directory__topic-title"><span><?php echo esc_html($index + 1); ?></span><?php echo esc_html($topic['title']); ?></h2>
+                    <div class="mathcourse-directory__lessons">
                         <?php foreach ($topic['lessons'] as $lesson) : ?>
                             <?php if ($lesson['accessible']) : ?>
-                                <a class="mathcourse-lesson <?php echo $lesson['completed'] ? 'is-complete' : ''; ?>" href="<?php echo esc_url($lesson['url']); ?>">
-                                    <span class="mathcourse-lesson__state"><?php echo $lesson['completed'] ? '✓' : '○'; ?></span>
-                                    <span class="mathcourse-lesson__title"><?php echo esc_html($lesson['title']); ?></span>
-                                    <?php if ($lesson['preview']) : ?><span class="mathcourse-lesson__preview">试看</span><?php endif; ?>
+                                <a class="mathcourse-directory__lesson <?php echo $lesson['completed'] ? 'is-complete' : ''; ?>" href="<?php echo esc_url($lesson['url']); ?>">
+                                    <span class="mathcourse-directory__status" aria-hidden="true"><?php echo $lesson['completed'] ? '✓' : '○'; ?></span>
+                                    <span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span>
+                                    <?php if ($lesson['preview']) : ?><span class="mathcourse-directory__preview">试看</span><?php endif; ?>
                                 </a>
                             <?php else : ?>
-                                <div class="mathcourse-lesson is-locked" aria-disabled="true">
-                                    <span class="mathcourse-lesson__state">🔒</span>
-                                    <span class="mathcourse-lesson__title"><?php echo esc_html($lesson['title']); ?></span>
-                                    <span class="mathcourse-lesson__locked">需授权</span>
+                                <div class="mathcourse-directory__lesson is-locked" aria-disabled="true">
+                                    <span class="mathcourse-directory__status" aria-hidden="true">🔒</span>
+                                    <span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span>
+                                    <span class="mathcourse-directory__locked">需授权</span>
                                 </div>
                             <?php endif; ?>
                         <?php endforeach; ?>
