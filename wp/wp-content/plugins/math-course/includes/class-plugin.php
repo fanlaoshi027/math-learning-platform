@@ -16,6 +16,10 @@ class Plugin {
 			new Admin\Menu();
 		}
 
+		if ( class_exists( 'MathCourse\Admin\Course_Actions' ) ) {
+			new Admin\Course_Actions();
+		}
+
 		if ( class_exists( 'MathCourse\Course\Meta' ) ) {
 			new Course\Meta();
 		}
