@@ -19,6 +19,7 @@ class Plugin {
         if (class_exists('MathCourse\\Tutor\\Adapter')) new Tutor\Adapter();
         if (class_exists('MathCourse\\Admin\\Order_Manager')) new Admin\Order_Manager();
         if (class_exists('MathCourse\\Video\\Player')) new Video\Player();
+        if (class_exists('MathCourse\\Video\\Video_Router')) new Video\Video_Router();
         if (class_exists('MathCourse\\Frontend\\Course_Directory')) new Frontend\Course_Directory();
         if (class_exists('MathCourse\\Frontend\\Course_Directory_Assets')) new Frontend\Course_Directory_Assets();
     }
