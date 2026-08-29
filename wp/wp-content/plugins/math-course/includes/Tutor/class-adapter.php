@@ -22,12 +22,18 @@ class Adapter
         return defined('TUTOR_VERSION') ? TUTOR_VERSION : '';
     }
 
-    public function course_post_type()
-    {
-        // 优先使用 Tutor LMS 官方暴露的 Course Post Type
-        if ($this->is_available() && !empty(tutor()->course_post_type)) {
-            return (string) tutor()->course_post_type;
-        }
+   public function course_post_type()
+{
+    if ($this->is_available() && !empty(tutor()->course_post_type)) {
+        return (string) tutor()->course_post_type;
+    }
+
+    if (class_exists('\Tutor\Models\CourseModel')) {
+        return (string) \Tutor\Models\CourseModel::POST_TYPE;
+    }
+
+    return '';
+}
 
         // 兼容 Tutor LMS 4.x：
         // 某些版本未通过 tutor()->course_post_type 暴露课程 Post Type。
