@@ -11,6 +11,8 @@ class Course_Directory {
     public function __construct() {
         $this->service = new Course_Service();
         add_shortcode('mathcourse_course_directory', array($this, 'render'));
+        // 兼容旧页面/旧模板短代码，避免后台仍显示原始短代码文字。
+        add_shortcode('mathcourse_course_center', array($this, 'render'));
     }
 
     public function render($atts = array()) {
@@ -50,6 +52,13 @@ class Course_Directory {
             }
 
             $has_access = !empty($data['access']);
+
+            // 登录后的课程中心只显示：已授权课程 + 免费课程。
+            // 未授权的付费课程不应出现在“我的课程”中，也不能误导学员进入。
+            if ($user_id && !$has_access) {
+                continue;
+            }
+
             $progress = isset($data['progress']) ? $data['progress'] : array(
                 'completed' => 0,
                 'total' => 0,
@@ -67,7 +76,13 @@ class Course_Directory {
             );
         }
 
-        // 已授权课程优先显示，授权课程内部按课程排序保持稳定。
+        if (empty($cards)) {
+            if ($user_id) {
+                return '<div class="mathcourse-directory__empty"><strong>暂无可学习课程</strong><span>已授权课程和免费课程会显示在这里。</span></div>';
+            }
+            return '<div class="mathcourse-directory__empty"><strong>目前暂无可直接学习的课程</strong><span>登录后查看你的授权课程。</span></div>';
+        }
+
         usort($cards, function ($a, $b) {
             return (int) $b['access'] <=> (int) $a['access'];
         });
@@ -94,29 +109,26 @@ class Course_Directory {
                             <div class="mathcourse-center__meta">
                                 <?php if (!empty($data['grade'])) : ?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif; ?>
                                 <?php if (!empty($data['type'])) : ?><span><?php echo esc_html($data['type'] === 'supplementary' ? '教辅配套课' : '专题课程'); ?></span><?php endif; ?>
+                                <?php if (!empty($data['is_free'])) : ?><span>免费</span><?php endif; ?>
                             </div>
                             <h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2>
 
-                            <?php if ($has_access) : ?>
-                                <div class="mathcourse-center__progress-text">
-                                    <span>学习进度</span>
-                                    <strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong>
-                                    <em><?php echo esc_html($progress['percent']); ?>%</em>
-                                </div>
-                                <div class="mathcourse-center__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr($progress['percent']); ?>">
-                                    <span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span>
-                                </div>
-                                <?php if ($continue && !empty($continue['url'])) : ?>
-                                    <a class="mathcourse-center__button" href="<?php echo esc_url($continue['url']); ?>">
-                                        <?php echo !empty($progress['completed']) ? '继续学习' : '开始学习'; ?>
-                                        <span>→</span>
-                                    </a>
-                                <?php else : ?>
-                                    <a class="mathcourse-center__button" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
-                                <?php endif; ?>
+                            <div class="mathcourse-center__progress-text">
+                                <span>学习进度</span>
+                                <strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong>
+                                <em><?php echo esc_html($progress['percent']); ?>%</em>
+                            </div>
+                            <div class="mathcourse-center__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr($progress['percent']); ?>">
+                                <span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span>
+                            </div>
+
+                            <?php if ($continue && !empty($continue['url'])) : ?>
+                                <a class="mathcourse-center__button" href="<?php echo esc_url($continue['url']); ?>">
+                                    <?php echo !empty($progress['completed']) ? '继续学习' : '开始学习'; ?>
+                                    <span>→</span>
+                                </a>
                             <?php else : ?>
-                                <div class="mathcourse-center__locked">未授权 · 可查看课程</div>
-                                <a class="mathcourse-center__button is-outline" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
+                                <a class="mathcourse-center__button" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
                             <?php endif; ?>
                         </div>
                     </article>
@@ -132,13 +144,11 @@ class Course_Directory {
             return '<p>课程系统暂不可用。</p>';
         }
 
-        if (!is_singular() || !is_admin()) {
-            $data = $this->service->get_course_directory($course_id, get_current_user_id());
-        } else {
-            $data = $this->service->get_course_directory($course_id, get_current_user_id());
-        }
+        $data = $this->service->get_course_directory($course_id, get_current_user_id());
 
-        if (!$data) return '<p>课程不存在或课程系统暂不可用。</p>';
+        if (!$data) {
+            return '<p>课程不存在或课程系统暂不可用。</p>';
+        }
 
         $progress = isset($data['progress']) ? $data['progress'] : array(
             'completed' => 0,
@@ -182,10 +192,10 @@ class Course_Directory {
                 <div class="mathcourse-directory__notice">
                     <?php if ($is_logged_in) : ?>
                         <strong>你还没有获得本课程的学习权限</strong>
-                        <span>已标记为“试看”的课时仍可直接观看。</span>
+                        <span>付费课程需要授权后才能观看。</span>
                     <?php else : ?>
                         <strong>请登录后学习本课程</strong>
-                        <span>已标记为“试看”的课时无需课程授权即可观看。</span>
+                        <span>只有明确标记为“试看”的课时可以直接观看。</span>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
