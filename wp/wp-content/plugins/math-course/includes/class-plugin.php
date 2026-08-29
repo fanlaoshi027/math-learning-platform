@@ -32,6 +32,10 @@ class Plugin {
 			new Tutor\Hooks();
 		}
 
+		if ( class_exists( 'MathCourse\Admin\Order_Manager' ) ) {
+			new Admin\Order_Manager();
+		}
+
 		if ( class_exists( 'MathCourse\Video\Player' ) ) {
 			new Video\Player();
 		}
