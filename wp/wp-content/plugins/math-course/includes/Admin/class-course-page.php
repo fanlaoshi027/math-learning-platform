@@ -4,270 +4,75 @@ namespace MathCourse\Admin;
 
 defined('ABSPATH') || exit;
 
+use MathCourse\Tutor\Adapter;
 
 class Course_Page {
 
-
     /**
-     * 后台课程列表
+     * 后台课程列表。
      */
     public function render() {
-
-
         if (!current_user_can('manage_options')) {
-
             return;
-
         }
 
+        $adapter = new Adapter();
 
         echo '<div class="wrap">';
-
         echo '<h1>课程管理</h1>';
-
-
+        echo '<p style="color:#646970;">课程、专题和课时由 MathCourse 管理，底层数据仍使用 Tutor LMS。课时数量按「课程 → 专题 → 课时」真实结构统计。</p>';
         echo '<table class="widefat striped">';
-
-
-        echo '<thead>';
-
-        echo '<tr>';
-
-        echo '<th>课程</th>';
-
-        echo '<th>封面</th>';
-
-        echo '<th>课时</th>';
-
-        echo '<th>状态</th>';
-
-        echo '<th>操作</th>';
-
-        echo '</tr>';
-
-        echo '</thead>';
-
-
-
+        echo '<thead><tr><th>课程</th><th>封面</th><th>课时</th><th>状态</th><th>操作</th></tr></thead>';
         echo '<tbody>';
 
-
-
         foreach ($this->get_courses() as $course) {
-
-
-            $course_id =
-                $course->ID;
-
-
+            $course_id = (int) $course->ID;
 
             echo '<tr>';
-
-
-
-            /**
-             * 课程名称
-             */
+            echo '<td><strong>' . esc_html($course->post_title) . '</strong></td>';
             echo '<td>';
 
-            echo '<strong>';
-
-            echo esc_html(
-                $course->post_title
-            );
-
-            echo '</strong>';
-
-            echo '</td>';
-
-
-
-
-            /**
-             * 封面
-             */
-            echo '<td>';
-
-
-            $cover =
-                get_the_post_thumbnail_url(
-                    $course_id,
-                    'thumbnail'
-                );
-
-
-            if ($cover) {
-
-
-                echo '<img src="' .
-                    esc_url($cover)
-                    .
-                    '" width="80">';
-
-
-            } else {
-
-
-                echo '-';
-
-
+            $cover = get_the_post_thumbnail_url($course_id, 'thumbnail');
+            if (!$cover) {
+                $cover = get_post_meta($course_id, '_mathcourse_cover', true);
             }
 
+            if ($cover) {
+                echo '<img src="' . esc_url($cover) . '" width="80" height="45" style="object-fit:cover;border-radius:6px;">';
+            } else {
+                echo '-';
+            }
 
             echo '</td>';
-
-
-
-
-
-            /**
-             * 课时数量
-             */
-            echo '<td>';
-
-
-            echo esc_html(
-                $this->lesson_count(
-                    $course_id
-                )
-            );
-
-
-            echo '</td>';
-
-
-
-
-
-            /**
-             * 状态
-             */
-            echo '<td>';
-
-            echo esc_html(
-                ucfirst(
-                    $course->post_status
-                )
-            );
-
-            echo '</td>';
-
-
-
-
-
-
-            /**
-             * 编辑
-             */
-            echo '<td>';
-
-
-            echo '<a class="button" href="' .
-                esc_url(
-                    admin_url(
-                        'admin.php?page=mathcourse-course-edit&course_id=' .
-                        $course_id
-                    )
-                )
-                .
-                '">编辑</a>';
-
-
-
-            echo '</td>';
-
-
-
+            echo '<td><strong>' . esc_html($adapter->get_course_lesson_count($course_id)) . '</strong></td>';
+            echo '<td>' . esc_html(ucfirst($course->post_status)) . '</td>';
+            echo '<td><a class="button" href="' . esc_url(admin_url('admin.php?page=mathcourse-course-edit&course_id=' . $course_id)) . '">编辑</a></td>';
             echo '</tr>';
-
-
         }
 
-
-
-
-        echo '</tbody>';
-
-        echo '</table>';
-
-
-
-        echo '</div>';
-
+        echo '</tbody></table></div>';
     }
 
-
-
-
-
     /**
-     * 获取 Tutor LMS课程
+     * 获取 Tutor LMS 课程。
      */
     private function get_courses() {
+        if (!function_exists('tutor')) {
+            return array();
+        }
 
-
-        $args = array(
-
-            'post_type'=>array(
-
-                'courses',
-
-                'tutor_course'
-
-            ),
-
-            'post_status'=>array(
-
-                'publish',
-
-                'draft'
-
-            ),
-
-            'posts_per_page'=>50
-
-        );
-
-
-
-        return get_posts($args);
-
-
+        return get_posts(array(
+            'post_type'      => tutor()->course_post_type,
+            'post_status'    => array('publish', 'draft', 'private'),
+            'posts_per_page' => 50,
+            'orderby'        => array('menu_order' => 'ASC', 'date' => 'DESC'),
+        ));
     }
-
-
-
-
 
     /**
-     * 统计课时
+     * 保留旧方法，避免其他代码调用时产生兼容问题。
      */
     private function lesson_count($course_id) {
-
-
-
-        $lessons =
-            get_posts(
-
-                array(
-
-                    'post_type'=>'lesson',
-
-                    'post_parent'=>$course_id,
-
-                    'numberposts'=>-1
-
-                )
-
-            );
-
-
-
-        return count($lessons);
-
-
+        return (new Adapter())->get_course_lesson_count($course_id);
     }
-
-
 }
