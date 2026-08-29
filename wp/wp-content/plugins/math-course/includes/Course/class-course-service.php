@@ -27,11 +27,11 @@ class Course_Service {
         }
 
         return array(
-            'id'     => (int) $course->ID,
-            'title'  => get_the_title($course),
-            'type'   => get_post_meta($course->ID, '_mathcourse_type', true),
-            'grade'  => get_post_meta($course->ID, '_mathcourse_grade', true),
-            'cover'  => get_post_meta($course->ID, '_mathcourse_cover', true),
+            'id'    => (int) $course->ID,
+            'title' => get_the_title($course),
+            'type'  => get_post_meta($course->ID, '_mathcourse_type', true),
+            'grade' => get_post_meta($course->ID, '_mathcourse_grade', true),
+            'cover' => get_post_meta($course->ID, '_mathcourse_cover', true),
         );
     }
 
@@ -40,6 +40,7 @@ class Course_Service {
      */
     public function get_course_directory($course_id, $user_id = 0) {
         $course = $this->tutor->get_course($course_id);
+
         if (!$course) {
             return null;
         }
@@ -55,12 +56,15 @@ class Course_Service {
             $lessons = array();
 
             foreach ($this->tutor->get_lessons($topic->ID) as $lesson) {
-                $completed_lesson = $user_id ? $this->tutor->is_lesson_completed($lesson->ID, $user_id) : false;
+                $completed_lesson = $user_id
+                    ? $this->tutor->is_lesson_completed($lesson->ID, $user_id)
+                    : false;
 
-                $preview = get_post_meta($lesson->ID, '_mathcourse_preview', true) === 'yes';
+                $preview = $this->tutor->is_preview_lesson($lesson->ID);
                 $accessible = $course_access || $preview;
 
                 $total++;
+
                 if ($completed_lesson) {
                     $completed++;
                 }
@@ -68,8 +72,8 @@ class Course_Service {
                 $lessons[] = array(
                     'id'          => (int) $lesson->ID,
                     'title'       => get_the_title($lesson),
-                    'page_number' => get_post_meta($lesson->ID, '_mathcourse_page_number', true),
-                    'video_id'    => get_post_meta($lesson->ID, '_mathcourse_video_id', true),
+                    'page_number' => $this->tutor->get_lesson_page_number($lesson->ID),
+                    'video_id'    => $this->tutor->get_lesson_video_id($lesson->ID),
                     'url'         => $accessible ? get_permalink($lesson) : '',
                     'completed'   => $completed_lesson,
                     'preview'     => $preview,
@@ -85,13 +89,13 @@ class Course_Service {
         }
 
         return array(
-            'id'      => (int) $course->ID,
-            'title'   => get_the_title($course),
-            'type'    => get_post_meta($course->ID, '_mathcourse_type', true),
-            'grade'   => get_post_meta($course->ID, '_mathcourse_grade', true),
-            'cover'   => get_post_meta($course->ID, '_mathcourse_cover', true),
-            'topics'  => $topics,
-            'access'  => $course_access,
+            'id'    => (int) $course->ID,
+            'title' => get_the_title($course),
+            'type'  => get_post_meta($course->ID, '_mathcourse_type', true),
+            'grade' => get_post_meta($course->ID, '_mathcourse_grade', true),
+            'cover' => get_post_meta($course->ID, '_mathcourse_cover', true),
+            'topics'=> $topics,
+            'access'=> $course_access,
             'progress'=> array(
                 'completed' => $completed,
                 'total'     => $total,
