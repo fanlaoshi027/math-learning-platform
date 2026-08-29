@@ -9,8 +9,7 @@ use MathCourse\Access\Access_Service;
 /**
  * 学习进度服务。
  *
- * 服务端只保存“课时是否完成”和“完成时间”；视频播放位置仍由前端
- * localStorage 保存，不上传服务器。
+ * 服务端保存课时完成状态和完成时间；视频播放到几分几秒由前端 localStorage 保存。
  */
 class Progress_Service {
 
@@ -24,7 +23,7 @@ class Progress_Service {
         $course_id = absint( $course_id );
         $user_id   = absint( $user_id );
 
-        if ( ! $course_id || ! $user_id || ! $this->access->has_access( $user_id, $course_id ) ) {
+        if ( ! $course_id || ! $user_id || ! $this->access->can_access_course( $user_id, $course_id ) ) {
             return $this->empty_progress();
         }
 
@@ -44,9 +43,7 @@ class Progress_Service {
 
     /**
      * 标记课时完成。
-     *
-     * 只有当前学员已经获得该课时所属课程的权限时才能写入完成状态。
-     * 重复提交同一个课时视为成功，保持接口幂等。
+     * 免费课程和已授权课程都允许写入完成状态；试看但未授权的学员不能写入完成状态。
      */
     public function complete_lesson( $user_id, $lesson_id ) {
         $user_id   = absint( $user_id );
@@ -57,7 +54,7 @@ class Progress_Service {
         }
 
         $course_id = $this->get_lesson_course_id( $lesson_id );
-        if ( ! $course_id || ! $this->access->has_access( $user_id, $course_id ) ) {
+        if ( ! $course_id || ! $this->access->can_access_course( $user_id, $course_id ) ) {
             return false;
         }
 
@@ -70,11 +67,7 @@ class Progress_Service {
         $completed[] = $lesson_id;
         $completed   = array_values( array_unique( array_map( 'intval', $completed ) ) );
 
-        $saved = update_user_meta(
-            $user_id,
-            'mc_completed_lessons',
-            $completed
-        );
+        $saved = update_user_meta( $user_id, 'mc_completed_lessons', $completed );
 
         if ( false === $saved ) {
             return false;
@@ -83,11 +76,7 @@ class Progress_Service {
         $times = $this->get_completed_times( $user_id );
         $times[ $lesson_id ] = current_time( 'timestamp' );
 
-        update_user_meta(
-            $user_id,
-            'mc_lesson_completed_time',
-            $times
-        );
+        update_user_meta( $user_id, 'mc_lesson_completed_time', $times );
 
         return true;
     }
@@ -106,9 +95,7 @@ class Progress_Service {
             return true;
         }
 
-        $completed = array_values(
-            array_diff( $completed, array( $lesson_id ) )
-        );
+        $completed = array_values( array_diff( $completed, array( $lesson_id ) ) );
 
         $saved = update_user_meta(
             $user_id,
@@ -148,8 +135,7 @@ class Progress_Service {
         }
 
         if ( ! $course_id ) {
-            $times = $this->get_completed_times( $user_id );
-            return $this->find_latest_lesson( $completed, $times );
+            return $this->find_latest_lesson( $completed, $this->get_completed_times( $user_id ) );
         }
 
         $course_lessons = $this->get_course_lessons( absint( $course_id ), false );
@@ -166,12 +152,11 @@ class Progress_Service {
             return 0;
         }
 
-        $times = $this->get_completed_times( $user_id );
-        return $this->find_latest_lesson( $course_completed, $times );
+        return $this->find_latest_lesson( $course_completed, $this->get_completed_times( $user_id ) );
     }
 
     public function get_lesson_completed_time( $user_id, $lesson_id ) {
-        $times = $this->get_completed_times( $user_id );
+        $times     = $this->get_completed_times( $user_id );
         $lesson_id = absint( $lesson_id );
 
         return isset( $times[ $lesson_id ] ) ? absint( $times[ $lesson_id ] ) : 0;
@@ -192,15 +177,10 @@ class Progress_Service {
 
             if ( in_array( $lesson_id, $completed_lessons, true ) ) {
                 $completed++;
-
-                $lesson_time = isset( $completed_times[ $lesson_id ] )
-                    ? absint( $completed_times[ $lesson_id ] )
-                    : 0;
+                $lesson_time = isset( $completed_times[ $lesson_id ] ) ? absint( $completed_times[ $lesson_id ] ) : 0;
 
                 if ( $lesson_time >= $last_time ) {
                     $last_time      = $lesson_time;
-                    $last_lesson_id = $lesson_id;
-                } elseif ( ! $last_lesson_id ) {
                     $last_lesson_id = $lesson_id;
                 }
             }
@@ -216,32 +196,21 @@ class Progress_Service {
     }
 
     private function get_completed_lessons( $user_id ) {
-        $data = get_user_meta(
-            absint( $user_id ),
-            'mc_completed_lessons',
-            true
-        );
-
+        $data = get_user_meta( absint( $user_id ), 'mc_completed_lessons', true );
         return is_array( $data ) ? array_values( array_unique( array_map( 'intval', $data ) ) ) : array();
     }
 
     private function get_completed_times( $user_id ) {
-        $data = get_user_meta(
-            absint( $user_id ),
-            'mc_lesson_completed_time',
-            true
-        );
+        $data = get_user_meta( absint( $user_id ), 'mc_lesson_completed_time', true );
 
         if ( ! is_array( $data ) ) {
             return array();
         }
 
         $times = array();
-
         foreach ( $data as $lesson_id => $timestamp ) {
             $lesson_id = absint( $lesson_id );
             $timestamp = absint( $timestamp );
-
             if ( $lesson_id && $timestamp ) {
                 $times[ $lesson_id ] = $timestamp;
             }
@@ -273,14 +242,10 @@ class Progress_Service {
             'total'           => 0,
             'percent'         => 0,
             'last_lesson_id' => 0,
-            'last_time'       => 0,
+            'last_time'      => 0,
         );
     }
 
-    /**
-     * 按 Course → topics → Tutor Lesson 结构获取课程课时。
-     * 学员前台只统计已发布课时；后台可以选择把草稿/私密课时一起统计。
-     */
     private function get_course_lessons( $course_id, $include_unpublished = false ) {
         $course_id = absint( $course_id );
 
@@ -288,36 +253,24 @@ class Progress_Service {
             return array();
         }
 
-        $topic_status = $include_unpublished
-            ? array( 'publish', 'draft', 'private' )
-            : array( 'publish' );
-
-        $lesson_status = $include_unpublished
-            ? array( 'publish', 'draft', 'private' )
-            : array( 'publish' );
-
+        $status = $include_unpublished ? array( 'publish', 'draft', 'private' ) : array( 'publish' );
         $topics = get_posts(
             array(
                 'post_type'      => 'topics',
                 'post_parent'    => $course_id,
-                'post_status'    => $topic_status,
+                'post_status'    => $status,
                 'posts_per_page' => -1,
                 'orderby'        => array( 'menu_order' => 'ASC', 'date' => 'ASC' ),
             )
         );
 
-        if ( empty( $topics ) ) {
-            return array();
-        }
-
         $lessons = array();
-
         foreach ( $topics as $topic ) {
             $topic_lessons = get_posts(
                 array(
                     'post_type'      => tutor()->lesson_post_type,
                     'post_parent'    => $topic->ID,
-                    'post_status'    => $lesson_status,
+                    'post_status'    => $status,
                     'posts_per_page' => -1,
                     'orderby'        => array( 'menu_order' => 'ASC', 'date' => 'ASC' ),
                 )
@@ -331,9 +284,6 @@ class Progress_Service {
         return $lessons;
     }
 
-    /**
-     * 根据 Tutor Lesson → Topic → Course 关系解析所属课程。
-     */
     private function get_lesson_course_id( $lesson_id ) {
         $lesson_id = absint( $lesson_id );
 
