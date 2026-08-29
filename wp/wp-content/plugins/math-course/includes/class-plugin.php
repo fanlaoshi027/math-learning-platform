@@ -15,6 +15,7 @@ class Plugin {
         if (class_exists('MathCourse\\Course\\Course_Service')) new Course\Course_Service();
         if (class_exists('MathCourse\\Access\\Access_Service')) new Access\Access_Service();
         if (class_exists('MathCourse\\Progress\\Progress_Service')) new Progress\Progress_Service();
+        if (class_exists('MathCourse\\Progress\\Progress_Ajax')) new Progress\Progress_Ajax();
         if (class_exists('MathCourse\\Tutor\\Hooks')) new Tutor\Hooks();
         if (class_exists('MathCourse\\Tutor\\Adapter')) new Tutor\Adapter();
         if (class_exists('MathCourse\\Admin\\Order_Manager')) new Admin\Order_Manager();
@@ -28,6 +29,9 @@ class Plugin {
         add_action('wp_enqueue_scripts', function() {
             wp_enqueue_style('mathcourse', MATHCOURSE_URL . 'assets/css/mathcourse.css', array(), MATHCOURSE_VERSION);
             wp_enqueue_script('mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array('jquery'), MATHCOURSE_VERSION, true);
+            wp_localize_script('mathcourse-player','MathCourseData',array(
+                'ajaxurl'=>admin_url('admin-ajax.php')
+            ));
         });
     }
 }
