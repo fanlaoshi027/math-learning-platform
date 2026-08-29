@@ -11,92 +11,40 @@ class Course_Directory {
     public function __construct() {
         $this->service = new Course_Service();
         add_shortcode('mathcourse_course_directory', array($this, 'render'));
-        // 兼容旧页面/旧模板短代码，避免后台仍显示原始短代码文字。
         add_shortcode('mathcourse_course_center', array($this, 'render'));
+        add_shortcode('mathcourse_learning_center', array($this, 'render_learning_center'));
     }
 
     public function render($atts = array()) {
         $atts = shortcode_atts(array('course_id' => 0), $atts, 'mathcourse_course_directory');
         $course_id = absint($atts['course_id']);
-
-        if ($course_id) {
-            return $this->render_single_course($course_id);
-        }
-
-        return $this->render_course_center();
+        return $course_id ? $this->render_single_course($course_id) : $this->render_course_center();
     }
 
+    /**
+     * 公开课程目录：游客和登录用户都看到已发布课程。
+     * 这里不是“我的课程”，因此不按个人授权过滤。
+     */
     private function render_course_center() {
-        if (!function_exists('tutor')) {
-            return '<p>课程系统暂不可用。</p>';
-        }
+        if (!function_exists('tutor')) return '<p>课程系统暂不可用。</p>';
 
-        $user_id = get_current_user_id();
-        $course_post_type = tutor()->course_post_type;
         $courses = get_posts(array(
-            'post_type'      => $course_post_type,
-            'post_status'    => 'publish',
+            'post_type' => tutor()->course_post_type,
+            'post_status' => 'publish',
             'posts_per_page' => -1,
-            'orderby'        => array('menu_order' => 'ASC', 'date' => 'DESC'),
+            'orderby' => array('menu_order' => 'ASC', 'date' => 'DESC'),
         ));
 
-        if (empty($courses)) {
-            return '<p class="mathcourse-directory__empty">目前还没有已发布课程。</p>';
-        }
-
-        $cards = array();
-        foreach ($courses as $course) {
-            $data = $this->service->get_course_directory($course->ID, $user_id);
-            if (!$data) {
-                continue;
-            }
-
-            $has_access = !empty($data['access']);
-
-            // 登录后的课程中心只显示：已授权课程 + 免费课程。
-            // 未授权的付费课程不应出现在“我的课程”中，也不能误导学员进入。
-            if ($user_id && !$has_access) {
-                continue;
-            }
-
-            $progress = isset($data['progress']) ? $data['progress'] : array(
-                'completed' => 0,
-                'total' => 0,
-                'percent' => 0,
-                'last_lesson_id' => 0,
-                'last_time' => 0,
-            );
-
-            $continue_lesson = $this->find_continue_lesson($data);
-            $cards[] = array(
-                'data' => $data,
-                'access' => $has_access,
-                'progress' => $progress,
-                'continue' => $continue_lesson,
-            );
-        }
-
-        if (empty($cards)) {
-            if ($user_id) {
-                return '<div class="mathcourse-directory__empty"><strong>暂无可学习课程</strong><span>已授权课程和免费课程会显示在这里。</span></div>';
-            }
-            return '<div class="mathcourse-directory__empty"><strong>目前暂无可直接学习的课程</strong><span>登录后查看你的授权课程。</span></div>';
-        }
-
-        usort($cards, function ($a, $b) {
-            return (int) $b['access'] <=> (int) $a['access'];
-        });
+        if (empty($courses)) return '<p class="mathcourse-directory__empty">目前还没有已发布课程。</p>';
 
         ob_start(); ?>
         <div class="mathcourse-center">
             <div class="mathcourse-center__grid">
-                <?php foreach ($cards as $card) :
-                    $data = $card['data'];
-                    $progress = $card['progress'];
-                    $continue = $card['continue'];
-                    $has_access = $card['access'];
+                <?php foreach ($courses as $course) :
+                    $data = $this->service->get_course_directory($course->ID, get_current_user_id());
+                    if (!$data) continue;
                     $cover = !empty($data['cover']) ? $data['cover'] : '';
-                    ?>
+                ?>
                     <article class="mathcourse-center__card">
                         <a class="mathcourse-center__cover" href="<?php echo esc_url(get_permalink($data['id'])); ?>">
                             <?php if ($cover) : ?>
@@ -109,100 +57,92 @@ class Course_Directory {
                             <div class="mathcourse-center__meta">
                                 <?php if (!empty($data['grade'])) : ?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif; ?>
                                 <?php if (!empty($data['type'])) : ?><span><?php echo esc_html($data['type'] === 'supplementary' ? '教辅配套课' : '专题课程'); ?></span><?php endif; ?>
-                                <?php if (!empty($data['is_free'])) : ?><span>免费</span><?php endif; ?>
                             </div>
                             <h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2>
-
-                            <div class="mathcourse-center__progress-text">
-                                <span>学习进度</span>
-                                <strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong>
-                                <em><?php echo esc_html($progress['percent']); ?>%</em>
-                            </div>
-                            <div class="mathcourse-center__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr($progress['percent']); ?>">
-                                <span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span>
-                            </div>
-
-                            <?php if ($continue && !empty($continue['url'])) : ?>
-                                <a class="mathcourse-center__button" href="<?php echo esc_url($continue['url']); ?>">
-                                    <?php echo !empty($progress['completed']) ? '继续学习' : '开始学习'; ?>
-                                    <span>→</span>
-                                </a>
-                            <?php else : ?>
-                                <a class="mathcourse-center__button" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
-                            <?php endif; ?>
+                            <a class="mathcourse-center__button" href="<?php echo esc_url(get_permalink($data['id'])); ?>">查看课程 <span>→</span></a>
                         </div>
                     </article>
                 <?php endforeach; ?>
             </div>
         </div>
-        <?php
-        return ob_get_clean();
+        <?php return ob_get_clean();
+    }
+
+    /**
+     * 学员学习中心：只显示当前用户已经获得 MathCourse 授权的课程，并显示 Progress。
+     */
+    public function render_learning_center() {
+        if (!is_user_logged_in()) {
+            return '<div class="mathcourse-learning-center__login"><strong>请先登录</strong><span>登录后查看你的课程和学习进度。</span></div>';
+        }
+
+        $user_id = get_current_user_id();
+        $courses = get_posts(array(
+            'post_type' => function_exists('tutor') ? tutor()->course_post_type : 'courses',
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'orderby' => array('menu_order' => 'ASC', 'date' => 'DESC'),
+        ));
+
+        $cards = array();
+        foreach ($courses as $course) {
+            $data = $this->service->get_course_directory($course->ID, $user_id);
+            if (!$data || empty($data['access'])) continue;
+            $progress = isset($data['progress']) ? $data['progress'] : array('completed'=>0,'total'=>0,'percent'=>0);
+            $continue = $this->find_continue_lesson($data);
+            $cards[] = array('data'=>$data, 'progress'=>$progress, 'continue'=>$continue);
+        }
+
+        ob_start(); ?>
+        <div class="mathcourse-learning-center">
+            <div class="mathcourse-learning-center__heading">
+                <h1>学习中心</h1>
+                <p>我的课程与学习进度</p>
+            </div>
+            <?php if (empty($cards)) : ?>
+                <div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div>
+            <?php else : ?>
+                <div class="mathcourse-learning-center__grid">
+                    <?php foreach ($cards as $card) : $data=$card['data']; $progress=$card['progress']; $continue=$card['continue']; ?>
+                        <article class="mathcourse-learning-center__card">
+                            <div class="mathcourse-learning-center__cover">
+                                <?php if (!empty($data['cover'])) : ?><img src="<?php echo esc_url($data['cover']); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy"><?php else : ?><span>数学课程</span><?php endif; ?>
+                            </div>
+                            <div class="mathcourse-learning-center__body">
+                                <h2><?php echo esc_html($data['title']); ?></h2>
+                                <div class="mathcourse-learning-center__progress-row"><span>学习进度</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong><em><?php echo esc_html($progress['percent']); ?>%</em></div>
+                                <div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div>
+                                <a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue && !empty($continue['url']) ? $continue['url'] : get_permalink($data['id'])); ?>"><?php echo !empty($progress['completed']) ? '继续学习' : '开始学习'; ?><span>→</span></a>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php return ob_get_clean();
     }
 
     private function render_single_course($course_id) {
-        if (!function_exists('tutor')) {
-            return '<p>课程系统暂不可用。</p>';
-        }
-
+        if (!function_exists('tutor')) return '<p>课程系统暂不可用。</p>';
         $data = $this->service->get_course_directory($course_id, get_current_user_id());
+        if (!$data) return '<p>课程不存在或课程系统暂不可用。</p>';
 
-        if (!$data) {
-            return '<p>课程不存在或课程系统暂不可用。</p>';
-        }
-
-        $progress = isset($data['progress']) ? $data['progress'] : array(
-            'completed' => 0,
-            'total' => 0,
-            'percent' => 0,
-            'last_lesson_id' => 0,
-            'last_time' => 0,
-        );
-        $is_logged_in = is_user_logged_in();
+        $progress = $data['progress'];
         $has_access = !empty($data['access']);
-        $continue_lesson = $this->find_continue_lesson($data);
+        $is_logged_in = is_user_logged_in();
+        $continue = $this->find_continue_lesson($data);
 
         ob_start(); ?>
         <div class="mathcourse-directory" data-course-id="<?php echo esc_attr($data['id']); ?>">
             <div class="mathcourse-directory__header">
                 <div class="mathcourse-directory__heading">
                     <h1><?php echo esc_html($data['title']); ?></h1>
-                    <?php if ($has_access) : ?>
-                        <div class="mathcourse-directory__progress" aria-label="课程进度">
-                            <div class="mathcourse-directory__progress-text">
-                                学习进度 <?php echo esc_html($progress['percent']); ?>%
-                                <span>（<?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?>）</span>
-                            </div>
-                            <div class="mathcourse-directory__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr($progress['percent']); ?>">
-                                <span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                    <?php if ($has_access) : ?><div class="mathcourse-directory__progress"><div class="mathcourse-directory__progress-text">学习进度 <?php echo esc_html($progress['percent']); ?>% <span>（<?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?>）</span></div><div class="mathcourse-directory__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div></div><?php endif; ?>
                 </div>
-
-                <?php if ($continue_lesson && !empty($continue_lesson['url'])) : ?>
-                    <a class="mathcourse-directory__continue" href="<?php echo esc_url($continue_lesson['url']); ?>">
-                        <span><?php echo $has_access && !empty($progress['completed']) ? '继续学习' : '开始学习'; ?></span>
-                        <strong><?php echo esc_html($continue_lesson['title']); ?></strong>
-                        <span class="mathcourse-directory__continue-arrow">→</span>
-                    </a>
-                <?php endif; ?>
+                <?php if ($continue && !empty($continue['url'])) : ?><a class="mathcourse-directory__continue" href="<?php echo esc_url($continue['url']); ?>"><span><?php echo $has_access && !empty($progress['completed']) ? '继续学习' : '开始学习'; ?></span><strong><?php echo esc_html($continue['title']); ?></strong><span>→</span></a><?php endif; ?>
             </div>
 
-            <?php if (!$has_access) : ?>
-                <div class="mathcourse-directory__notice">
-                    <?php if ($is_logged_in) : ?>
-                        <strong>你还没有获得本课程的学习权限</strong>
-                        <span>付费课程需要授权后才能观看。</span>
-                    <?php else : ?>
-                        <strong>请登录后学习本课程</strong>
-                        <span>只有明确标记为“试看”的课时可以直接观看。</span>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
-
-            <?php if (empty($data['topics'])) : ?>
-                <p class="mathcourse-directory__empty">本课程暂时还没有课程内容。</p>
-            <?php endif; ?>
+            <?php if (!$has_access) : ?><div class="mathcourse-directory__notice"><strong><?php echo $is_logged_in ? '你还没有获得本课程的学习授权' : '本课程部分内容可免费试看'; ?></strong><span><?php echo $is_logged_in ? '标记“试看”的课时可以直接观看，其余课时需要授权。' : '标记“试看”的课时可以直接观看，其余课时需要登录并获得课程授权。'; ?></span></div><?php endif; ?>
 
             <?php foreach ($data['topics'] as $index => $topic) : ?>
                 <section class="mathcourse-directory__topic">
@@ -210,17 +150,9 @@ class Course_Directory {
                     <div class="mathcourse-directory__lessons">
                         <?php foreach ($topic['lessons'] as $lesson) : ?>
                             <?php if ($lesson['accessible']) : ?>
-                                <a class="mathcourse-directory__lesson <?php echo $lesson['completed'] ? 'is-complete' : ''; ?>" href="<?php echo esc_url($lesson['url']); ?>">
-                                    <span class="mathcourse-directory__status" aria-hidden="true"><?php echo $lesson['completed'] ? '✓' : '○'; ?></span>
-                                    <span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span>
-                                    <?php if ($lesson['preview']) : ?><span class="mathcourse-directory__preview">试看</span><?php endif; ?>
-                                </a>
+                                <a class="mathcourse-directory__lesson <?php echo $lesson['completed'] ? 'is-complete' : ''; ?>" href="<?php echo esc_url($lesson['url']); ?>"><span class="mathcourse-directory__status"><?php echo $lesson['completed'] ? '✓' : '○'; ?></span><span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span><?php if ($lesson['preview']) : ?><span class="mathcourse-directory__preview">试看</span><?php endif; ?></a>
                             <?php else : ?>
-                                <div class="mathcourse-directory__lesson is-locked" aria-disabled="true">
-                                    <span class="mathcourse-directory__status" aria-hidden="true">🔒</span>
-                                    <span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span>
-                                    <span class="mathcourse-directory__locked">需授权</span>
-                                </div>
+                                <button type="button" class="mathcourse-directory__lesson is-locked" data-mathcourse-lock="1" data-course-title="<?php echo esc_attr($data['title']); ?>"><span class="mathcourse-directory__status">🔒</span><span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span><span class="mathcourse-directory__locked">需授权</span></button>
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
@@ -231,38 +163,19 @@ class Course_Directory {
     }
 
     private function find_continue_lesson($data) {
-        $has_access = !empty($data['access']);
-        $continue_lesson = null;
-        $last_completed_lesson = null;
-
+        if (empty($data['access'])) return null;
+        $last = null;
         foreach ($data['topics'] as $topic) {
             foreach ($topic['lessons'] as $lesson) {
-                if ($lesson['completed'] && $has_access) {
-                    $last_completed_lesson = $lesson;
-                }
-                if (!$continue_lesson && $lesson['accessible'] && (!$has_access || !$lesson['completed'])) {
-                    $continue_lesson = $lesson;
-                }
+                if ($lesson['completed']) $last = $lesson;
+                elseif (!$last && $lesson['accessible']) return $lesson;
             }
         }
-
-        if ($has_access && !$continue_lesson && $last_completed_lesson) {
-            $continue_lesson = $last_completed_lesson;
-        }
-
-        return $continue_lesson;
+        return $last;
     }
 
     private function grade_label($grade) {
-        $labels = array(
-            '7' => '七年级',
-            '8' => '八年级',
-            '9' => '九年级',
-            '10' => '高一',
-            '11' => '高二',
-            '12' => '高三',
-        );
-
-        return isset($labels[(string) $grade]) ? $labels[(string) $grade] : (string) $grade;
+        $labels = array('7'=>'七年级','8'=>'八年级','9'=>'九年级','10'=>'高一','11'=>'高二','12'=>'高三');
+        return isset($labels[(string)$grade]) ? $labels[(string)$grade] : (string)$grade;
     }
 }
