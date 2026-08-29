@@ -1,10 +1,11 @@
 <?php
 namespace MathCourse\Tutor;
+
 defined('ABSPATH') || exit;
 
 /**
- * Thin adapter around Tutor LMS data used by MathCourse frontend services.
- * No Tutor LMS core files are modified.
+ * MathCourse 与 Tutor LMS 的统一数据适配层。
+ * 不修改 Tutor LMS 源码。
  */
 class Adapter {
 
@@ -22,22 +23,38 @@ class Adapter {
 
     public function get_topics($course_id) {
         return get_posts(array(
-            'post_type' => 'topics',
-            'post_parent' => absint($course_id),
-            'post_status' => 'publish',
+            'post_type'      => 'topics',
+            'post_parent'    => absint($course_id),
+            'post_status'    => 'publish',
             'posts_per_page' => -1,
-            'orderby' => array('menu_order' => 'ASC', 'ID' => 'ASC'),
+            'orderby'        => array('menu_order' => 'ASC', 'ID' => 'ASC'),
         ));
     }
 
     public function get_lessons($topic_id) {
+        $lesson_post_type = $this->is_available() ? tutor()->lesson_post_type : 'lesson';
+
         return get_posts(array(
-            'post_type' => 'lesson',
-            'post_parent' => absint($topic_id),
-            'post_status' => 'publish',
+            'post_type'      => $lesson_post_type,
+            'post_parent'    => absint($topic_id),
+            'post_status'    => 'publish',
             'posts_per_page' => -1,
-            'orderby' => array('menu_order' => 'ASC', 'ID' => 'ASC'),
+            'orderby'        => array('menu_order' => 'ASC', 'ID' => 'ASC'),
         ));
+    }
+
+    /**
+     * 获取课程下全部已发布课时数量。
+     * Tutor 的 Lesson 是 Topic 的子级，因此不能直接用 Course ID 查询。
+     */
+    public function get_course_lesson_count($course_id) {
+        $count = 0;
+
+        foreach ($this->get_topics($course_id) as $topic) {
+            $count += count($this->get_lessons($topic->ID));
+        }
+
+        return $count;
     }
 
     /**
@@ -74,12 +91,11 @@ class Adapter {
     }
 
     public function is_preview_lesson($lesson_id) {
-        return get_post_meta(absint($lesson_id), '_mathcourse_preview', true) === 'yes';
+        return 'yes' === get_post_meta(absint($lesson_id), '_mathcourse_preview', true);
     }
 
     /**
-     * 统一课程完成进度接口
-     * 主题和业务层不直接调用 Tutor LMS
+     * 统一课程完成进度接口。
      */
     public function get_course_progress($course_id, $user_id = 0) {
         $user_id = $user_id ? absint($user_id) : get_current_user_id();
@@ -98,8 +114,8 @@ class Adapter {
 
         return array(
             'completed' => $completed,
-            'total' => $total,
-            'percent' => $total ? round(($completed / $total) * 100) : 0,
+            'total'     => $total,
+            'percent'   => $total ? round(($completed / $total) * 100) : 0,
         );
     }
 
