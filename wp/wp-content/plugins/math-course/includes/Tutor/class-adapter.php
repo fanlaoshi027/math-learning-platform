@@ -43,23 +43,14 @@ class Adapter {
         ));
     }
 
-    /**
-     * 获取课程下全部已发布课时数量。
-     * Tutor 的 Lesson 是 Topic 的子级，因此不能直接用 Course ID 查询。
-     */
     public function get_course_lesson_count($course_id) {
         $count = 0;
-
         foreach ($this->get_topics($course_id) as $topic) {
             $count += count($this->get_lessons($topic->ID));
         }
-
         return $count;
     }
 
-    /**
-     * Resolve the Tutor LMS course that owns a lesson.
-     */
     public function get_lesson_course_id($lesson_id) {
         $lesson_id = absint($lesson_id);
         if (!$lesson_id) {
@@ -76,30 +67,40 @@ class Adapter {
             return 0;
         }
 
-        $course_id = absint($topic->post_parent);
-        $course = $this->get_course($course_id);
-
+        $course = $this->get_course($topic->post_parent);
         return $course ? (int) $course->ID : 0;
     }
 
     public function get_lesson_page_number($lesson_id) {
-        return sanitize_text_field(get_post_meta(absint($lesson_id), '_mathcourse_page_number', true));
+        $lesson_id = absint($lesson_id);
+        $value = get_post_meta($lesson_id, '_mathcourse_page_number', true);
+
+        // 兼容当前 MathCourse 后台早期版本写入的 _mathcourse_page。
+        if ('' === (string) $value) {
+            $value = get_post_meta($lesson_id, '_mathcourse_page', true);
+        }
+
+        return sanitize_text_field($value);
     }
 
     public function get_lesson_video_id($lesson_id) {
-        return sanitize_text_field(get_post_meta(absint($lesson_id), '_mathcourse_video_id', true));
+        $lesson_id = absint($lesson_id);
+        $value = get_post_meta($lesson_id, '_mathcourse_video_id', true);
+
+        // 兼容当前 MathCourse 后台早期版本写入的 _mathcourse_video。
+        if ('' === (string) $value) {
+            $value = get_post_meta($lesson_id, '_mathcourse_video', true);
+        }
+
+        return sanitize_text_field($value);
     }
 
     public function is_preview_lesson($lesson_id) {
         return 'yes' === get_post_meta(absint($lesson_id), '_mathcourse_preview', true);
     }
 
-    /**
-     * 统一课程完成进度接口。
-     */
     public function get_course_progress($course_id, $user_id = 0) {
         $user_id = $user_id ? absint($user_id) : get_current_user_id();
-
         $total = 0;
         $completed = 0;
 
