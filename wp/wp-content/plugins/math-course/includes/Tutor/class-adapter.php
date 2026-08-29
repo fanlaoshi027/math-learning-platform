@@ -40,6 +40,31 @@ class Adapter {
         ));
     }
 
+    /**
+     * Resolve the Tutor LMS course that owns a lesson.
+     */
+    public function get_lesson_course_id($lesson_id) {
+        $lesson_id = absint($lesson_id);
+        if (!$lesson_id) {
+            return 0;
+        }
+
+        $lesson = get_post($lesson_id);
+        if (!$lesson || !$this->is_available() || tutor()->lesson_post_type !== $lesson->post_type) {
+            return 0;
+        }
+
+        $topic = get_post($lesson->post_parent);
+        if (!$topic || 'topics' !== $topic->post_type) {
+            return 0;
+        }
+
+        $course_id = absint($topic->post_parent);
+        $course = $this->get_course($course_id);
+
+        return $course ? (int) $course->ID : 0;
+    }
+
     public function get_lesson_page_number($lesson_id) {
         return sanitize_text_field(get_post_meta(absint($lesson_id), '_mathcourse_page_number', true));
     }
