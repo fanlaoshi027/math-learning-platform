@@ -4,8 +4,8 @@ namespace MathCourse\Progress;
 defined('ABSPATH') || exit;
 
 /**
- * Save lesson completion only.
- * Playback position stays in browser localStorage.
+ * Lesson completion storage.
+ * Playback position is handled by browser localStorage only.
  */
 class Progress_Ajax {
 
@@ -25,9 +25,27 @@ class Progress_Ajax {
             wp_send_json_error(array('message'=>'invalid lesson'));
         }
 
-        if (function_exists('tutor_utils')) {
-            tutor_utils()->mark_lesson_complete($lesson_id);
+        $user_id = get_current_user_id();
+
+        $completed = get_user_meta(
+            $user_id,
+            'mc_completed_lessons',
+            true
+        );
+
+        if (!is_array($completed)) {
+            $completed = array();
         }
+
+        if (!in_array($lesson_id, $completed, true)) {
+            $completed[] = $lesson_id;
+        }
+
+        update_user_meta(
+            $user_id,
+            'mc_completed_lessons',
+            $completed
+        );
 
         wp_send_json_success(array(
             'lesson_id'=>$lesson_id,
