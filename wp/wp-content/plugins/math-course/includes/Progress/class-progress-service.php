@@ -31,11 +31,11 @@ class Progress_Service {
             return $this->empty_progress();
         }
 
-        return $this->calculate_progress( $course_id, $user_id );
+        return $this->calculate_progress( $course_id, $user_id, false );
     }
 
     /**
-     * 后台使用：不要求学员拥有当前课程授权，直接统计其完成记录。
+     * 后台使用：不要求学员拥有当前课程授权，统计全部已创建课时。
      */
     public function get_admin_course_progress( $course_id, $user_id ) {
         $course_id = absint( $course_id );
@@ -45,7 +45,7 @@ class Progress_Service {
             return $this->empty_progress();
         }
 
-        return $this->calculate_progress( $course_id, $user_id );
+        return $this->calculate_progress( $course_id, $user_id, true );
     }
 
     /**
@@ -150,9 +150,6 @@ class Progress_Service {
 
     /**
      * 获取指定用户最后完成的课时 ID。
-     *
-     * 有完成时间记录时按实际完成时间判断；旧数据没有时间记录时，
-     * 回退到 mc_completed_lessons 的最后一个记录。
      */
     public function get_last_completed_lesson( $user_id, $course_id = 0 ) {
         $completed = $this->get_completed_lessons( $user_id );
@@ -166,7 +163,7 @@ class Progress_Service {
             return $this->find_latest_lesson( $completed, $times );
         }
 
-        $course_lessons = $this->get_course_lessons( absint( $course_id ) );
+        $course_lessons = $this->get_course_lessons( absint( $course_id ), false );
         $course_ids     = array_map( 'intval', wp_list_pluck( $course_lessons, 'ID' ) );
         $course_completed = array();
 
@@ -194,8 +191,8 @@ class Progress_Service {
         return isset( $times[ $lesson_id ] ) ? absint( $times[ $lesson_id ] ) : 0;
     }
 
-    private function calculate_progress( $course_id, $user_id ) {
-        $lessons           = $this->get_course_lessons( $course_id );
+    private function calculate_progress( $course_id, $user_id, $include_unpublished = false ) {
+        $lessons           = $this->get_course_lessons( $course_id, $include_unpublished );
         $completed_lessons = $this->get_completed_lessons( $user_id );
         $completed_times   = $this->get_completed_times( $user_id );
 
@@ -218,7 +215,6 @@ class Progress_Service {
                     $last_time      = $lesson_time;
                     $last_lesson_id = $lesson_id;
                 } elseif ( ! $last_lesson_id ) {
-                    // 兼容旧数据：没有完成时间时仍然给出一个合理的最后课时。
                     $last_lesson_id = $lesson_id;
                 }
             }
@@ -229,7 +225,7 @@ class Progress_Service {
             'total'           => $total,
             'percent'         => $total ? round( ( $completed / $total ) * 100 ) : 0,
             'last_lesson_id' => $last_lesson_id,
-            'last_time'       => $last_time,
+            'last_time'      => $last_time,
         );
     }
 
@@ -298,19 +294,29 @@ class Progress_Service {
     /**
      * 按当前 MathCourse 编辑器实际使用的结构获取课程课时：
      * Course → topics → Tutor Lesson。
+     *
+     * 学员前台只统计已发布课时；后台可以选择把草稿/私密课时一起统计。
      */
-    private function get_course_lessons( $course_id ) {
+    private function get_course_lessons( $course_id, $include_unpublished = false ) {
         $course_id = absint( $course_id );
 
         if ( ! $course_id || ! function_exists( 'tutor' ) || empty( tutor()->lesson_post_type ) ) {
             return array();
         }
 
+        $topic_status = $include_unpublished
+            ? array( 'publish', 'draft', 'private' )
+            : array( 'publish' );
+
+        $lesson_status = $include_unpublished
+            ? array( 'publish', 'draft', 'private' )
+            : array( 'publish' );
+
         $topics = get_posts(
             array(
                 'post_type'      => 'topics',
                 'post_parent'    => $course_id,
-                'post_status'    => array( 'publish', 'draft', 'private' ),
+                'post_status'    => $topic_status,
                 'posts_per_page' => -1,
                 'orderby'        => array( 'menu_order' => 'ASC', 'date' => 'ASC' ),
             )
@@ -327,7 +333,7 @@ class Progress_Service {
                 array(
                     'post_type'      => tutor()->lesson_post_type,
                     'post_parent'    => $topic->ID,
-                    'post_status'    => array( 'publish', 'draft', 'private' ),
+                    'post_status'    => $lesson_status,
                     'posts_per_page' => -1,
                     'orderby'        => array( 'menu_order' => 'ASC', 'date' => 'ASC' ),
                 )
