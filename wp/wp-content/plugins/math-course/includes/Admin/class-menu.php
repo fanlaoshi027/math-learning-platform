@@ -14,8 +14,9 @@ class Menu {
 		add_menu_page( 'MathCourse', 'MathCourse', 'manage_options', 'mathcourse', array( $this, 'dashboard' ), 'dashicons-welcome-learn-more', 30 );
 
 		add_submenu_page( 'mathcourse', '课程管理', '课程管理', 'manage_options', 'mathcourse-courses', array( $this, 'courses_page' ) );
-		add_submenu_page( 'mathcourse', '课程授权', '课程授权', 'manage_options', 'mathcourse-access', array( $this, 'access_page' ) );
+		add_submenu_page( 'mathcourse', '课程授权', '课程授权', 'manage_options', 'mathcourse-access', 'manage_options', 'mathcourse-access', array( $this, 'access_page' ) );
 		add_submenu_page( 'mathcourse', '设置', '设置', 'manage_options', 'mathcourse-settings', array( $this, 'settings_page' ) );
+		add_submenu_page( null, '编辑课程', '编辑课程', 'manage_options', 'mathcourse-course-edit', array( $this, 'course_edit_page' ) );
 	}
 
 	public function dashboard() {
@@ -25,6 +26,12 @@ class Menu {
 	public function courses_page() {
 		if ( class_exists( 'MathCourse\Admin\Course_Page' ) ) {
 			( new Course_Page() )->render();
+		}
+	}
+
+	public function course_edit_page() {
+		if ( class_exists( 'MathCourse\Admin\Course_Editor' ) ) {
+			( new Course_Editor() )->render();
 		}
 	}
 
