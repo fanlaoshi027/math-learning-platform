@@ -2,24 +2,61 @@
 
 namespace MathCourse\Video;
 
-use MathCourse\Access\Access_Service;
-
 defined('ABSPATH') || exit;
 
 class Player
 {
 
-    private $access;
-
     public function __construct()
     {
-        $this->access = new Access_Service();
-
         add_shortcode(
             'mathcourse_video',
             array(
                 $this,
                 'render'
+            )
+        );
+
+        add_action(
+            'wp_enqueue_scripts',
+            array(
+                $this,
+                'assets'
+            )
+        );
+    }
+
+
+    public function assets()
+    {
+        wp_enqueue_style(
+            'video-js',
+            'https://vjs.zencdn.net/8.10.0/video-js.css',
+            array(),
+            '8.10.0'
+        );
+
+        wp_enqueue_script(
+            'video-js',
+            'https://vjs.zencdn.net/8.10.0/video.min.js',
+            array(),
+            '8.10.0',
+            true
+        );
+
+        wp_enqueue_script(
+            'mathcourse-player',
+            MATHCOURSE_URL . 'assets/js/player.js',
+            array('video-js'),
+            MATHCOURSE_VERSION,
+            true
+        );
+
+        wp_localize_script(
+            'mathcourse-player',
+            'mathcoursePlayer',
+            array(
+                'ajax_url' => admin_url('admin-ajax.php')
             )
         );
     }
@@ -30,7 +67,7 @@ class Player
         $atts = shortcode_atts(
             array(
                 'url' => '',
-                'lesson_id' => ''
+                'lesson_id' => 0
             ),
             $atts
         );
@@ -41,20 +78,16 @@ class Player
 
         $lesson_id = absint($atts['lesson_id']);
 
-        if ($lesson_id && !$this->can_play($lesson_id)) {
-            return '<div class="mathcourse-video-lock">🔒 本课暂未开放，请联系老师获取学习权限。</div>';
-        }
-
         ob_start();
         ?>
 
         <video
-            class="mathcourse-player"
-            <?php if ($lesson_id): ?>
-            data-lesson-id="<?php echo esc_attr($lesson_id); ?>"
-            <?php endif; ?>
+            id="mathcourse-player-<?php echo esc_attr($lesson_id); ?>"
+            class="video-js vjs-big-play-centered"
             controls
-            preload="metadata">
+            preload="metadata"
+            playsinline
+            data-lesson-id="<?php echo esc_attr($lesson_id); ?>">
 
             <source
                 src="<?php echo esc_url($atts['url']); ?>"
@@ -64,30 +97,6 @@ class Player
 
         <?php
         return ob_get_clean();
-    }
-
-
-    private function can_play($lesson_id)
-    {
-        $course_id = tutor_utils()->get_course_id_by_content($lesson_id);
-
-        if (!$course_id) {
-            return false;
-        }
-
-        $user_id = get_current_user_id();
-
-        // 试看课无需授权
-        if (get_post_meta($lesson_id, '_mathcourse_video_trial', true)) {
-            return true;
-        }
-
-        // 已授权课程
-        if ($user_id && $this->access->has_access($user_id, $course_id)) {
-            return true;
-        }
-
-        return false;
     }
 
 }
