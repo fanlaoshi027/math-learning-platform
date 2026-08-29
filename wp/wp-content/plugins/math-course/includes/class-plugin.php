@@ -32,7 +32,7 @@ class Plugin {
             wp_enqueue_style('mathcourse', MATHCOURSE_URL . 'assets/css/mathcourse.css', array(), MATHCOURSE_VERSION);
             wp_enqueue_script('mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array('jquery'), MATHCOURSE_VERSION, true);
             wp_localize_script('mathcourse-player','MathCourseData',array(
-                'ajaxurl'=>admin_url('admin-ajax-admin.php')
+                'ajaxurl'=>admin_url('admin-ajax.php')
             ));
         });
     }
