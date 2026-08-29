@@ -11,92 +11,30 @@ Text Domain: mathcourse
 
 defined('ABSPATH') || exit;
 
+define('MATHCOURSE_VERSION', '1.0.0');
+define('MATHCOURSE_PATH', plugin_dir_path(__FILE__));
+define('MATHCOURSE_URL', plugin_dir_url(__FILE__));
 
-/*
-|--------------------------------------------------------------------------
-| 基础常量
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'MATHCOURSE_VERSION',
-    '1.0.0'
-);
-
-
-define(
-    'MATHCOURSE_PATH',
-    plugin_dir_path(__FILE__)
-);
-
-
-define(
-    'MATHCOURSE_URL',
-    plugin_dir_url(__FILE__)
-);
-
-
-
-/*
-|--------------------------------------------------------------------------
-| 自动加载
-|--------------------------------------------------------------------------
-*/
-
-require_once MATHCOURSE_PATH .
-'includes/class-autoloader.php';
-
-
+require_once MATHCOURSE_PATH . 'includes/class-autoloader.php';
 \MathCourse\Autoloader::register();
 
-
-
-/*
-|--------------------------------------------------------------------------
-| 插件激活
-|--------------------------------------------------------------------------
-*/
-
-register_activation_hook(
-    __FILE__,
-    function(){
-
-        if(
-            class_exists(
-                '\MathCourse\Database\Install'
-            )
-        ){
-
-            \MathCourse\Database\Install::activate();
-
-        }
-
+register_activation_hook(__FILE__, function () {
+    if (class_exists('\\MathCourse\\Database\\Install')) {
+        \MathCourse\Database\Install::activate();
     }
-);
-
-
-
-/*
-|--------------------------------------------------------------------------
-| 插件启动
-|--------------------------------------------------------------------------
-*/
-
-add_action(
-    'plugins_loaded',
-    function(){
-
-        if(
-            class_exists(
-                '\MathCourse\Plugin'
-            )
-        ){
-
-            $plugin = new \MathCourse\Plugin();
-
-            $plugin->run();
-
-        }
-
+    if (class_exists('\\MathCourse\\Access\\Access_Schema')) {
+        \MathCourse\Access\Access_Schema::install();
     }
-);
+});
+
+add_action('plugins_loaded', function () {
+    if (class_exists('\\MathCourse\\Access\\Access_Schema')) {
+        $version = get_option('mathcourse_access_db_version', '');
+        if ($version !== \MathCourse\Access\Access_Schema::VERSION) {
+            \MathCourse\Access\Access_Schema::install();
+        }
+    }
+    if (class_exists('\\MathCourse\\Plugin')) {
+        (new \MathCourse\Plugin())->run();
+    }
+});
