@@ -36,32 +36,35 @@ class Video_Router
             return;
         }
 
-        $url = get_post_meta($lesson_id, '_mathcourse_video_url', true);
+        $video_url = get_post_meta($lesson_id, '_mathcourse_hls_url', true);
 
-        if (!$url) {
+        if (!$video_url) {
+            $video_url = get_post_meta($lesson_id, '_mathcourse_video_url', true);
+        }
+
+        if (!$video_url) {
+            status_header(404);
             wp_die('视频不存在');
         }
 
-        // 试看课：允许访问
-        $is_trial = get_post_meta($lesson_id, '_mathcourse_video_trial', true);
+        $course_id = 0;
 
-        $allow = (bool)$is_trial;
+        if (function_exists('tutor_utils')) {
+            $course_id = tutor_utils()->get_course_id_by_content($lesson_id);
+        }
 
-        // 已登录用户：检查课程授权
-        if (!$allow && is_user_logged_in()) {
+        $allow = false;
 
-            $course_id = 0;
+        if (is_user_logged_in() && $course_id) {
+            $allow = $this->access->can_watch_lesson(
+                get_current_user_id(),
+                $course_id,
+                $lesson_id
+            );
+        }
 
-            if (function_exists('tutor_utils')) {
-                $course_id = tutor_utils()->get_course_id_by_content($lesson_id);
-            }
-
-            if ($course_id) {
-                $allow = $this->access->has_access(
-                    get_current_user_id(),
-                    $course_id
-                );
-            }
+        if (!$allow) {
+            $allow = $this->access->can_preview($course_id, $lesson_id);
         }
 
         if (!$allow) {
@@ -69,10 +72,13 @@ class Video_Router
             wp_die('暂无观看权限，请联系老师开通课程。');
         }
 
-        header('Content-Type: application/vnd.apple.mpegurl');
-        header('Cache-Control: private, no-store');
+        nocache_headers();
 
-        echo esc_url_raw($url);
+        header('Content-Type: application/vnd.apple.mpegurl');
+        header('Cache-Control: private, no-store, no-cache, must-revalidate');
+        header('X-Content-Type-Options: nosniff');
+
+        echo esc_url_raw($video_url);
         exit;
     }
 }
