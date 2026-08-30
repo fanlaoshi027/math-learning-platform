@@ -3,6 +3,8 @@ namespace MathCourse\Access;
 
 defined('ABSPATH') || exit;
 
+use MathCourse\Tutor\Adapter;
+
 class Access_Service {
 
     private function table() {
@@ -23,10 +25,6 @@ class Access_Service {
         return false;
     }
 
-    /**
-     * 管理员可以直接预览课程，方便老师上传和检查课时视频。
-     * 普通学员仍然必须通过 MathCourse 授权才能完整学习课程。
-     */
     public function can_access_course($user_id, $course_id) {
         $user_id   = absint($user_id);
         $course_id = absint($course_id);
@@ -146,6 +144,8 @@ class Access_Service {
 
     /**
      * 试看权限完全由 MathCourse 课时属性控制。
+     * 同时必须确认 lesson 确实属于传入的 course，避免仅凭 lesson meta
+     * 就把其他课程的试看课时误判为当前课程的试看内容。
      */
     public function can_preview($course_id, $lesson_id) {
         $course_id = absint($course_id);
@@ -155,15 +155,23 @@ class Access_Service {
             return false;
         }
 
-        return 'yes' === get_post_meta($lesson_id, '_mathcourse_preview', true)
-            || 'yes' === get_post_meta($lesson_id, '_is_preview', true);
+        $adapter = new Adapter();
+        if (!$adapter->is_available()) {
+            return false;
+        }
+
+        if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) {
+            return false;
+        }
+
+        return $adapter->is_preview_lesson($lesson_id);
     }
 
     /**
      * 最终播放权限：
      * 1. 管理员：可直接预览，用于课程维护；
      * 2. 已授权学员：全部已发布课时；
-     * 3. 未授权学员/游客：只有明确标记为“允许试看”的课时；
+     * 3. 未授权学员/游客：只有当前课程中明确标记为“允许试看”的课时；
      * 4. Tutor LMS Public/Private/Free 设置不会绕过上述规则。
      */
     public function can_watch_lesson($user_id, $course_id, $lesson_id) {
