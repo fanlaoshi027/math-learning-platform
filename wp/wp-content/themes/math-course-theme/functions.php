@@ -10,6 +10,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Enqueue theme assets.
  *
+ * Keep the base stylesheet global, but load the larger reference UI styles only
+ * on pages that actually use the course UI shortcodes.
+ *
  * @return void
  */
 function mc_theme_assets() {
@@ -18,19 +21,23 @@ function mc_theme_assets() {
 	$version    = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
 	$ui_version = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
 
-	wp_enqueue_style(
-		'mc-theme-style',
-		get_stylesheet_uri(),
-		array(),
-		$version
-	);
+	wp_enqueue_style( 'mc-theme-style', get_stylesheet_uri(), array(), $version );
 
-	wp_enqueue_style(
-		'mc-reference-ui',
-		get_stylesheet_directory_uri() . '/assets/css/reference-ui.css',
-		array( 'mc-theme-style' ),
-		$ui_version
-	);
+	$load_course_ui = is_page( array( 'course-center', 'xueyuan-denglu', '学习课程' ) );
+	if ( ! $load_course_ui ) {
+		$load_course_ui = has_shortcode( get_post_field( 'post_content', get_queried_object_id() ), 'mathcourse_course_player' )
+			|| has_shortcode( get_post_field( 'post_content', get_queried_object_id() ), 'math_course_center_v82' )
+			|| has_shortcode( get_post_field( 'post_content', get_queried_object_id() ), 'math_student_login' );
+	}
+
+	if ( $load_course_ui ) {
+		wp_enqueue_style(
+			'mc-reference-ui',
+			get_stylesheet_directory_uri() . '/assets/css/reference-ui.css',
+			array( 'mc-theme-style' ),
+			$ui_version
+		);
+	}
 }
 add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
 
