@@ -6,6 +6,7 @@ class Plugin {
     public function run() {
         $this->load_modules();
         $this->load_assets();
+        $this->load_admin_assets();
     }
 
     private function load_modules() {
@@ -37,6 +38,12 @@ class Plugin {
             wp_localize_script('mathcourse-player', 'MathCourseData', array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
             ));
+        });
+    }
+
+    private function load_admin_assets() {
+        add_action('admin_enqueue_scripts', function() {
+            wp_enqueue_style('mathcourse-admin', MATHCOURSE_URL . 'assets/css/admin.css', array(), MATHCOURSE_VERSION);
         });
     }
 }
