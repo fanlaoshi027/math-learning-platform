@@ -3,12 +3,7 @@ namespace MathCourse;
 defined('ABSPATH') || exit;
 
 class Plugin {
-    public function run() {
-        $this->load_modules();
-        $this->load_assets();
-        $this->load_admin_assets();
-    }
-
+    public function run() { $this->load_modules(); $this->load_assets(); $this->load_admin_assets(); }
     private function load_modules() {
         if (class_exists('MathCourse\\Admin\\Menu')) new Admin\Menu();
         if (class_exists('MathCourse\\Admin\\Course_Actions')) new Admin\Course_Actions();
@@ -28,22 +23,9 @@ class Plugin {
         if (class_exists('MathCourse\\Video\\Player')) new Video\Player();
         if (class_exists('MathCourse\\Video\\Video_Router')) new Video\Video_Router();
         if (class_exists('MathCourse\\Frontend\\Course_Directory')) new Frontend\Course_Directory();
+        if (class_exists('MathCourse\\Frontend\\Course_Player')) new Frontend\Course_Player();
         if (class_exists('MathCourse\\Frontend\\Course_Directory_Assets')) new Frontend\Course_Directory_Assets();
     }
-
-    private function load_assets() {
-        add_action('wp_enqueue_scripts', function() {
-            wp_enqueue_style('mathcourse', MATHCOURSE_URL . 'assets/css/mathcourse.css', array(), MATHCOURSE_VERSION);
-            wp_enqueue_script('mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array('jquery'), MATHCOURSE_VERSION, true);
-            wp_localize_script('mathcourse-player', 'MathCourseData', array(
-                'ajaxurl' => admin_url('admin-ajax.php'),
-            ));
-        });
-    }
-
-    private function load_admin_assets() {
-        add_action('admin_enqueue_scripts', function() {
-            wp_enqueue_style('mathcourse-admin', MATHCOURSE_URL . 'assets/css/admin.css', array(), MATHCOURSE_VERSION);
-        });
-    }
+    private function load_assets() { add_action('wp_enqueue_scripts', function() { wp_enqueue_style('mathcourse', MATHCOURSE_URL.'assets/css/mathcourse.css', array(), MATHCOURSE_VERSION); wp_enqueue_script('mathcourse-player', MATHCOURSE_URL.'assets/js/player.js', array('jquery'), MATHCOURSE_VERSION, true); wp_localize_script('mathcourse-player','MathCourseData',array('ajaxurl'=>admin_url('admin-ajax.php'))); }); }
+    private function load_admin_assets() { add_action('admin_enqueue_scripts', function() { wp_enqueue_style('mathcourse-admin', MATHCOURSE_URL.'assets/css/admin.css', array(), MATHCOURSE_VERSION); }); }
 }
