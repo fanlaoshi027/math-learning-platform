@@ -9,6 +9,7 @@ class Plugin {
         if (class_exists('MathCourse\\Admin\\Course_Actions')) new Admin\Course_Actions();
         if (class_exists('MathCourse\\Admin\\Course_Sort')) new Admin\Course_Sort();
         if (class_exists('MathCourse\\Admin\\Batch_Manager')) new Admin\Batch_Manager();
+        if (class_exists('MathCourse\\Admin\\Demo_Importer')) new Admin\Demo_Importer();
         if (class_exists('MathCourse\\Course\\Meta')) new Course\Meta();
         if (class_exists('MathCourse\\Course\\Lesson_Meta')) new Course\Lesson_Meta();
         if (class_exists('MathCourse\\Course\\Course_Service')) new Course\Course_Service();
