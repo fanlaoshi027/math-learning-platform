@@ -2,23 +2,32 @@
 
 namespace MathCourse\Course;
 
+use MathCourse\Tutor\Adapter;
+
 defined('ABSPATH') || exit;
 
 class Meta {
 
+    /** @var Adapter */
+    private $tutor;
+
     public function __construct() {
+        $this->tutor = new Adapter();
         add_action('add_meta_boxes', array($this,'add'));
         add_action('save_post', array($this,'save'),10,2);
     }
 
     public function add(){
-        if(!function_exists('tutor')) return;
+        if (!$this->tutor->is_available()) return;
+
+        $course_post_type = $this->tutor->get_course_post_type();
+        if (!$course_post_type) return;
 
         add_meta_box(
             'mathcourse_course_settings',
             'MathCourse 课程信息',
             array($this,'box'),
-            tutor()->course_post_type,
+            $course_post_type,
             'side',
             'high'
         );
@@ -27,7 +36,7 @@ class Meta {
             'mathcourse_cover',
             '课程封面',
             array($this,'cover_box'),
-            tutor()->course_post_type,
+            $course_post_type,
             'side'
         );
     }
@@ -67,7 +76,7 @@ class Meta {
     }
 
     public function save($post_id,$post){
-        if(!function_exists('tutor') || !is_object($post) || tutor()->course_post_type!==$post->post_type) return;
+        if (!is_object($post) || !$this->tutor->is_course_post_type($post->post_type)) return;
         if((defined('DOING_AUTOSAVE')&&DOING_AUTOSAVE)||wp_is_post_revision($post_id)) return;
         if(!current_user_can('edit_post',$post_id)) return;
 
