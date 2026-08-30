@@ -1,0 +1,39 @@
+# MathCourse HLS production template
+#
+# IMPORTANT:
+# 1. This is an EXAMPLE only. Do not paste it into Nginx unchanged.
+# 2. Replace the HLS root with the real server filesystem path.
+# 3. Keep the HLS directory outside a directly browsable/public alias whenever possible.
+# 4. The PHP gateway remains the fallback until this configuration is tested.
+#
+# Recommended final request flow:
+#   WordPress / MathCourse -> permission + short-lived signature
+#   Nginx -> serves m3u8 / ts directly
+#
+# The current PHP router signs lesson + expiry + exact media URL. If the
+# production Nginx implementation is enabled, its secure-link algorithm and
+# URL layout MUST match the token generator before switching traffic.
+
+# Example protected internal location:
+#
+# location ^~ /math-hls-internal/ {
+#     internal;
+#     alias /REAL/PATH/TO/wp-content/uploads/wangke/;
+#     add_header X-Content-Type-Options nosniff always;
+#     add_header Cache-Control "private, no-store" always;
+# }
+#
+# Do not add a public location for the same HLS directory. A public alias such
+# as /wp-content/uploads/wangke/ would bypass the application-level protection.
+
+# Migration checklist:
+# - [ ] Confirm the real HLS filesystem path.
+# - [ ] Confirm direct browser access to the original HLS URL is denied.
+# - [ ] Confirm MathCourse can still obtain a short-lived playback URL.
+# - [ ] Confirm m3u8 playback works on Chrome/Edge/Safari/iPhone.
+# - [ ] Confirm ts/m4s segment requests are served by Nginx, not PHP-FPM.
+# - [ ] Confirm an expired token is rejected.
+# - [ ] Confirm an unauthorized WordPress account is rejected.
+# - [ ] Confirm preview lessons still work.
+# - [ ] Confirm authorized paid lessons still work.
+# - [ ] Only after all checks pass, switch production traffic from PHP proxy to Nginx.
