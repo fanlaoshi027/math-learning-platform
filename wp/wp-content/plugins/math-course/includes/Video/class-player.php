@@ -54,10 +54,9 @@ class Player {
 
 		$course_id = absint( $video['course_id'] ?: $course_id );
 
-		// Load player assets only when this shortcode actually renders a player.
-		$this->assets();
-
 		if ( ! empty( $video['hls_url'] ) ) {
+			// Only load Video.js when an HLS player is actually rendered.
+			$this->assets();
 			ob_start();
 			?>
 			<video
@@ -74,6 +73,7 @@ class Player {
 			return ob_get_clean();
 		}
 
+		// Keep Tutor LMS fallback support without loading Video.js unnecessarily.
 		$tutor_player = $this->tutor->render_lesson_video( $lesson_id );
 		if ( $tutor_player ) {
 			return $tutor_player;
