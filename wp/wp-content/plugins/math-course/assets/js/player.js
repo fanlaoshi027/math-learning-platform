@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let lastTime = 0;
         let lastWallClock = 0;
         let playedSinceSeek = 0;
+        let completedAt = 0;
 
         if (window.videojs && element.classList.contains('video-js')) {
             try { player = window.videojs(element); } catch (e) { player = element; }
@@ -96,6 +97,34 @@ document.addEventListener('DOMContentLoaded', function () {
             lastTime = val('currentTime');
             lastWallClock = Date.now();
         }
+        function submitCompletion() {
+            if (completionSent || completedAt || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
+            completionSent = true;
+            const formData = new FormData();
+            formData.append('action', 'mathcourse_complete_lesson');
+            formData.append('nonce', mathcoursePlayer.nonce);
+            formData.append('lesson_id', String(lessonId));
+
+            fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: formData, keepalive: true })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.json();
+                })
+                .then(function (result) {
+                    if (!result || !result.success) throw new Error('progress rejected');
+                    completedAt = Date.now();
+                    clearSavedTime();
+                    const data = result.data || {};
+                    const serverCourseId = Number(data.course_id || courseId || 0);
+                    updateProgressUI(data.progress || null, lessonId);
+                    document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
+                    document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
+                })
+                .catch(function (error) {
+                    completionSent = false;
+                    console.warn('MathCourse: unable to save lesson completion.', error);
+                });
+        }
 
         ['loadedmetadata', 'durationchange', 'canplay'].forEach(function (eventName) { on(player, eventName, restore); });
         on(player, 'play', markPlayingInterval);
@@ -114,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function () {
             lastTime = time;
             lastWallClock = now;
 
-            if (!completionSent && !seeking && Number.isFinite(duration) && duration > 0 && time >= duration - 5 && playedSinceSeek >= 1.2) {
+            if (!completionSent && !completedAt && !seeking && Number.isFinite(duration) && duration > 0 && time >= duration - 5 && playedSinceSeek >= 1.2) {
                 submitCompletion();
             }
         });
@@ -126,33 +155,5 @@ document.addEventListener('DOMContentLoaded', function () {
         function persistBeforeLeave() { savePosition(true); }
         window.addEventListener('pagehide', persistBeforeLeave);
         window.addEventListener('beforeunload', persistBeforeLeave);
-
-        function submitCompletion() {
-            if (completionSent || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
-            completionSent = true;
-            const formData = new FormData();
-            formData.append('action', 'mathcourse_complete_lesson');
-            formData.append('nonce', mathcoursePlayer.nonce);
-            formData.append('lesson_id', String(lessonId));
-
-            fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: formData, keepalive: true })
-                .then(function (response) {
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    return response.json();
-                })
-                .then(function (result) {
-                    if (!result || !result.success) throw new Error('progress rejected');
-                    clearSavedTime();
-                    const data = result.data || {};
-                    const serverCourseId = Number(data.course_id || courseId || 0);
-                    updateProgressUI(data.progress || null, lessonId);
-                    document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
-                    document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
-                })
-                .catch(function (error) {
-                    completionSent = false;
-                    console.warn('MathCourse: unable to save lesson completion.', error);
-                });
-        }
     });
 });
