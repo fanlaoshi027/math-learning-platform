@@ -2,74 +2,35 @@
 /**
  * Math Course Theme - Learning Player Page.
  *
- * Theme controls layout only. Course, access, video and progress logic
- * are provided by the MathCourse plugin.
+ * Course selection opens the learning player directly. The player chooses
+ * the first accessible lesson when lesson_id is not supplied.
  */
 defined( 'ABSPATH' ) || exit;
 
 get_header();
 
-$lesson_id    = isset( $_GET['lesson_id'] ) ? absint( $_GET['lesson_id'] ) : 0;
-$course_id    = 0;
-$lesson_title = '';
-$access_error = '';
-
-if ( $lesson_id && class_exists( '\MathCourse\Tutor\Adapter' ) ) {
-	$adapter = new \MathCourse\Tutor\Adapter();
-	$lesson  = $adapter->get_lesson( $lesson_id );
-
-	if ( $lesson ) {
-		$course_id    = $adapter->get_lesson_course_id( $lesson_id );
-		$lesson_title = get_the_title( $lesson_id );
-	}
-}
-
-if ( ! $lesson_id || ! $course_id ) {
-	$access_error = '课时不存在或链接无效。';
-}
+$course_id = isset( $_GET['course_id'] ) ? absint( $_GET['course_id'] ) : 0;
+$lesson_id = isset( $_GET['lesson_id'] ) ? absint( $_GET['lesson_id'] ) : 0;
 ?>
 
 <main class="mc-learning-page">
 	<div class="mc-learning-container">
-
-		<?php if ( $access_error ) : ?>
+		<?php
+		if ( $course_id && shortcode_exists( 'mathcourse_course_player' ) ) {
+			echo do_shortcode(
+				'[mathcourse_course_player course_id="' . esc_attr( $course_id ) . '"' .
+				( $lesson_id ? ' lesson_id="' . esc_attr( $lesson_id ) . '"' : '' ) .
+				']'
+			);
+		} else {
+			?>
 			<section class="mc-lesson-card">
-				<h1><?php echo esc_html( $access_error ); ?></h1>
+				<h1>课程不存在或链接无效</h1>
 				<p><a href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">返回课程中心</a></p>
 			</section>
-		<?php else : ?>
-			<section class="mc-video-card">
-				<div class="mc-video-box">
-					<?php
-					if ( shortcode_exists( 'mathcourse_video' ) ) {
-						echo do_shortcode(
-							'[mathcourse_video lesson_id="' . esc_attr( $lesson_id ) . '" course_id="' . esc_attr( $course_id ) . '"]'
-						);
-					} else {
-						echo '<p>播放器暂不可用，请联系管理员。</p>';
-					}
-					?>
-				</div>
-			</section>
-
-			<section class="mc-lesson-card">
-				<div class="mc-lesson-header">
-					<h1><?php echo esc_html( $lesson_title ); ?></h1>
-				</div>
-			</section>
-
-			<section class="mc-outline-card">
-				<h2>课程目录</h2>
-				<?php
-				if ( shortcode_exists( 'mathcourse_course_learning' ) ) {
-					echo do_shortcode(
-						'[mathcourse_course_learning course_id="' . esc_attr( $course_id ) . '"]'
-					);
-				}
-				?>
-			</section>
-		<?php endif; ?>
-
+			<?php
+		}
+		?>
 	</div>
 </main>
 
