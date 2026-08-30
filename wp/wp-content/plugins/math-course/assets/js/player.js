@@ -1,5 +1,16 @@
 document.addEventListener('DOMContentLoaded', function () {
     const players = document.querySelectorAll('video.mathcourse-player, video.video-js[data-lesson-id]');
+    function updateProgressUI(progress, lessonId) {
+        if (!progress) return;
+        document.querySelectorAll('.mc-course-player__progress span').forEach(function (el) { el.textContent = '学习进度 ' + Number(progress.percent || 0) + '%'; });
+        document.querySelectorAll('.mc-course-player__progress strong').forEach(function (el) { el.textContent = Number(progress.completed || 0) + ' / ' + Number(progress.total || 0) + ' 课时'; });
+        document.querySelectorAll('.mc-course-player__progress i').forEach(function (el) { el.style.width = Number(progress.percent || 0) + '%'; });
+        document.querySelectorAll('.mc-course-player__sidebar-head span').forEach(function (el) { el.textContent = Number(progress.completed || 0) + '/' + Number(progress.total || 0); });
+        if (lessonId) document.querySelectorAll('.mc-course-player__item').forEach(function (item) {
+            const link = item.getAttribute('href') || '';
+            if (link.indexOf('lesson_id=' + lessonId) !== -1) { item.classList.add('is-complete'); const check = item.querySelector('.mc-course-player__check'); if (check) check.textContent = '✓'; }
+        });
+    }
     players.forEach(function (element) {
         const lessonId=parseInt(element.dataset.lessonId||'0',10), courseId=parseInt(element.dataset.courseId||'0',10);
         if(!lessonId)return;
@@ -12,6 +23,6 @@ document.addEventListener('DOMContentLoaded', function () {
         ['loadedmetadata','durationchange','canplay'].forEach(function(e){on(player,e,restore);});
         on(player,'timeupdate',function(){const t=val('currentTime'),d=val('duration');if(t>0&&Number.isFinite(t))localStorage.setItem(storageKey,String(Math.floor(t)));if(!completionSent&&Number.isFinite(d)&&d>0&&t>=d-0.5)submitCompletion();});
         on(player,'ended',submitCompletion);
-        function submitCompletion(){if(completionSent||!courseId||!window.mathcoursePlayer||!mathcoursePlayer.ajax_url||!mathcoursePlayer.nonce)return;completionSent=true;const fd=new FormData();fd.append('action','mathcourse_complete_lesson');fd.append('nonce',mathcoursePlayer.nonce);fd.append('lesson_id',String(lessonId));fd.append('course_id',String(courseId));fetch(mathcoursePlayer.ajax_url,{method:'POST',credentials:'same-origin',body:fd}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(result){if(!result||!result.success)throw new Error('progress rejected');localStorage.removeItem(storageKey);document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete',{detail:{lessonId:lessonId,courseId:courseId,progress:result.data&&result.data.progress?result.data.progress:null}}));document.dispatchEvent(new CustomEvent('mathcourse_progress_updated',{detail:{lessonId:lessonId,courseId:courseId,progress:result.data&&result.data.progress?result.data.progress:null}}));}).catch(function(error){completionSent=false;console.warn('MathCourse: unable to save lesson completion.',error);});}
+        function submitCompletion(){if(completionSent||!courseId||!window.mathcoursePlayer||!mathcoursePlayer.ajax_url||!mathcoursePlayer.nonce)return;completionSent=true;const fd=new FormData();fd.append('action','mathcourse_complete_lesson');fd.append('nonce',mathcoursePlayer.nonce);fd.append('lesson_id',String(lessonId));fd.append('course_id',String(courseId));fetch(mathcoursePlayer.ajax_url,{method:'POST',credentials:'same-origin',body:fd}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(result){if(!result||!result.success)throw new Error('progress rejected');localStorage.removeItem(storageKey);const progress=result.data&&result.data.progress?result.data.progress:null;updateProgressUI(progress,lessonId);document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete',{detail:{lessonId:lessonId,courseId:courseId,progress:progress}}));document.dispatchEvent(new CustomEvent('mathcourse_progress_updated',{detail:{lessonId:lessonId,courseId:courseId,progress:progress}}));}).catch(function(error){completionSent=false;console.warn('MathCourse: unable to save lesson completion.',error);});}
     });
 });
