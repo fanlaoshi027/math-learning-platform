@@ -32,7 +32,10 @@ class Course_Service {
     }
 
     /**
-     * 获取课时视频数据。试看课时对游客和未授权学员开放，其他课时必须授权。
+     * 获取课时视频数据。
+     *
+     * 播放资源优先使用 MathCourse 的 HLS 地址；如果尚未迁移到 HLS，
+     * 则允许播放器回退到 Tutor LMS 原生 _video 数据，兼容已经上传的旧视频。
      */
     public function get_lesson_video($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
@@ -42,13 +45,18 @@ class Course_Service {
         $course_access = $user_id ? $this->access->can_access_course($user_id, $course_id) : false;
         $accessible = $course_access || $preview;
 
+        $hls_url = $accessible ? get_post_meta($lesson_id, '_mathcourse_hls_url', true) : '';
+        $tutor_video = $accessible ? get_post_meta($lesson_id, '_video', true) : '';
+
         return array(
-            'id'         => $lesson_id,
-            'course_id'  => $course_id,
-            'video_id'   => get_post_meta($lesson_id, '_mathcourse_video_id', true),
-            'hls_url'    => $accessible ? get_post_meta($lesson_id, '_mathcourse_hls_url', true) : '',
-            'preview'    => $preview,
-            'accessible' => $accessible,
+            'id'           => $lesson_id,
+            'course_id'    => $course_id,
+            'video_id'     => $this->tutor->get_lesson_video_id($lesson_id),
+            'hls_url'      => $hls_url,
+            'tutor_video'  => $tutor_video,
+            'has_video'    => !empty($hls_url) || !empty($tutor_video),
+            'preview'      => $preview,
+            'accessible'   => $accessible,
         );
     }
 
@@ -68,15 +76,18 @@ class Course_Service {
                     ? $this->progress->is_completed($user_id, $lesson->ID)
                     : false;
                 $preview = $this->tutor->is_preview_lesson($lesson->ID);
-                // 授权用户可看全部；游客和未授权用户只可看明确标记为“试看”的课时。
                 $accessible = $course_access || $preview;
+                $hls_url = $accessible ? get_post_meta($lesson->ID, '_mathcourse_hls_url', true) : '';
+                $tutor_video = $accessible ? get_post_meta($lesson->ID, '_video', true) : '';
 
                 $lessons[] = array(
                     'id'           => (int) $lesson->ID,
                     'title'        => get_the_title($lesson),
                     'page_number'  => $this->tutor->get_lesson_page_number($lesson->ID),
                     'video_id'     => $this->tutor->get_lesson_video_id($lesson->ID),
-                    'hls_url'      => $accessible ? get_post_meta($lesson->ID, '_mathcourse_hls_url', true) : '',
+                    'hls_url'      => $hls_url,
+                    'tutor_video'  => $tutor_video,
+                    'has_video'    => !empty($hls_url) || !empty($tutor_video),
                     'url'          => $accessible ? get_permalink($lesson) : '',
                     'completed'    => $completed_lesson,
                     'preview'      => $preview,
