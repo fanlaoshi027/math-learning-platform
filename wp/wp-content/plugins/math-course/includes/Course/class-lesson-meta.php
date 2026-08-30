@@ -38,8 +38,9 @@ class Lesson_Meta {
         <p><label>视频ID</label>
         <input style="width:100%" name="mathcourse_video_id" value="<?php echo esc_attr($video); ?>"></p>
 
-        <p><label>HLS地址</label>
-        <input style="width:100%" name="mathcourse_hls_url" value="<?php echo esc_attr($hls); ?>" placeholder="m3u8"></p>
+        <p><label>HLS地址（仅服务器端保存）</label>
+        <input style="width:100%" type="password" autocomplete="off" name="mathcourse_hls_url" value="<?php echo esc_attr($hls); ?>" placeholder="留空则保持原地址不变">
+        <small>不会直接输出到前台播放器；播放器只使用受保护的短时地址。</small></p>
 
         <p><label><input type="checkbox" name="mathcourse_preview" value="yes" <?php checked($preview, 'yes'); ?>> 免费试看</label></p>
         <?php
@@ -54,7 +55,14 @@ class Lesson_Meta {
 
         update_post_meta($post_id, '_mathcourse_page_number', sanitize_text_field(wp_unslash($_POST['mathcourse_page_number'] ?? '')));
         update_post_meta($post_id, '_mathcourse_video_id', sanitize_text_field(wp_unslash($_POST['mathcourse_video_id'] ?? '')));
-        update_post_meta($post_id, '_mathcourse_hls_url', esc_url_raw(wp_unslash($_POST['mathcourse_hls_url'] ?? '')));
+
+        // The HLS source is a server-side secret. An empty submitted field means
+        // "keep existing value", which prevents accidental deletion when the
+        // password-style field is intentionally left blank.
+        if (isset($_POST['mathcourse_hls_url']) && '' !== trim((string) wp_unslash($_POST['mathcourse_hls_url']))) {
+            update_post_meta($post_id, '_mathcourse_hls_url', esc_url_raw(wp_unslash($_POST['mathcourse_hls_url'])));
+        }
+
         update_post_meta($post_id, '_mathcourse_preview', isset($_POST['mathcourse_preview']) ? 'yes' : 'no');
     }
 }
