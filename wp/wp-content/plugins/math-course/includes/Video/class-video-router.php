@@ -5,11 +5,7 @@ defined('ABSPATH') || exit;
 
 use MathCourse\Access\Access_Service;
 
-/**
- * Protected HLS gateway.
- * The storage URL is never sent to the browser. Short-lived lesson-bound
- * signatures protect the playlist and each media segment.
- */
+/** Short-lived signed HLS gateway. */
 class Video_Router {
     private $access;
     private $token_ttl = 600;
@@ -21,29 +17,21 @@ class Video_Router {
     }
 
     public function register_route() {
-        add_rewrite_rule(
-            '^math-video/([0-9]+)/([0-9]+)/([A-Za-z0-9_-]+)/?$',
-            'index.php?math_video=$matches[1]&math_video_exp=$matches[2]&math_video_sig=$matches[3]',
-            'top'
-        );
+        add_rewrite_rule('^math-video/([0-9]+)/([0-9]+)/([A-Za-z0-9_-]+)/?$', 'index.php?math_video=$matches[1]&math_video_exp=$matches[2]&math_video_sig=$matches[3]', 'top');
         add_rewrite_tag('%math_video%', '([0-9]+)');
         add_rewrite_tag('%math_video_exp%', '([0-9]+)');
         add_rewrite_tag('%math_video_sig%', '([A-Za-z0-9_-]+)');
     }
 
-    /** Create a short-lived signed playlist URL. */
     public function get_protected_url($lesson_id) {
         $lesson_id = absint($lesson_id);
         if (!$lesson_id) return '';
-
         $expires = time() + $this->token_ttl;
-        $signature = $this->sign($lesson_id, $expires, '');
-        return home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $signature . '/');
+        return home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $this->sign($lesson_id, $expires, '') . '/');
     }
 
     private function sign($lesson_id, $expires, $file) {
-        $payload = absint($lesson_id) . '|' . absint($expires) . '|' . (string) $file;
-        return rtrim(strtr(base64_encode(hash_hmac('sha256', $payload, wp_salt('auth'), true)), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode(hash_hmac('sha256', absint($lesson_id) . '|' . absint($expires) . '|' . (string) $file, wp_salt('auth'), true)), '+/', '-_'), '=');
     }
 
     private function valid_signature($lesson_id, $expires, $file, $signature) {
@@ -58,13 +46,8 @@ class Video_Router {
     }
 
     private function can_watch($lesson_id) {
-        $course_id = function_exists('tutor_utils')
-            ? absint(tutor_utils()->get_course_id_by_content($lesson_id))
-            : 0;
-
-        if (is_user_logged_in() && $course_id && $this->access->can_watch_lesson(get_current_user_id(), $course_id, $lesson_id)) {
-            return true;
-        }
+        $course_id = function_exists('tutor_utils') ? absint(tutor_utils()->get_course_id_by_content($lesson_id)) : 0;
+        if (is_user_logged_in() && $course_id && $this->access->can_watch_lesson(get_current_user_id(), $course_id, $lesson_id)) return true;
         return $course_id && $this->access->can_preview($course_id, $lesson_id);
     }
 
@@ -91,52 +74,31 @@ class Video_Router {
             exit('视频不存在。');
         }
 
-        if ($file === '') {
-            $this->serve_playlist($lesson_id, $expires, $source);
-        } else {
-            $this->serve_media($lesson_id, $expires, $file);
-        }
+        if ($file === '') $this->serve_playlist($lesson_id, $expires, $source);
+        else $this->serve_media($file);
         exit;
     }
 
     private function serve_playlist($lesson_id, $expires, $source) {
-        $response = wp_remote_get($source, array(
-            'timeout' => 15,
-            'redirection' => 3,
-            'sslverify' => true,
-            'headers' => array('Accept' => 'application/vnd.apple.mpegurl, application/x-mpegURL, */*'),
-        ));
-
+        $response = wp_remote_get($source, array('timeout' => 15, 'redirection' => 3, 'sslverify' => true));
         if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
-            status_header(502);
-            exit('视频源暂时无法访问。');
+            status_header(502); exit('视频源暂时无法访问。');
         }
 
         $body = wp_remote_retrieve_body($response);
-        if (!$body) {
-            status_header(502);
-            exit('视频播放列表为空。');
-        }
+        if (!$body) { status_header(502); exit('视频播放列表为空。'); }
 
         $parts = wp_parse_url($source);
-        $origin = (!empty($parts['scheme']) && !empty($parts['host']))
-            ? $parts['scheme'] . '://' . $parts['host'] . (!empty($parts['port']) ? ':' . $parts['port'] : '')
-            : '';
+        $origin = (!empty($parts['scheme']) && !empty($parts['host'])) ? $parts['scheme'] . '://' . $parts['host'] . (!empty($parts['port']) ? ':' . $parts['port'] : '') : '';
         $base_dir = trailingslashit(dirname(isset($parts['path']) ? $parts['path'] : '/'));
-
         $lines = preg_split('/\r\n|\r|\n/', $body);
+
         foreach ($lines as $index => $line) {
             $uri = trim($line);
             if ($uri === '' || strpos($uri, '#') === 0) continue;
-
-            $absolute = preg_match('#^https?://#i', $uri)
-                ? $uri
-                : $origin . $this->resolve_path($base_dir, $uri);
+            $absolute = preg_match('#^https?://#i', $uri) ? $uri : $origin . $this->resolve_path($base_dir, $uri);
             $sig = $this->sign($lesson_id, $expires, $absolute);
-            $lines[$index] = add_query_arg(
-                'file', rawurlencode($absolute),
-                home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/')
-            );
+            $lines[$index] = add_query_arg('file', rawurlencode($absolute), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
         }
 
         nocache_headers();
@@ -156,30 +118,14 @@ class Video_Router {
         return '/' . implode('/', $segments);
     }
 
-    private function serve_media($lesson_id, $expires, $file) {
-        $signature = isset($_GET['sig']) ? sanitize_text_field(wp_unslash($_GET['sig'])) : '';
-        // The playlist signs the exact source URI, so a copied segment URL
-        // cannot be changed to another remote resource without invalidating it.
-        if (!$signature) {
-            $path = wp_parse_url($file, PHP_URL_PATH);
-            $signature = '';
-        }
-
-        $response = wp_remote_get($file, array(
-            'timeout' => 20,
-            'redirection' => 3,
-            'sslverify' => true,
-            'headers' => array('Accept' => '*/*'),
-        ));
-
+    private function serve_media($file) {
+        $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true, 'headers' => array('Accept' => '*/*')));
         if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
-            status_header(502);
-            exit('视频片段暂时无法访问。');
+            status_header(502); exit('视频片段暂时无法访问。');
         }
 
         $body = wp_remote_retrieve_body($response);
-        $path = (string) wp_parse_url($file, PHP_URL_PATH);
-        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
         $type = 'application/octet-stream';
         if ($ext === 'ts') $type = 'video/mp2t';
         elseif ($ext === 'm4s') $type = 'video/iso.segment';
