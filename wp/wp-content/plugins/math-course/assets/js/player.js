@@ -132,6 +132,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     console.warn('MathCourse: unable to save lesson completion.', error);
                 });
         }
+        function maybeCompleteAtEnd() {
+            if (completionSent || completedAt) return;
+            const time = val('currentTime');
+            const duration = val('duration');
+            if (!Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0) return;
+            // 用户主动快进到结尾也视为完成课时；不要求从头连续播放。
+            if (time >= duration - Math.max(1, Math.min(5, duration * 0.01))) submitCompletion();
+        }
 
         ['loadedmetadata', 'durationchange', 'canplay'].forEach(function (eventName) { on(player, eventName, restore); });
         on(player, 'play', markPlayingInterval);
@@ -149,18 +157,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             lastTime = time;
             lastWallClock = now;
-
-            if (!completionSent && !completedAt && !seeking && Number.isFinite(duration) && duration > 0 && time >= duration - 5 && playedSinceSeek >= 1.2) {
-                submitCompletion();
-            }
+            maybeCompleteAtEnd();
         });
         on(player, 'pause', function () { savePosition(true); resetWatchWindow(); });
         on(player, 'seeking', function () { seeking = true; resetWatchWindow(); });
-        on(player, 'seeked', function () { seeking = false; resetWatchWindow(); });
-        on(player, 'ended', function () {
-            if (playedSinceSeek >= 1.2) submitCompletion();
-            else savePosition(true);
-        });
+        on(player, 'seeked', function () { seeking = false; resetWatchWindow(); maybeCompleteAtEnd(); });
+        on(player, 'ended', function () { submitCompletion(); });
 
         function persistBeforeLeave() { savePosition(true); }
         window.addEventListener('pagehide', persistBeforeLeave);
