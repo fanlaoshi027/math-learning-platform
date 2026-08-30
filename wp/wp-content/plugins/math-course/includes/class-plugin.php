@@ -18,7 +18,6 @@ class Plugin {
         if (class_exists('MathCourse\\Progress\\Progress_Ajax')) new Progress\Progress_Ajax();
         if (class_exists('MathCourse\\Tutor\\Hooks')) new Tutor\Hooks();
         if (class_exists('MathCourse\\Tutor\\Adapter')) new Tutor\Adapter();
-        if (class_exists('MathCourse\\Admin\\Order_Manager')) new Admin\Order_Manager();
         if (class_exists('MathCourse\\Learning\\Lesson_Status')) new Learning\Lesson_Status();
         if (class_exists('MathCourse\\Learning\\Course_Learning')) new Learning\Course_Learning();
         if (class_exists('MathCourse\\Video\\Player')) new Video\Player();
