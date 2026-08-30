@@ -19,6 +19,7 @@ while ( have_posts() ) : the_post();
 				$service = new \MathCourse\Course\Course_Service();
 				$video   = $service->get_lesson_video( $post_id, get_current_user_id() );
 				$course_id = ! empty( $video['course_id'] ) ? absint( $video['course_id'] ) : 0;
+				$is_demo = 'yes' === get_post_meta( $post_id, '_mathcourse_demo', true );
 				?>
 				<article class="mc-lesson-page" data-lesson-id="<?php echo esc_attr( $post_id ); ?>" data-course-id="<?php echo esc_attr( $course_id ); ?>">
 					<a class="mc-back-link" href="<?php echo esc_url( $course_id ? get_permalink( $course_id ) : home_url( '/' ) ); ?>">← 返回课程</a>
@@ -26,7 +27,7 @@ while ( have_posts() ) : the_post();
 						<h1><?php the_title(); ?></h1>
 						<?php if ( $video['preview'] && empty( $video['accessible'] ) ) : ?><span class="mc-lesson-badge">试看</span><?php endif; ?>
 					</header>
-					<?php if ( ! empty( $video['accessible'] ) && ! empty( $video['hls_url'] ) ) : ?>
+					<?php if ( ! empty( $video['accessible'] ) && ( ! empty( $video['hls_url'] ) || $is_demo ) ) : ?>
 						<div class="mc-lesson-player">
 							<?php echo do_shortcode( '[mathcourse_video lesson_id="' . absint( $post_id ) . '" course_id="' . absint( $course_id ) . '"]' ); ?>
 						</div>
