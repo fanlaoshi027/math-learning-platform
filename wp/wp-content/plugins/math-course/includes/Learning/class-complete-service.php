@@ -1,111 +1,34 @@
 <?php
-
 namespace MathCourse\Learning;
 
 defined('ABSPATH') || exit;
 
+use MathCourse\Progress\Progress_Service;
 
-class Complete_Service
-{
+/**
+ * @deprecated Completion is now handled by Progress_Service.
+ * Kept as a compatibility wrapper for older integrations.
+ */
+class Complete_Service {
+    public function save($user_id, $course_id, $lesson_id) {
+        $user_id   = absint($user_id);
+        $course_id = absint($course_id);
+        $lesson_id = absint($lesson_id);
 
+        if (!$user_id || !$course_id || !$lesson_id) return false;
 
-    public function save(
-        $user_id,
-        $course_id,
-        $lesson_id
-    )
-    {
+        $service = new Progress_Service();
+        $actual_course_id = $service->get_lesson_course_id($lesson_id);
+        if (!$actual_course_id || $actual_course_id !== $course_id) return false;
 
-
-        global $wpdb;
-
-
-        $table =
-        $wpdb->prefix .
-        'mathcourse_learning';
-
-
-
-        return $wpdb->replace(
-
-            $table,
-
-            array(
-
-                'user_id'=>$user_id,
-
-                'course_id'=>$course_id,
-
-                'lesson_id'=>$lesson_id,
-
-                'completed_time'=>current_time(
-                    'mysql'
-                )
-
-            ),
-
-            array(
-
-                '%d',
-
-                '%d',
-
-                '%d',
-
-                '%s'
-
-            )
-
-        );
-
-
+        return $service->complete_lesson($user_id, $lesson_id, false);
     }
 
+    public function is_complete($user_id, $lesson_id) {
+        $user_id   = absint($user_id);
+        $lesson_id = absint($lesson_id);
+        if (!$user_id || !$lesson_id) return false;
 
-
-
-    public function is_complete(
-        $user_id,
-        $lesson_id
-    )
-    {
-
-
-        global $wpdb;
-
-
-        $table =
-        $wpdb->prefix .
-        'mathcourse_learning';
-
-
-
-        $count =
-        $wpdb->get_var(
-
-            $wpdb->prepare(
-
-                "
-                SELECT COUNT(*)
-                FROM {$table}
-                WHERE user_id=%d
-                AND lesson_id=%d
-                ",
-
-                $user_id,
-
-                $lesson_id
-
-            )
-
-        );
-
-
-
-        return $count > 0;
-
-
+        return (new Progress_Service())->is_completed($user_id, $lesson_id);
     }
-
-
 }
