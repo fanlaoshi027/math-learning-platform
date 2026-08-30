@@ -15,7 +15,6 @@ class Player {
 	public function __construct() {
 		$this->tutor = new Adapter();
 		add_shortcode( 'mathcourse_video', array( $this, 'render' ) );
-		add_action( 'wp_enqueue_scripts', array( $this, 'assets' ) );
 	}
 
 	public function assets() {
@@ -58,6 +57,9 @@ class Player {
 		}
 
 		$course_id = absint( $video['course_id'] ?: $course_id );
+
+		// Load player assets only on pages that actually render a player.
+		$this->assets();
 
 		// MathCourse HLS is the preferred protected playback path. Do not expose
 		// a configured HLS URL when the lesson is locked.
