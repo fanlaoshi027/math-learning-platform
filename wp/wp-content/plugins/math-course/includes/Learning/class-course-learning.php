@@ -12,32 +12,22 @@ class Course_Learning {
     }
 
     public function render($atts = array()) {
-        if (!is_user_logged_in()) {
-            return '<p>请登录后学习</p>';
-        }
-
+        if (!is_user_logged_in()) return '<p>请登录后学习</p>';
         $atts = shortcode_atts(array('course_id' => 0), $atts, 'mathcourse_course_learning');
         $course_id = absint($atts['course_id']);
-        if (!$course_id && isset($_GET['course_id'])) {
-            $course_id = absint($_GET['course_id']);
-        }
-        if (!$course_id) {
-            return '<p>课程信息不存在。</p>';
-        }
+        if (!$course_id && isset($_GET['course_id'])) $course_id = absint($_GET['course_id']);
+        if (!$course_id) return '<p>课程信息不存在。</p>';
 
         $user_id = get_current_user_id();
         $directory = (new Course_Service())->get_course_directory($course_id, $user_id);
-        if (!$directory) {
-            return '<p>课程不存在。</p>';
-        }
-        if (empty($directory['access'])) {
-            return '<p>你还没有获得该课程的学习权限。</p>';
-        }
+        if (!$directory) return '<p>课程不存在。</p>';
+        if (empty($directory['access'])) return '<p>你还没有获得该课程的学习权限。</p>';
 
         $progress = isset($directory['progress']) ? $directory['progress'] : array('completed' => 0, 'total' => 0, 'percent' => 0);
         $learning_page = get_permalink(get_page_by_path('学习课程')) ?: home_url('/学习课程/');
         $current_lesson_id = isset($_GET['lesson_id']) ? absint($_GET['lesson_id']) : 0;
         $continue_lesson = $this->find_continue_lesson($directory);
+        $navigation = $this->get_lesson_navigation($directory, $current_lesson_id, $learning_page);
 
         ob_start();
         ?>
@@ -52,6 +42,21 @@ class Course_Learning {
                     <span><?php echo !empty($progress['completed']) ? '继续学习' : '开始学习'; ?></span>
                     <a href="<?php echo esc_url($continue_lesson['url']); ?>"><?php echo esc_html($continue_lesson['title']); ?> →</a>
                 </div>
+            <?php endif; ?>
+
+            <?php if ($current_lesson_id && ($navigation['previous'] || $navigation['next'])) : ?>
+                <nav class="mc-learning-nav" aria-label="课时导航">
+                    <?php if ($navigation['previous']) : ?>
+                        <a href="<?php echo esc_url($navigation['previous']['url']); ?>">← <?php echo esc_html($navigation['previous']['title']); ?></a>
+                    <?php else : ?>
+                        <span aria-hidden="true"></span>
+                    <?php endif; ?>
+                    <?php if ($navigation['next']) : ?>
+                        <a class="is-primary" href="<?php echo esc_url($navigation['next']['url']); ?>">下一讲：<?php echo esc_html($navigation['next']['title']); ?> →</a>
+                    <?php else : ?>
+                        <a href="<?php echo esc_url($learning_page); ?>">返回课程 →</a>
+                    <?php endif; ?>
+                </nav>
             <?php endif; ?>
 
             <div class="mc-course-outline">
@@ -116,5 +121,33 @@ class Course_Learning {
             }
         }
         return $last_completed;
+    }
+
+    private function get_lesson_navigation($data, $current_lesson_id, $learning_page) {
+        $lessons = array();
+        foreach ($data['topics'] as $topic) {
+            foreach ($topic['lessons'] as $lesson) {
+                if (!empty($lesson['accessible'])) $lessons[] = $lesson;
+            }
+        }
+        $current_index = -1;
+        foreach ($lessons as $index => $lesson) {
+            if (absint($lesson['id']) === absint($current_lesson_id)) {
+                $current_index = $index;
+                break;
+            }
+        }
+        if ($current_index < 0) return array('previous' => null, 'next' => null);
+
+        $make_link = static function ($lesson) use ($learning_page) {
+            return array(
+                'title' => isset($lesson['title']) ? $lesson['title'] : '',
+                'url' => add_query_arg('lesson_id', absint($lesson['id']), $learning_page),
+            );
+        };
+        return array(
+            'previous' => $current_index > 0 ? $make_link($lessons[$current_index - 1]) : null,
+            'next' => isset($lessons[$current_index + 1]) ? $make_link($lessons[$current_index + 1]) : null,
+        );
     }
 }
