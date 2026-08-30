@@ -37,10 +37,11 @@ class Course_Service {
         $lesson = $this->tutor->get_lesson($lesson_id);
         if (!$lesson) return null;
 
-        $preview = $this->tutor->is_preview_lesson($lesson_id);
         $course_id = $this->tutor->get_lesson_course_id($lesson_id);
-        $course_access = $user_id ? $this->access->can_access_course($user_id, $course_id) : false;
-        $accessible = $course_access || $preview;
+        if (!$course_id) return null;
+
+        $accessible = $this->access->can_watch_lesson($user_id, $course_id, $lesson_id);
+        $preview = $this->access->can_preview($course_id, $lesson_id);
         $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson_id);
 
         return array(
@@ -66,8 +67,8 @@ class Course_Service {
             $lessons = array();
             foreach ($this->tutor->get_lessons($topic->ID, false) as $lesson) {
                 $completed_lesson = ($course_access && $user_id) ? $this->progress->is_completed($user_id, $lesson->ID) : false;
-                $preview = $this->tutor->is_preview_lesson($lesson->ID);
-                $accessible = $course_access || $preview;
+                $preview = $this->access->can_preview($course->ID, $lesson->ID);
+                $accessible = $this->access->can_watch_lesson($user_id, $course->ID, $lesson->ID);
                 $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson->ID);
 
                 $lessons[] = array(
