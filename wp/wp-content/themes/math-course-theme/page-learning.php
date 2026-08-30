@@ -5,7 +5,6 @@
  * Theme controls layout only. Course, access, video and progress logic
  * are provided by the MathCourse plugin.
  */
-
 defined( 'ABSPATH' ) || exit;
 
 get_header();
@@ -15,15 +14,13 @@ $course_id    = 0;
 $lesson_title = '';
 $access_error = '';
 
-if ( $lesson_id && function_exists( 'tutor' ) ) {
-	$lesson = get_post( $lesson_id );
+if ( $lesson_id && class_exists( '\MathCourse\Tutor\Adapter' ) ) {
+	$adapter = new \MathCourse\Tutor\Adapter();
+	$lesson  = $adapter->get_lesson( $lesson_id );
 
-	if ( $lesson && tutor()->lesson_post_type === $lesson->post_type ) {
-		$topic = get_post( $lesson->post_parent );
-		if ( $topic && 'topics' === $topic->post_type ) {
-			$course_id    = absint( $topic->post_parent );
-			$lesson_title = get_the_title( $lesson_id );
-		}
+	if ( $lesson ) {
+		$course_id    = $adapter->get_lesson_course_id( $lesson_id );
+		$lesson_title = get_the_title( $lesson_id );
 	}
 }
 
