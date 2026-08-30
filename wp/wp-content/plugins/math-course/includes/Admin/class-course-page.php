@@ -10,7 +10,7 @@ class Course_Page {
     public function render() {
         if (!current_user_can('manage_options')) return;
         $adapter = new Adapter();
-        $courses = $this->get_courses();
+        $courses = $adapter->get_courses(true, 50);
         $total_lessons = 0;
         foreach ($courses as $course) $total_lessons += $adapter->get_course_lesson_count((int)$course->ID);
         ?>
@@ -43,6 +43,5 @@ class Course_Page {
         </div>
         <?php
     }
-    private function get_courses() { if(!function_exists('tutor')) return array(); return get_posts(array('post_type'=>tutor()->course_post_type,'post_status'=>array('publish','draft','private'),'posts_per_page'=>50,'orderby'=>array('menu_order'=>'ASC','date'=>'DESC'))); }
     private function count_status($courses,$status) { $n=0; foreach($courses as $course) if($status===$course->post_status)$n++; return $n; }
 }
