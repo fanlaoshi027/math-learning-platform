@@ -1,0 +1,152 @@
+<?php
+/**
+ * Scale Question (learning-area quiz attempt).
+ *
+ * Pro-only frontend for the Scale quiz type. Backend grading and data contract
+ * are handled by Tutor Pro.
+ *
+ * @package TutorPro\Templates
+ * @subpackage LearningArea\Quiz\Questions
+ * @since 4.0.0
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+use Tutor\Components\Constants\Color;
+use Tutor\Components\Constants\Size;
+use TUTOR\Icon;
+use Tutor\Components\SvgIcon;
+
+global $tutor_is_started_quiz;
+
+// Mark that the new learning-area scale template has rendered for this question
+// so Tutor Pro can skip its legacy renderer when appropriate.
+$question_id = isset( $question['question_id'] ) ? (int) $question['question_id'] : 0;
+if ( $question_id > 0 ) {
+	if ( ! isset( $GLOBALS['tutor_learning_area_scale_rendered'] ) || ! is_array( $GLOBALS['tutor_learning_area_scale_rendered'] ) ) {
+		$GLOBALS['tutor_learning_area_scale_rendered'] = array();
+	}
+	$GLOBALS['tutor_learning_area_scale_rendered'][ $question_id ] = true;
+}
+
+$attempt_id = ( is_object( $tutor_is_started_quiz ) && isset( $tutor_is_started_quiz->attempt_id ) ) ? (int) $tutor_is_started_quiz->attempt_id : 0;
+
+// Field name used by TutorCore form + PHP submit handler.
+$field_name_base = $question_field_name_base ?? '';
+$field_name      = $field_name_base . '[answers][scale][value]';
+$register_attr   = "register('{$field_name}')";
+
+// Compatibility: $question here is an array prepared by Quiz::render_question.
+$question_type = isset( $question['question_type'] ) ? (string) $question['question_type'] : 'scale';
+$answers       = isset( $question['question_answers'] ) && is_array( $question['question_answers'] ) ? $question['question_answers'] : array();
+
+$answer = ! empty( $answers ) ? (object) $answers[0] : null;
+
+if ( ! $answer ) {
+	return;
+}
+
+$target_json = ! empty( $answer->answer_two_gap_match ) ? $answer->answer_two_gap_match : '';
+$target      = is_string( $target_json ) ? json_decode( stripslashes( $target_json ), true ) : null;
+
+// Get scale configuration from answer settings or use defaults.
+$scale_config     = is_array( $target ) && isset( $target['config'] ) ? $target['config'] : array();
+$min_value        = (float) ( $scale_config['min'] ?? 0 );
+$max_value        = (float) ( $scale_config['max'] ?? 100 );
+$step             = (float) ( $scale_config['step'] ?? 1 );
+$default_val      = (float) ( $scale_config['defaultValue'] ?? ( ( $min_value + $max_value ) / 2 ) );
+$px_per_unit      = (float) ( $scale_config['pxPerUnit'] ?? 10 );
+$label_every      = (float) ( $scale_config['labelEvery'] ?? max( 1, ( $max_value - $min_value ) / 10 ) );
+$minor_tick_every = (float) ( $scale_config['minorTickEvery'] ?? max( 1, ( $max_value - $min_value ) / 50 ) );
+$precision        = (int) ( $scale_config['precision'] ?? ( ( $step < 1 ) ? 2 : 0 ) );
+
+// Unique DOM IDs for this question instance.
+$wrapper_id      = 'tutor-scale-question-' . $question_id;
+$container_id    = 'tutor-scale-container-' . $question_id;
+$scale_id        = 'tutor-scale-' . $question_id;
+$bubble_id       = 'tutor-scale-bubble-' . $question_id;
+$input_id        = 'tutor-scale-value-' . $question_id;
+$instruction_id  = 'tutor-scale-instruction-' . $question_id;
+$live_region_id  = 'tutor-scale-live-' . $question_id;
+
+/**
+ * Allow Tutor Pro to enqueue the scale-question script for the new frontend.
+ *
+ * @since 4.0.0
+ */
+do_action( 'tutor_enqueue_scale_question_script' );
+?>
+
+<div
+	id="<?php echo esc_attr( $wrapper_id ); ?>"
+	class="quiz-question-ans-choice-area tutor-mt-40 tutor-scale-question question-type-<?php echo esc_attr( $question_type ); ?> <?php echo esc_html( $answer_is_required ? 'quiz-answer-required' : '' ); ?>"
+	data-question-type="<?php echo esc_attr( $question_type ); ?>"
+	data-question-id="<?php echo esc_attr( (string) $question_id ); ?>"
+	data-scale-config="
+		<?php
+		echo esc_attr(
+			wp_json_encode(
+				array(
+					'min'            => $min_value,
+					'max'            => $max_value,
+					'step'           => $step,
+					'defaultValue'   => $default_val,
+					'pxPerUnit'      => $px_per_unit,
+					'labelEvery'     => $label_every,
+					'minorTickEvery' => $minor_tick_every,
+					'precision'      => $precision,
+				)
+			)
+		);
+		?>
+		"
+>
+	<div class="tutor-scale-slider-wrapper">
+		<div
+			class="tutor-scale-container"
+			id="<?php echo esc_attr( $container_id ); ?>"
+			role="slider"
+			tabindex="0"
+			aria-valuemin="<?php echo esc_attr( (string) $min_value ); ?>"
+			aria-valuemax="<?php echo esc_attr( (string) $max_value ); ?>"
+			aria-valuenow="<?php echo esc_attr( (string) $default_val ); ?>"
+			aria-valuetext="<?php echo esc_attr( (string) $default_val ); ?>"
+			aria-describedby="<?php echo esc_attr( $instruction_id ); ?>"
+			aria-label="<?php esc_attr_e( 'Interactive scale: drag or use arrow keys to select your answer value.', 'tutor-pro' ); ?>"
+		>
+			<div class="tutor-scale" id="<?php echo esc_attr( $scale_id ); ?>">
+				<!-- Ticks will be generated by JavaScript -->
+			</div>
+		</div>
+
+		<div class="tutor-scale-bubble" id="<?php echo esc_attr( $bubble_id ); ?>">
+			<div class="tutor-scale-bubble-value"><?php echo esc_html( $default_val ); ?></div>
+			<div class="tutor-scale-bubble-pointer"></div>
+		</div>
+
+		<div class="tutor-scale-instructions">
+			<div class="tutor-scale-hand-icon" aria-hidden="true">
+				<?php SvgIcon::make()->name( Icon::HAND_SWIPE_RIGHT )->size( Size::SIZE_20 )->color( Color::SECONDARY )->flip_rtl()->render(); ?>
+			</div>
+			<span id="<?php echo esc_attr( $instruction_id ); ?>" class="tutor-scale-instruction-text">
+				<?php esc_html_e( 'Move the scale left or right to set the correct value', 'tutor-pro' ); ?>
+			</span>
+		</div>
+
+		<div
+			id="<?php echo esc_attr( $live_region_id ); ?>"
+			class="tutor-quiz-a11y-live-region tutor-quiz-a11y-sr-only"
+			aria-live="polite"
+			aria-atomic="true"
+			role="status"
+		></div>
+	</div>
+
+	<input
+		type="hidden"
+		id="<?php echo esc_attr( $input_id ); ?>"
+		name="<?php echo esc_attr( $field_name ); ?>"
+		x-bind="<?php echo esc_attr( $register_attr ); ?>"
+		value=""
+	/>
+</div>
