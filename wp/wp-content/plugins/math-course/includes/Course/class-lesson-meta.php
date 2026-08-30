@@ -2,23 +2,32 @@
 
 namespace MathCourse\Course;
 
+use MathCourse\Tutor\Adapter;
+
 defined('ABSPATH') || exit;
 
 class Lesson_Meta {
 
+    /** @var Adapter */
+    private $tutor;
+
     public function __construct() {
+        $this->tutor = new Adapter();
         add_action('add_meta_boxes', array($this, 'add'));
         add_action('save_post', array($this, 'save'), 10, 2);
     }
 
     public function add() {
-        if (!function_exists('tutor')) return;
+        if (!$this->tutor->is_available()) return;
+
+        $lesson_post_type = $this->tutor->get_lesson_post_type();
+        if (!$lesson_post_type) return;
 
         add_meta_box(
             'mathcourse_lesson_settings',
             'MathCourse 课时信息',
             array($this, 'render'),
-            'lesson',
+            $lesson_post_type,
             'side',
             'high'
         );
@@ -47,7 +56,7 @@ class Lesson_Meta {
     }
 
     public function save($post_id, $post) {
-        if (!$post || 'lesson' !== $post->post_type) return;
+        if (!$post || !$this->tutor->is_lesson_post_type($post->post_type)) return;
         if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || wp_is_post_revision($post_id)) return;
         if (!current_user_can('edit_post', $post_id)) return;
 
