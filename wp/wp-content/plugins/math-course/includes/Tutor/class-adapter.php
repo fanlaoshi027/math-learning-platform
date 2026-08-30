@@ -13,8 +13,28 @@ class Adapter {
         return function_exists('tutor');
     }
 
+    /** Tutor 课程 Post Type。业务层不得自行猜测。 */
+    public function get_course_post_type() {
+        return $this->is_available() && !empty(tutor()->course_post_type) ? tutor()->course_post_type : '';
+    }
+
+    /** Tutor 课时 Post Type。业务层不得自行猜测。 */
+    public function get_lesson_post_type() {
+        return $this->is_available() && !empty(tutor()->lesson_post_type) ? tutor()->lesson_post_type : '';
+    }
+
+    /** MathCourse/Tutor 课程所属的 Topic Post Type。 */
+    public function get_topic_post_type() {
+        return 'topics';
+    }
+
     public function get_courses($include_unpublished = true, $limit = -1) {
         if (!$this->is_available()) {
+            return array();
+        }
+
+        $post_type = $this->get_course_post_type();
+        if (!$post_type) {
             return array();
         }
 
@@ -25,7 +45,7 @@ class Adapter {
         }
 
         return get_posts(array(
-            'post_type'      => tutor()->course_post_type,
+            'post_type'      => $post_type,
             'post_status'    => $status,
             'posts_per_page' => $limit,
             'orderby'        => array('menu_order' => 'ASC', 'date' => 'DESC'),
@@ -34,9 +54,10 @@ class Adapter {
 
     public function get_course($course_id) {
         $course_id = absint($course_id);
+        $post_type = $this->get_course_post_type();
         $course = $course_id ? get_post($course_id) : null;
 
-        if (!$course || !$this->is_available() || tutor()->course_post_type !== $course->post_type) {
+        if (!$course || !$post_type || $post_type !== $course->post_type) {
             return null;
         }
 
@@ -45,9 +66,10 @@ class Adapter {
 
     public function get_topics($course_id, $include_unpublished = true) {
         $status = $include_unpublished ? array('publish', 'draft', 'private') : array('publish');
+        $post_type = $this->get_topic_post_type();
 
         return get_posts(array(
-            'post_type'      => 'topics',
+            'post_type'      => $post_type,
             'post_parent'    => absint($course_id),
             'post_status'    => $status,
             'posts_per_page' => -1,
@@ -56,7 +78,11 @@ class Adapter {
     }
 
     public function get_lessons($topic_id, $include_unpublished = true) {
-        $lesson_post_type = $this->is_available() ? tutor()->lesson_post_type : 'lesson';
+        $lesson_post_type = $this->get_lesson_post_type();
+        if (!$lesson_post_type) {
+            return array();
+        }
+
         $status = $include_unpublished ? array('publish', 'draft', 'private') : array('publish');
 
         return get_posts(array(
@@ -88,12 +114,13 @@ class Adapter {
 
     public function get_lesson($lesson_id) {
         $lesson_id = absint($lesson_id);
-        if (!$lesson_id || !$this->is_available()) {
+        $lesson_post_type = $this->get_lesson_post_type();
+        if (!$lesson_id || !$lesson_post_type) {
             return null;
         }
 
         $lesson = get_post($lesson_id);
-        if (!$lesson || tutor()->lesson_post_type !== $lesson->post_type) {
+        if (!$lesson || $lesson_post_type !== $lesson->post_type) {
             return null;
         }
 
@@ -107,7 +134,7 @@ class Adapter {
         }
 
         $topic = get_post($lesson->post_parent);
-        if (!$topic || 'topics' !== $topic->post_type) {
+        if (!$topic || $this->get_topic_post_type() !== $topic->post_type) {
             return 0;
         }
 
