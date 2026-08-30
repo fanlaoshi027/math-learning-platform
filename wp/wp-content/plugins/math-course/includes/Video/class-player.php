@@ -24,14 +24,8 @@ class Player {
 	}
 
 	/**
-	 * Render a lesson video.
-	 *
-	 * Priority:
-	 * 1. MathCourse HLS URL, when one has been configured.
-	 * 2. The native Tutor LMS video already stored in the lesson's _video meta.
-	 *
-	 * This keeps existing Tutor LMS uploads playable while we progressively move
-	 * to the MathCourse HLS/token playback pipeline.
+	 * Render a lesson video only after MathCourse has granted playback access.
+	 * The player itself is never responsible for deciding course permissions.
 	 */
 	public function render( $atts ) {
 		$atts = shortcode_atts(
@@ -45,21 +39,24 @@ class Player {
 
 		$lesson_id = absint( $atts['lesson_id'] );
 		$course_id = absint( $atts['course_id'] );
+		$user_id   = get_current_user_id();
 
-		if ( $lesson_id ) {
-			$service = new Course_Service();
-			$video   = $service->get_lesson_video( $lesson_id, get_current_user_id() );
-
-			if ( empty( $video['accessible'] ) ) {
-				return '<div class="mc-video-locked">该课时需要课程授权后才能观看。</div>';
-			}
-
-			$atts['url'] = ! empty( $video['hls_url'] ) ? $video['hls_url'] : '';
-			$course_id  = absint( $video['course_id'] );
+		if ( ! $lesson_id ) {
+			return '<div class="mc-video-missing">未指定课时。</div>';
 		}
 
-		// If MathCourse has an HLS URL, use our Video.js player.
-		if ( ! empty( $atts['url'] ) ) {
+		$service = new Course_Service();
+		$video   = $service->get_lesson_video( $lesson_id, $user_id );
+
+		if ( empty( $video['id'] ) || empty( $video['accessible'] ) ) {
+			return '<div class="mc-video-locked">该课时需要课程授权或试看权限后才能观看。</div>';
+		}
+
+		$course_id = absint( $video['course_id'] ?: $course_id );
+
+		// MathCourse HLS is the preferred protected playback path. Do not expose
+		// a configured HLS URL when the lesson is locked.
+		if ( ! empty( $video['hls_url'] ) ) {
 			ob_start();
 			?>
 			<video
@@ -70,14 +67,15 @@ class Player {
 				playsinline
 				data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>"
 				data-course-id="<?php echo esc_attr( $course_id ); ?>">
-				<source src="<?php echo esc_url( $atts['url'] ); ?>" type="application/x-mpegURL">
+				<source src="<?php echo esc_url( $video['hls_url'] ); ?>" type="application/x-mpegURL">
 			</video>
 			<?php
 			return ob_get_clean();
 		}
 
-		// Existing lessons may have been uploaded through Tutor LMS. Do not force
-		// the administrator to re-enter an HLS address just to play those videos.
+		// A lesson may still use Tutor LMS's native video while it is being
+		// migrated to the MathCourse HLS pipeline. Permission has already been
+		// checked above, so this fallback is safe from the page-level access side.
 		$tutor_player = $this->render_tutor_video( $lesson_id );
 		if ( $tutor_player ) {
 			return $tutor_player;
@@ -87,7 +85,7 @@ class Player {
 	}
 
 	/**
-	 * Render Tutor LMS's native lesson video from the existing _video metadata.
+	 * Render Tutor LMS's native lesson video from existing _video metadata.
 	 */
 	private function render_tutor_video( $lesson_id ) {
 		if ( ! $lesson_id || ! function_exists( 'tutor_lesson_video' ) || ! function_exists( 'tutor_utils' ) ) {
@@ -95,12 +93,7 @@ class Player {
 		}
 
 		$lesson = get_post( $lesson_id );
-		if ( ! $lesson ) {
-			return '';
-		}
-
-		$video_meta = get_post_meta( $lesson_id, '_video', true );
-		if ( empty( $video_meta ) ) {
+		if ( ! $lesson || empty( get_post_meta( $lesson_id, '_video', true ) ) ) {
 			return '';
 		}
 
@@ -112,8 +105,6 @@ class Player {
 		try {
 			$video_info = tutor_utils()->get_video_info();
 			if ( ! $video_info ) {
-				wp_reset_postdata();
-				$post = $previous_post;
 				return '';
 			}
 
