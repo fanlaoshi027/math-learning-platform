@@ -1,0 +1,88 @@
+/* MathCourse Learning UI — mobile-first, lightweight. */
+.mc-learning-page {
+	min-height: 70vh;
+	padding: 20px 0 48px;
+	background: var(--mc-bg, #f6f8fb);
+}
+.mc-learning-container {
+	width: min(1180px, calc(100% - 28px));
+	margin: 0 auto;
+}
+.mc-learning-page .mc-video-card,
+.mc-learning-page .mc-lesson-card,
+.mc-learning-page .mc-outline-card {
+	background: #fff;
+	border: 1px solid var(--mc-line, #e5eaf0);
+	border-radius: 16px;
+	box-shadow: 0 8px 28px rgba(13,41,66,.055);
+}
+.mc-learning-page .mc-video-card {
+	overflow: hidden;
+	margin-bottom: 12px;
+}
+.mc-learning-page .mc-video-box {
+	background: #0b1724;
+	aspect-ratio: 16 / 9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+}
+.mc-learning-page .mc-video-box video,
+.mc-learning-page .mc-video-box .video-js {
+	width: 100%;
+	height: 100%;
+}
+.mc-learning-page .mc-lesson-card {
+	padding: 18px 20px;
+	margin-bottom: 12px;
+}
+.mc-learning-page .mc-lesson-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.mc-learning-page .mc-lesson-header h1 {
+	margin: 0;
+	color: var(--mc-navy, #0d2942);
+	font-size: 19px;
+	line-height: 1.45;
+	letter-spacing: -.025em;
+}
+.mc-learning-page .mc-outline-card {
+	padding: 18px 20px 22px;
+}
+.mc-learning-page .mc-outline-card h2 {
+	margin: 0 0 15px;
+	color: var(--mc-navy, #0d2942);
+	font-size: 16px;
+}
+.mc-learning-page .mc-outline-card a {
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+}
+.mc-learning-page .mc-outline-card a:focus-visible,
+.mc-learning-page .mc-lesson-card a:focus-visible {
+	outline: 3px solid rgba(23,105,224,.22);
+	outline-offset: 2px;
+}
+@media (min-width: 900px) {
+	.mc-learning-page { padding: 28px 0 64px; }
+	.mc-learning-container { width: min(1180px, calc(100% - 40px)); }
+	.mc-learning-page .mc-video-card { margin-bottom: 14px; }
+	.mc-learning-page .mc-lesson-card { padding: 20px 24px; }
+	.mc-learning-page .mc-outline-card { padding: 22px 24px 26px; }
+}
+@media (max-width: 640px) {
+	.mc-learning-page { padding-top: 10px; }
+	.mc-learning-container { width: calc(100% - 20px); }
+	.mc-learning-page .mc-video-card { border-radius: 12px; margin-left: -10px; margin-right: -10px; border-left: 0; border-right: 0; box-shadow: none; }
+	.mc-learning-page .mc-lesson-card,
+	.mc-learning-page .mc-outline-card { border-radius: 14px; }
+	.mc-learning-page .mc-lesson-header h1 { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.mc-learning-page *, .mc-learning-page *::before, .mc-learning-page *::after { transition: none !important; scroll-behavior: auto !important; }
+}
