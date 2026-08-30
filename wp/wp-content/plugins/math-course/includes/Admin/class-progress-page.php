@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
 
 use MathCourse\Access\Access_Service;
 use MathCourse\Progress\Progress_Service;
+use MathCourse\Tutor\Adapter;
 
 class Progress_Page {
 
@@ -14,7 +15,8 @@ class Progress_Page {
             wp_die( esc_html__( 'You do not have permission to access this page.', 'mathcourse' ) );
         }
 
-        if ( ! function_exists( 'tutor' ) ) {
+        $tutor = new Adapter();
+        if ( ! $tutor->is_available() ) {
             $this->notice( 'MathCourse 需要 Tutor LMS 4.0.4。' );
             return;
         }
@@ -31,9 +33,15 @@ class Progress_Page {
             )
         );
 
+        $course_post_type = $tutor->get_course_post_type();
+        if ( ! $course_post_type ) {
+            $this->notice( '无法获取 Tutor LMS 课程类型。' );
+            return;
+        }
+
         $courses = get_posts(
             array(
-                'post_type'      => tutor()->course_post_type,
+                'post_type'      => $course_post_type,
                 'post_status'    => array( 'publish', 'draft', 'private' ),
                 'posts_per_page' => 100,
                 'orderby'        => 'date',
