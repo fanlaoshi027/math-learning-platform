@@ -13,12 +13,14 @@ defined( 'ABSPATH' ) || exit;
  * @return void
  */
 function mc_theme_assets() {
-	$style_path  = get_stylesheet_directory() . '/style.css';
-	$ui_path     = get_stylesheet_directory() . '/assets/css/reference-ui.css';
-	$detail_path = get_stylesheet_directory() . '/assets/css/course-detail.css';
-	$version     = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
-	$ui_version  = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
+	$style_path   = get_stylesheet_directory() . '/style.css';
+	$ui_path      = get_stylesheet_directory() . '/assets/css/reference-ui.css';
+	$detail_path  = get_stylesheet_directory() . '/assets/css/course-detail.css';
+	$learning_path = get_stylesheet_directory() . '/assets/css/learning.css';
+	$version      = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
+	$ui_version   = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
 	$detail_version = file_exists( $detail_path ) ? (string) filemtime( $detail_path ) : '1.0.0';
+	$learning_version = file_exists( $learning_path ) ? (string) filemtime( $learning_path ) : '1.0.0';
 
 	wp_enqueue_style( 'mc-theme-style', get_stylesheet_uri(), array(), $version );
 
@@ -36,6 +38,10 @@ function mc_theme_assets() {
 
 	if ( $load_course_ui && ( isset( $_GET['course_id'] ) || has_shortcode( $queried_content, 'mathcourse_course_directory' ) ) ) {
 		wp_enqueue_style( 'mc-course-detail', get_stylesheet_directory_uri() . '/assets/css/course-detail.css', array( 'mc-reference-ui' ), $detail_version );
+	}
+
+	if ( is_page_template( 'page-learning.php' ) ) {
+		wp_enqueue_style( 'mc-learning', get_stylesheet_directory_uri() . '/assets/css/learning.css', array( 'mc-theme-style' ), $learning_version );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
