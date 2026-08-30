@@ -24,7 +24,8 @@ class Access_Service {
     }
 
     /**
-     * 登录学员只有在 MathCourse 获得授权后，才能完整学习课程。
+     * 管理员可以直接预览课程，方便老师上传和检查课时视频。
+     * 普通学员仍然必须通过 MathCourse 授权才能完整学习课程。
      */
     public function can_access_course($user_id, $course_id) {
         $user_id   = absint($user_id);
@@ -32,6 +33,10 @@ class Access_Service {
 
         if (!$user_id || !$course_id) {
             return false;
+        }
+
+        if (user_can($user_id, 'manage_options')) {
+            return true;
         }
 
         return $this->has_access($user_id, $course_id);
@@ -48,6 +53,12 @@ class Access_Service {
         );
 
         if (!$user_id || !$course_id) {
+            return $result;
+        }
+
+        if (user_can($user_id, 'manage_options')) {
+            $result['access'] = true;
+            $result['status'] = 'admin';
             return $result;
         }
 
@@ -144,14 +155,16 @@ class Access_Service {
             return false;
         }
 
-        return 'yes' === get_post_meta($lesson_id, '_mathcourse_preview', true);
+        return 'yes' === get_post_meta($lesson_id, '_mathcourse_preview', true)
+            || 'yes' === get_post_meta($lesson_id, '_is_preview', true);
     }
 
     /**
      * 最终播放权限：
-     * 1. 已授权学员：全部已发布课时；
-     * 2. 未授权学员/游客：只有 MathCourse 标记为“允许试看”的课时；
-     * 3. Tutor LMS Public/Private/Free 设置不会绕过上述规则。
+     * 1. 管理员：可直接预览，用于课程维护；
+     * 2. 已授权学员：全部已发布课时；
+     * 3. 未授权学员/游客：只有明确标记为“允许试看”的课时；
+     * 4. Tutor LMS Public/Private/Free 设置不会绕过上述规则。
      */
     public function can_watch_lesson($user_id, $course_id, $lesson_id) {
         $user_id   = absint($user_id);
