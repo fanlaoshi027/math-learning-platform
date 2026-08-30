@@ -4,14 +4,17 @@ namespace MathCourse\Video;
 defined('ABSPATH') || exit;
 
 use MathCourse\Access\Access_Service;
+use MathCourse\Tutor\Adapter;
 
 /** Short-lived signed HLS gateway. */
 class Video_Router {
     private $access;
+    private $adapter;
     private $token_ttl = 600;
 
     public function __construct() {
-        $this->access = new Access_Service();
+        $this->access  = new Access_Service();
+        $this->adapter = new Adapter();
         add_action('init', array($this, 'register_route'));
         add_action('template_redirect', array($this, 'handle'));
     }
@@ -25,7 +28,7 @@ class Video_Router {
 
     public function get_protected_url($lesson_id) {
         $lesson_id = absint($lesson_id);
-        if (!$lesson_id) return '';
+        if (!$lesson_id || !$this->adapter->get_lesson($lesson_id)) return '';
         $expires = time() + $this->token_ttl;
         return home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $this->sign($lesson_id, $expires, '') . '/');
     }
@@ -40,15 +43,16 @@ class Video_Router {
     }
 
     private function get_source_url($lesson_id) {
-        $url = get_post_meta($lesson_id, '_mathcourse_hls_url', true);
-        if (!$url) $url = get_post_meta($lesson_id, '_mathcourse_video_url', true);
-        return esc_url_raw($url);
+        // Keep the real HLS origin behind the server-side Tutor/MathCourse layer.
+        return $this->adapter->get_lesson_hls_url($lesson_id);
     }
 
     private function can_watch($lesson_id) {
-        $course_id = function_exists('tutor_utils') ? absint(tutor_utils()->get_course_id_by_content($lesson_id)) : 0;
-        if (is_user_logged_in() && $course_id && $this->access->can_watch_lesson(get_current_user_id(), $course_id, $lesson_id)) return true;
-        return $course_id && $this->access->can_preview($course_id, $lesson_id);
+        $course_id = $this->adapter->get_lesson_course_id($lesson_id);
+        if (!$course_id) return false;
+
+        if (is_user_logged_in() && $this->access->can_watch_lesson(get_current_user_id(), $course_id, $lesson_id)) return true;
+        return $this->access->can_preview($course_id, $lesson_id);
     }
 
     public function handle() {
@@ -75,7 +79,7 @@ class Video_Router {
         }
 
         if ($file === '') $this->serve_playlist($lesson_id, $expires, $source);
-        else $this->serve_media($lesson_id, $expires, $file);
+        else $this->serve_media($lesson_id, $expires, $file, $source);
         exit;
     }
 
@@ -96,15 +100,50 @@ class Video_Router {
         foreach ($lines as $index => $line) {
             $uri = trim($line);
             if ($uri === '' || strpos($uri, '#') === 0) continue;
-            $absolute = preg_match('#^https?://#i', $uri) ? $uri : $origin . $this->resolve_path($base_dir, $uri);
-            $sig = $this->sign($lesson_id, $expires, $absolute);
-            $lines[$index] = add_query_arg('file', rawurlencode($absolute), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
+
+            // Do not expose the real HLS origin in the browser. The client receives
+            // only an opaque-ish relative file reference; the server resolves it.
+            $file_ref = $uri;
+            if (preg_match('#^https?://#i', $uri)) {
+                $target = wp_parse_url($uri);
+                if (!$target || empty($target['scheme']) || empty($target['host']) || strtolower($target['scheme']) !== strtolower($parts['scheme']) || strtolower($target['host']) !== strtolower($parts['host']) || (!empty($parts['port']) && (string) $parts['port'] !== (string) ($target['port'] ?? ''))) {
+                    status_header(403); exit('视频片段来源无效。');
+                }
+                $file_ref = (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
+            }
+
+            $sig = $this->sign($lesson_id, $expires, $file_ref);
+            $lines[$index] = add_query_arg('file', rawurlencode($file_ref), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
         }
 
         nocache_headers();
         header('Content-Type: application/vnd.apple.mpegurl');
         header('X-Content-Type-Options: nosniff');
         echo implode("\n", $lines);
+    }
+
+    private function resolve_source_file($source, $file_ref) {
+        $source_parts = wp_parse_url($source);
+        if (!$source_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return '';
+
+        if (preg_match('#^https?://#i', $file_ref)) {
+            return '';
+        }
+
+        $file_parts = wp_parse_url($file_ref);
+        if (!$file_parts) return '';
+
+        $origin = strtolower($source_parts['scheme']) . '://' . strtolower($source_parts['host']);
+        if (!empty($source_parts['port'])) $origin .= ':' . $source_parts['port'];
+
+        if (!empty($file_parts['path']) && strpos($file_parts['path'], '/') === 0) {
+            $path = $file_parts['path'];
+        } else {
+            $base_dir = trailingslashit(dirname(isset($source_parts['path']) ? $source_parts['path'] : '/'));
+            $path = $this->resolve_path($base_dir, $file_parts['path'] ?? '');
+        }
+
+        return $origin . $path . (!empty($file_parts['query']) ? '?' . $file_parts['query'] : '');
     }
 
     private function resolve_path($base_dir, $relative) {
@@ -118,20 +157,15 @@ class Video_Router {
         return '/' . implode('/', $segments);
     }
 
-    private function serve_media($lesson_id, $expires, $file) {
+    private function serve_media($lesson_id, $expires, $file_ref, $source) {
         $signature = sanitize_text_field(get_query_var('math_video_sig'));
-        if (!$this->valid_signature($lesson_id, $expires, $file, $signature)) {
+        if (!$this->valid_signature($lesson_id, $expires, $file_ref, $signature)) {
             status_header(403); exit('视频片段访问链接已失效。');
         }
 
-        $source = $this->get_source_url($lesson_id);
-        $source_parts = wp_parse_url($source);
-        $file_parts = wp_parse_url($file);
-        if (!$source_parts || !$file_parts || empty($source_parts['scheme']) || empty($source_parts['host']) || empty($file_parts['scheme']) || empty($file_parts['host'])) {
+        $file = $this->resolve_source_file($source, $file_ref);
+        if (!$file) {
             status_header(403); exit('视频片段地址无效。');
-        }
-        if (strtolower($source_parts['scheme']) !== strtolower($file_parts['scheme']) || strtolower($source_parts['host']) !== strtolower($file_parts['host']) || (!empty($source_parts['port']) && (string) $source_parts['port'] !== (string) ($file_parts['port'] ?? ''))) {
-            status_header(403); exit('视频片段来源无效。');
         }
 
         $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 0, 'sslverify' => true, 'headers' => array('Accept' => '*/*')));
