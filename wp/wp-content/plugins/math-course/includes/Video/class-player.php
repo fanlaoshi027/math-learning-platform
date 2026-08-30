@@ -27,10 +27,6 @@ class Player {
 		) );
 	}
 
-	/**
-	 * Render a lesson video only after MathCourse has granted playback access.
-	 * The player itself is never responsible for deciding course permissions.
-	 */
 	public function render( $atts ) {
 		$atts = shortcode_atts(
 			array(
@@ -58,11 +54,9 @@ class Player {
 
 		$course_id = absint( $video['course_id'] ?: $course_id );
 
-		// Load player assets only on pages that actually render a player.
+		// Load player assets only when this shortcode actually renders a player.
 		$this->assets();
 
-		// MathCourse HLS is the preferred protected playback path. Do not expose
-		// a configured HLS URL when the lesson is locked.
 		if ( ! empty( $video['hls_url'] ) ) {
 			ob_start();
 			?>
@@ -80,9 +74,6 @@ class Player {
 			return ob_get_clean();
 		}
 
-		// A lesson may still use Tutor LMS's native video while it is being
-		// migrated to the MathCourse HLS pipeline. Permission has already been
-		// checked above, so this fallback is safe from the page-level access side.
 		$tutor_player = $this->tutor->render_lesson_video( $lesson_id );
 		if ( $tutor_player ) {
 			return $tutor_player;
