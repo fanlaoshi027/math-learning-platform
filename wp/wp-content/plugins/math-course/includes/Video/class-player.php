@@ -5,10 +5,15 @@ namespace MathCourse\Video;
 defined( 'ABSPATH' ) || exit;
 
 use MathCourse\Course\Course_Service;
+use MathCourse\Tutor\Adapter;
 
 class Player {
 
+	/** @var Adapter */
+	private $tutor;
+
 	public function __construct() {
+		$this->tutor = new Adapter();
 		add_shortcode( 'mathcourse_video', array( $this, 'render' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'assets' ) );
 	}
@@ -76,44 +81,11 @@ class Player {
 		// A lesson may still use Tutor LMS's native video while it is being
 		// migrated to the MathCourse HLS pipeline. Permission has already been
 		// checked above, so this fallback is safe from the page-level access side.
-		$tutor_player = $this->render_tutor_video( $lesson_id );
+		$tutor_player = $this->tutor->render_lesson_video( $lesson_id );
 		if ( $tutor_player ) {
 			return $tutor_player;
 		}
 
 		return '<div class="mc-video-missing">本课时暂未配置可播放的视频资源。</div>';
-	}
-
-	/**
-	 * Render Tutor LMS's native lesson video from existing _video metadata.
-	 */
-	private function render_tutor_video( $lesson_id ) {
-		if ( ! $lesson_id || ! function_exists( 'tutor_lesson_video' ) || ! function_exists( 'tutor_utils' ) ) {
-			return '';
-		}
-
-		$lesson = get_post( $lesson_id );
-		if ( ! $lesson || empty( get_post_meta( $lesson_id, '_video', true ) ) ) {
-			return '';
-		}
-
-		global $post;
-		$previous_post = $post;
-		$post = $lesson;
-		setup_postdata( $lesson );
-
-		try {
-			$video_info = tutor_utils()->get_video_info();
-			if ( ! $video_info ) {
-				return '';
-			}
-
-			$html = tutor_lesson_video( false );
-		} finally {
-			wp_reset_postdata();
-			$post = $previous_post;
-		}
-
-		return is_string( $html ) ? $html : '';
 	}
 }
