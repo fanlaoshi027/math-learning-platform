@@ -13,68 +13,60 @@ class Adapter {
         return function_exists('tutor');
     }
 
-    /** Tutor 课程 Post Type。业务层不得自行猜测。 */
+    /** Tutor 课程 Post Type。Tutor LMS 4.x 默认为 courses。 */
     public function get_course_post_type() {
-        return $this->is_available() && !empty(tutor()->course_post_type) ? tutor()->course_post_type : '';
+        if (!$this->is_available()) return 'courses';
+        $post_type = !empty(tutor()->course_post_type) ? tutor()->course_post_type : 'courses';
+        return sanitize_key($post_type);
     }
 
-    /** Tutor 课时 Post Type。业务层不得自行猜测。 */
+    /** Tutor 课时 Post Type。 */
     public function get_lesson_post_type() {
-        return $this->is_available() && !empty(tutor()->lesson_post_type) ? tutor()->lesson_post_type : '';
+        if (!$this->is_available()) return 'lesson';
+        $post_type = !empty(tutor()->lesson_post_type) ? tutor()->lesson_post_type : 'lesson';
+        return sanitize_key($post_type);
     }
 
     /** MathCourse/Tutor 课程所属的 Topic Post Type。 */
-    public function get_topic_post_type() {
-        return 'topics';
-    }
+    public function get_topic_post_type() { return 'topics'; }
 
-    /** 判断给定 Post Type 是否为 Tutor 课程。 */
-    public function is_course_post_type($post_type) {
-        $course_post_type = $this->get_course_post_type();
-        return $course_post_type && $course_post_type === $post_type;
-    }
-
-    /** 判断给定 Post Type 是否为 Tutor 课时。 */
-    public function is_lesson_post_type($post_type) {
-        $lesson_post_type = $this->get_lesson_post_type();
-        return $lesson_post_type && $lesson_post_type === $post_type;
-    }
+    public function is_course_post_type($post_type) { return $this->get_course_post_type() === $post_type; }
+    public function is_lesson_post_type($post_type) { return $this->get_lesson_post_type() === $post_type; }
 
     public function get_courses($include_unpublished = true, $limit = -1) {
-        if (!$this->is_available()) return array();
         $post_type = $this->get_course_post_type();
-        if (!$post_type) return array();
-        $status = $include_unpublished ? array('publish', 'draft', 'private') : array('publish');
-        $limit = (int) $limit;
-        if (0 === $limit) return array();
-        return get_posts(array('post_type'=>$post_type,'post_status'=>$status,'posts_per_page'=>$limit,'orderby'=>array('menu_order'=>'ASC','date'=>'DESC')));
+        $status = $include_unpublished ? array('publish', 'draft', 'private', 'pending', 'future') : array('publish');
+        $limit = (int)$limit;
+        if ($limit === 0) return array();
+        return get_posts(array(
+            'post_type' => $post_type,
+            'post_status' => $status,
+            'posts_per_page' => $limit,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'no_found_rows' => true,
+        ));
     }
 
     public function get_course($course_id) {
-        $course_id = absint($course_id);
-        $post_type = $this->get_course_post_type();
-        $course = $course_id ? get_post($course_id) : null;
-        if (!$course || !$post_type || $post_type !== $course->post_type) return null;
-        return $course;
+        $course = absint($course_id) ? get_post(absint($course_id)) : null;
+        return ($course && $this->is_course_post_type($course->post_type)) ? $course : null;
     }
 
     public function get_topic($topic_id) {
-        $topic_id = absint($topic_id);
-        if (!$topic_id) return null;
-        $topic = get_post($topic_id);
+        $topic = absint($topic_id) ? get_post(absint($topic_id)) : null;
         return ($topic && $this->get_topic_post_type() === $topic->post_type) ? $topic : null;
     }
 
     public function get_topics($course_id, $include_unpublished = true) {
-        $status = $include_unpublished ? array('publish', 'draft', 'private') : array('publish');
-        return get_posts(array('post_type'=>$this->get_topic_post_type(),'post_parent'=>absint($course_id),'post_status'=>$status,'posts_per_page'=>-1,'orderby'=>array('menu_order'=>'ASC','ID'=>'ASC')));
+        $status = $include_unpublished ? array('publish', 'draft', 'private', 'pending', 'future') : array('publish');
+        return get_posts(array('post_type'=>$this->get_topic_post_type(),'post_parent'=>absint($course_id),'post_status'=>$status,'posts_per_page'=>-1,'orderby'=>'menu_order','order'=>'ASC'));
     }
 
     public function get_lessons($topic_id, $include_unpublished = true) {
         $lesson_post_type = $this->get_lesson_post_type();
-        if (!$lesson_post_type) return array();
-        $status = $include_unpublished ? array('publish', 'draft', 'private') : array('publish');
-        return get_posts(array('post_type'=>$lesson_post_type,'post_parent'=>absint($topic_id),'post_status'=>$status,'posts_per_page'=>-1,'orderby'=>array('menu_order'=>'ASC','ID'=>'ASC')));
+        $status = $include_unpublished ? array('publish', 'draft', 'private', 'pending', 'future') : array('publish');
+        return get_posts(array('post_type'=>$lesson_post_type,'post_parent'=>absint($topic_id),'post_status'=>$status,'posts_per_page'=>-1,'orderby'=>'menu_order','order'=>'ASC'));
     }
 
     public function get_course_lesson_count($course_id) {
@@ -90,11 +82,8 @@ class Adapter {
     }
 
     public function get_lesson($lesson_id) {
-        $lesson_id = absint($lesson_id);
-        $lesson_post_type = $this->get_lesson_post_type();
-        if (!$lesson_id || !$lesson_post_type) return null;
-        $lesson = get_post($lesson_id);
-        return (!$lesson || $lesson_post_type !== $lesson->post_type) ? null : $lesson;
+        $lesson = absint($lesson_id) ? get_post(absint($lesson_id)) : null;
+        return ($lesson && $this->is_lesson_post_type($lesson->post_type)) ? $lesson : null;
     }
 
     public function get_lesson_course_id($lesson_id) {
@@ -107,81 +96,53 @@ class Adapter {
     }
 
     public function get_lesson_page_number($lesson_id) {
-        $lesson_id = absint($lesson_id);
-        $value = get_post_meta($lesson_id, '_mathcourse_page_number', true);
-        if ('' === (string)$value) $value = get_post_meta($lesson_id, '_mathcourse_page', true);
+        $value = get_post_meta(absint($lesson_id), '_mathcourse_page_number', true);
+        if ($value === '') $value = get_post_meta(absint($lesson_id), '_mathcourse_page', true);
         return sanitize_text_field($value);
     }
 
     public function get_lesson_video_id($lesson_id) {
-        $lesson_id = absint($lesson_id);
-        $value = get_post_meta($lesson_id, '_mathcourse_video_id', true);
-        if ('' === (string)$value) $value = get_post_meta($lesson_id, '_mathcourse_video', true);
+        $value = get_post_meta(absint($lesson_id), '_mathcourse_video_id', true);
+        if ($value === '') $value = get_post_meta(absint($lesson_id), '_mathcourse_video', true);
         return sanitize_text_field($value);
     }
 
-    public function get_lesson_hls_url($lesson_id) {
-        $lesson_id = absint($lesson_id);
-        if (!$lesson_id) return '';
-        return esc_url_raw(get_post_meta($lesson_id, '_mathcourse_hls_url', true));
-    }
+    public function get_lesson_hls_url($lesson_id) { return esc_url_raw(get_post_meta(absint($lesson_id), '_mathcourse_hls_url', true)); }
 
     public function is_preview_lesson($lesson_id) {
-        $lesson_id = absint($lesson_id);
-        if (!$lesson_id) return false;
-        $native = get_post_meta($lesson_id, '_is_preview', true);
-        if ('yes' === $native || '1' === (string)$native) return true;
-        return 'yes' === get_post_meta($lesson_id, '_mathcourse_preview', true);
+        $native = get_post_meta(absint($lesson_id), '_is_preview', true);
+        if ($native === 'yes' || $native === '1') return true;
+        return get_post_meta(absint($lesson_id), '_mathcourse_preview', true) === 'yes';
     }
 
     public function set_lesson_preview($lesson_id, $enabled) {
-        $lesson_id = absint($lesson_id);
-        if (!$lesson_id) return false;
         $value = $enabled ? 'yes' : 'no';
-        update_post_meta($lesson_id, '_is_preview', $value);
-        update_post_meta($lesson_id, '_mathcourse_preview', $value);
+        update_post_meta(absint($lesson_id), '_is_preview', $value);
+        update_post_meta(absint($lesson_id), '_mathcourse_preview', $value);
         return true;
     }
 
-    /**
-     * 渲染 Tutor 原生课时视频。
-     * Tutor API/全局上下文只允许在 Adapter 内部使用，业务层不要直接调用。
-     */
     public function render_lesson_video($lesson_id) {
         $lesson = $this->get_lesson($lesson_id);
         if (!$lesson || !function_exists('tutor_lesson_video') || !function_exists('tutor_utils')) return '';
-        if ('' === (string)get_post_meta($lesson->ID, '_video', true)) return '';
-
+        if (get_post_meta($lesson->ID, '_video', true) === '') return '';
         global $post;
         $previous_post = $post;
         $post = $lesson;
         setup_postdata($lesson);
-
-        try {
-            $video_info = tutor_utils()->get_video_info();
-            if (!$video_info) return '';
-            $html = tutor_lesson_video(false);
-        } finally {
-            wp_reset_postdata();
-            $post = $previous_post;
-        }
-
+        try { $html = tutor_lesson_video(false); } finally { wp_reset_postdata(); $post = $previous_post; }
         return is_string($html) ? $html : '';
     }
 
     public function get_course_progress($course_id, $user_id = 0) {
         $user_id = $user_id ? absint($user_id) : get_current_user_id();
         $total = 0; $completed = 0;
-        foreach ($this->get_course_lessons($course_id, false) as $lesson) {
-            $total++;
-            if ($this->is_lesson_completed($lesson->ID, $user_id)) $completed++;
-        }
+        foreach ($this->get_course_lessons($course_id, false) as $lesson) { $total++; if ($this->is_lesson_completed($lesson->ID, $user_id)) $completed++; }
         return array('completed'=>$completed,'total'=>$total,'percent'=>$total ? round(($completed/$total)*100) : 0);
     }
 
     public function is_lesson_completed($lesson_id, $user_id = 0) {
         $user_id = $user_id ? absint($user_id) : get_current_user_id();
-        if (!$user_id || !function_exists('tutor_utils')) return false;
-        return (bool)tutor_utils()->is_completed_lesson(absint($lesson_id), $user_id);
+        return ($user_id && function_exists('tutor_utils')) ? (bool)tutor_utils()->is_completed_lesson(absint($lesson_id), $user_id) : false;
     }
 }
