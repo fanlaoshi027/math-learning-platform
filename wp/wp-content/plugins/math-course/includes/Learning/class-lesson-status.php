@@ -3,12 +3,15 @@ namespace MathCourse\Learning;
 
 defined('ABSPATH') || exit;
 
+use MathCourse\Tutor\Adapter;
+
 class Lesson_Status {
 
     public static function get($lesson_id, $user_id = 0) {
 
-        if ($user_id && function_exists('tutor_utils')) {
-            if (tutor_utils()->is_completed_lesson($lesson_id, $user_id)) {
+        if ($user_id) {
+            $adapter = new Adapter();
+            if ($adapter->is_lesson_completed($lesson_id, $user_id)) {
                 return array(
                     'type' => 'completed',
                     'label' => '已完成',
