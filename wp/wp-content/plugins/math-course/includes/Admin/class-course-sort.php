@@ -4,6 +4,8 @@ namespace MathCourse\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use MathCourse\Tutor\Adapter;
+
 /**
  * Handles drag-and-drop ordering for MathCourse topics and Tutor LMS lessons.
  */
@@ -12,7 +14,10 @@ class Course_Sort {
     const ACTION = 'mathcourse_save_order';
     const NONCE_ACTION = 'mathcourse_save_order';
 
+    private $tutor;
+
     public function __construct() {
+        $this->tutor = new Adapter();
         add_action( 'wp_ajax_' . self::ACTION, array( $this, 'save_order' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
     }
@@ -55,12 +60,12 @@ class Course_Sort {
 
         check_ajax_referer( self::NONCE_ACTION, 'nonce' );
 
-        if ( ! function_exists( 'tutor' ) ) {
+        if ( ! $this->tutor->is_available() ) {
             wp_send_json_error( array( 'message' => 'Tutor LMS 未加载。' ), 400 );
         }
 
         $course_id = isset( $_POST['course_id'] ) ? absint( $_POST['course_id'] ) : 0;
-        if ( ! $course_id || tutor()->course_post_type !== get_post_type( $course_id ) ) {
+        if ( ! $course_id || ! $this->tutor->get_course( $course_id ) ) {
             wp_send_json_error( array( 'message' => '课程不存在。' ), 400 );
         }
 
@@ -76,20 +81,15 @@ class Course_Sort {
             ? wp_unslash( $_POST['lesson_order'] )
             : array();
 
-        $valid_topics = get_posts(
-            array(
-                'post_type'      => 'topics',
-                'post_parent'    => $course_id,
-                'post_status'    => array( 'publish', 'draft', 'private' ),
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            )
-        );
-        $valid_topic_map = array_fill_keys( array_map( 'absint', $valid_topics ), true );
+        $valid_topics = $this->tutor->get_topics( $course_id, true );
+        $valid_topic_map = array();
+        foreach ( $valid_topics as $topic ) {
+            $valid_topic_map[ (int) $topic->ID ] = true;
+        }
 
         $position = 0;
         foreach ( $topic_order as $topic_id ) {
-            if ( ! isset( $valid_topic_map[ $topic_id ] ) ) {
+            if ( ! isset( $valid_topic_map[ $topic_id ] ) || ! current_user_can( 'edit_post', $topic_id ) ) {
                 continue;
             }
 
@@ -104,25 +104,20 @@ class Course_Sort {
 
         foreach ( $lesson_order as $topic_key => $lesson_ids ) {
             $topic_id = absint( $topic_key );
-            if ( ! isset( $valid_topic_map[ $topic_id ] ) || ! is_array( $lesson_ids ) ) {
+            if ( ! isset( $valid_topic_map[ $topic_id ] ) || ! is_array( $lesson_ids ) || ! current_user_can( 'edit_post', $topic_id ) ) {
                 continue;
             }
 
-            $valid_lessons = get_posts(
-                array(
-                    'post_type'      => tutor()->lesson_post_type,
-                    'post_parent'    => $topic_id,
-                    'post_status'    => array( 'publish', 'draft', 'private' ),
-                    'posts_per_page' => -1,
-                    'fields'         => 'ids',
-                )
-            );
-            $valid_lesson_map = array_fill_keys( array_map( 'absint', $valid_lessons ), true );
+            $valid_lessons = $this->tutor->get_lessons( $topic_id, true );
+            $valid_lesson_map = array();
+            foreach ( $valid_lessons as $lesson ) {
+                $valid_lesson_map[ (int) $lesson->ID ] = true;
+            }
 
             $position = 0;
             foreach ( $lesson_ids as $lesson_id ) {
                 $lesson_id = absint( $lesson_id );
-                if ( ! isset( $valid_lesson_map[ $lesson_id ] ) ) {
+                if ( ! isset( $valid_lesson_map[ $lesson_id ] ) || ! current_user_can( 'edit_post', $lesson_id ) ) {
                     continue;
                 }
 
