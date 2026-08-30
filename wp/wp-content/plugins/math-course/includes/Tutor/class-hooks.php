@@ -51,7 +51,8 @@ class Hooks {
             return;
         }
 
-        if (!function_exists('tutor') || tutor()->lesson_post_type !== $post->post_type) {
+        $adapter = new Adapter();
+        if (!$adapter->is_lesson_post_type($post->post_type)) {
             return;
         }
 
