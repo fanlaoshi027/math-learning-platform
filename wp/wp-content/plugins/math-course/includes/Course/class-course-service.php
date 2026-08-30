@@ -20,10 +20,7 @@ class Course_Service {
 
     public function get_course($course_id) {
         $course = $this->tutor->get_course($course_id);
-
-        if (!$course) {
-            return null;
-        }
+        if (!$course) return null;
 
         return array(
             'id'    => (int) $course->ID,
@@ -35,15 +32,15 @@ class Course_Service {
     }
 
     /**
-     * 获取课时视频数据，并在服务层统一完成课程权限判断。
+     * 获取课时视频数据。试看课时对游客和未授权学员开放，其他课时必须授权。
      */
     public function get_lesson_video($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
         $user_id   = absint($user_id);
-
         $preview   = $this->tutor->is_preview_lesson($lesson_id);
         $course_id = $this->tutor->get_lesson_course_id($lesson_id);
-        $accessible = $this->access->can_watch_lesson($user_id, $course_id, $lesson_id);
+        $course_access = $user_id ? $this->access->can_access_course($user_id, $course_id) : false;
+        $accessible = $course_access || $preview;
 
         return array(
             'id'         => $lesson_id,
@@ -57,10 +54,7 @@ class Course_Service {
 
     public function get_course_directory($course_id, $user_id = 0) {
         $course = $this->tutor->get_course($course_id);
-
-        if (!$course) {
-            return null;
-        }
+        if (!$course) return null;
 
         $user_id       = absint($user_id);
         $course_access = $user_id ? $this->access->can_access_course($user_id, $course->ID) : false;
@@ -69,16 +63,13 @@ class Course_Service {
 
         foreach ($this->tutor->get_topics($course->ID) as $topic) {
             $lessons = array();
-
             foreach ($this->tutor->get_lessons($topic->ID) as $lesson) {
                 $completed_lesson = $course_access && $user_id
                     ? $this->progress->is_completed($user_id, $lesson->ID)
                     : false;
                 $preview = $this->tutor->is_preview_lesson($lesson->ID);
-
-                // 登录用户：只有授权课程或免费课程可进入。
-                // 游客：只允许进入明确标记为“试看”的课时。
-                $accessible = $course_access || (!$user_id && $preview);
+                // 授权用户可看全部；游客和未授权用户只可看明确标记为“试看”的课时。
+                $accessible = $course_access || $preview;
 
                 $lessons[] = array(
                     'id'           => (int) $lesson->ID,
@@ -102,24 +93,18 @@ class Course_Service {
 
         $progress = $course_access && $user_id
             ? $this->progress->get_course_progress($course->ID, $user_id)
-            : array(
-                'completed'       => 0,
-                'total'           => 0,
-                'percent'         => 0,
-                'last_lesson_id'  => 0,
-                'last_time'       => 0,
-            );
+            : array('completed'=>0,'total'=>0,'percent'=>0,'last_lesson_id'=>0,'last_time'=>0);
 
         return array(
-            'id'          => (int) $course->ID,
-            'title'       => get_the_title($course),
-            'type'        => get_post_meta($course->ID, '_mathcourse_type', true),
-            'grade'       => get_post_meta($course->ID, '_mathcourse_grade', true),
-            'cover'       => get_post_meta($course->ID, '_mathcourse_cover', true),
-            'is_free'     => $course_free,
-            'topics'      => $topics,
-            'access'      => $course_access,
-            'progress'    => $progress,
+            'id'       => (int) $course->ID,
+            'title'    => get_the_title($course),
+            'type'     => get_post_meta($course->ID, '_mathcourse_type', true),
+            'grade'    => get_post_meta($course->ID, '_mathcourse_grade', true),
+            'cover'    => get_post_meta($course->ID, '_mathcourse_cover', true),
+            'is_free'  => $course_free,
+            'topics'   => $topics,
+            'access'   => $course_access,
+            'progress' => $progress,
         );
     }
 }
