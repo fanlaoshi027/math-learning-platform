@@ -39,10 +39,8 @@ class Progress_Ajax {
             wp_send_json_error(array('message' => 'invalid lesson'), 400);
         }
 
-        // Keep persisted server-side state minimal: completion only.
-        // Do not store exact playback time, seek position, or heartbeat data.
-        update_user_meta($user_id, 'mc_last_completed_course', $course_id);
-
+        // Keep server-side learning data minimal: only lesson completion is persisted.
+        // Exact playback time, seek position, and heartbeat data stay in the browser.
         wp_send_json_success(array(
             'lesson_id' => $lesson_id,
             'course_id' => $course_id,
