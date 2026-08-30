@@ -6,11 +6,9 @@ class Plugin {
     public function run() { $this->load_modules(); $this->load_assets(); $this->load_admin_assets(); }
 
     private function load_modules() {
-        // Load foundational services before consumers that instantiate them.
         if (class_exists('MathCourse\\Access\\Access_Service')) new Access\Access_Service();
         if (class_exists('MathCourse\\Tutor\\Adapter')) new Tutor\Adapter();
         if (class_exists('MathCourse\\Progress\\Progress_Service')) new Progress\Progress_Service();
-
         if (class_exists('MathCourse\\Admin\\Menu')) new Admin\Menu();
         if (class_exists('MathCourse\\Admin\\Course_Actions')) new Admin\Course_Actions();
         if (class_exists('MathCourse\\Admin\\Course_Sort')) new Admin\Course_Sort();
@@ -38,6 +36,7 @@ class Plugin {
     private function load_admin_assets() {
         add_action('admin_enqueue_scripts', function() {
             wp_enqueue_style('mathcourse-admin', MATHCOURSE_URL.'assets/css/admin.css', array(), MATHCOURSE_VERSION);
+            wp_enqueue_script('mathcourse-admin-course-editor', MATHCOURSE_URL.'assets/js/admin-course-editor.js', array(), MATHCOURSE_VERSION, true);
         });
     }
 }
