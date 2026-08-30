@@ -4,6 +4,7 @@ namespace MathCourse\Admin;
 defined('ABSPATH') || exit;
 
 use MathCourse\Access\Access_Service;
+use MathCourse\Tutor\Adapter;
 
 /**
  * One-click demo content importer.
@@ -75,7 +76,8 @@ class Demo_Importer {
         $this->guard();
         check_admin_referer('mathcourse_import_demo');
 
-        if (!function_exists('tutor')) {
+        $tutor = new Adapter();
+        if (!$tutor->is_available()) {
             wp_die('需要先启用 Tutor LMS 4.0.4。');
         }
 
@@ -85,7 +87,7 @@ class Demo_Importer {
         $created = array();
 
         foreach ($courses as $definition) {
-            $course_id = $this->find_or_create_course($definition, $course_ids);
+            $course_id = $this->find_or_create_course($definition, $course_ids, $tutor);
             if (!$course_id) {
                 continue;
             }
@@ -105,7 +107,7 @@ class Demo_Importer {
                 update_post_meta($topic_id, '_mathcourse_demo', 'yes');
 
                 foreach ($topic_definition['lessons'] as $lesson_index => $lesson_definition) {
-                    $lesson_id = $this->find_or_create_lesson($topic_id, $lesson_definition, $lesson_index);
+                    $lesson_id = $this->find_or_create_lesson($topic_id, $lesson_definition, $lesson_index, $tutor);
                     if (!$lesson_id) {
                         continue;
                     }
@@ -149,6 +151,8 @@ class Demo_Importer {
         $state = get_option(self::OPTION_KEY, array());
         $courses = !empty($state['courses']) && is_array($state['courses']) ? $state['courses'] : array();
         $access = new Access_Service();
+        $tutor = new Adapter();
+        $lesson_post_type = $tutor->get_lesson_post_type();
 
         foreach ($courses as $course_id) {
             $course_id = absint($course_id);
@@ -157,8 +161,10 @@ class Demo_Importer {
             }
 
             foreach (get_posts(array('post_type' => 'topics', 'post_parent' => $course_id, 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids')) as $topic_id) {
-                foreach (get_posts(array('post_type' => tutor()->lesson_post_type, 'post_parent' => $topic_id, 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids')) as $lesson_id) {
-                    wp_delete_post($lesson_id, true);
+                if ($lesson_post_type) {
+                    foreach (get_posts(array('post_type' => $lesson_post_type, 'post_parent' => $topic_id, 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids')) as $lesson_id) {
+                        wp_delete_post($lesson_id, true);
+                    }
                 }
                 wp_delete_post($topic_id, true);
             }
@@ -234,15 +240,18 @@ class Demo_Importer {
         );
     }
 
-    private function find_or_create_course($definition, $known) {
+    private function find_or_create_course($definition, $known, Adapter $tutor) {
         foreach ($known as $id) {
             if ($id && get_post_meta($id, '_mathcourse_demo_key', true) === $definition['key']) {
                 return absint($id);
             }
         }
 
+        $course_post_type = $tutor->get_course_post_type();
+        if (!$course_post_type) return 0;
+
         $ids = get_posts(array(
-            'post_type' => tutor()->course_post_type,
+            'post_type' => $course_post_type,
             'post_status' => 'any',
             'posts_per_page' => -1,
             'fields' => 'ids',
@@ -253,7 +262,7 @@ class Demo_Importer {
 
         $course_id = wp_insert_post(array(
             'post_title' => $definition['title'],
-            'post_type' => tutor()->course_post_type,
+            'post_type' => $course_post_type,
             'post_status' => 'publish',
             'post_author' => get_current_user_id(),
             'post_content' => '这是 MathCourse 演示课程，用于验收课程中心、课程详情和学习页 UI。',
@@ -273,13 +282,16 @@ class Demo_Importer {
         return is_wp_error($topic_id) ? 0 : absint($topic_id);
     }
 
-    private function find_or_create_lesson($topic_id, $definition, $order) {
-        $lessons = get_posts(array('post_type' => tutor()->lesson_post_type, 'post_parent' => absint($topic_id), 'post_status' => 'any', 'posts_per_page' => -1));
+    private function find_or_create_lesson($topic_id, $definition, $order, Adapter $tutor) {
+        $lesson_post_type = $tutor->get_lesson_post_type();
+        if (!$lesson_post_type) return 0;
+
+        $lessons = get_posts(array('post_type' => $lesson_post_type, 'post_parent' => absint($topic_id), 'post_status' => 'any', 'posts_per_page' => -1));
         foreach ($lessons as $lesson) {
             if ($lesson->post_title === $definition['title'] && 'yes' === get_post_meta($lesson->ID, '_mathcourse_demo', true)) return (int) $lesson->ID;
         }
         $lesson_id = wp_insert_post(array(
-            'post_title' => $definition['title'], 'post_type' => tutor()->lesson_post_type, 'post_status' => 'publish',
+            'post_title' => $definition['title'], 'post_type' => $lesson_post_type, 'post_status' => 'publish',
             'post_author' => get_current_user_id(), 'post_parent' => absint($topic_id), 'menu_order' => absint($order),
             'post_content' => '本节为演示课时内容。正式课程可以在这里填写知识点、例题与讲义说明。',
         ), true);
