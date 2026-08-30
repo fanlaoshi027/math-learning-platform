@@ -12,7 +12,10 @@ class Batch_Manager {
     const OPTION_PREFIX = 'mathcourse_batch_task_';
     const BATCH_SIZE = 10;
 
+    private $tutor;
+
     public function __construct() {
+        $this->tutor = new Adapter();
         add_action('admin_post_mathcourse_batch_create', array($this, 'create_task'));
         add_action('admin_post_mathcourse_batch_cancel', array($this, 'cancel_task'));
         add_action('wp_ajax_mathcourse_batch_step', array($this, 'ajax_step'));
@@ -22,19 +25,14 @@ class Batch_Manager {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You do not have permission to access this page.', 'mathcourse'));
         }
-        if (!function_exists('tutor')) {
+        if (!$this->tutor->is_available()) {
             echo '<div class="wrap"><h1>批量创建页码课时</h1><div class="notice notice-error"><p>需要先启用 Tutor LMS 4.0.4。</p></div></div>';
             return;
         }
 
         $task_id = isset($_GET['task_id']) ? sanitize_key(wp_unslash($_GET['task_id'])) : '';
         $task = $task_id ? $this->get_task($task_id) : null;
-        $courses = get_posts(array(
-            'post_type' => tutor()->course_post_type,
-            'post_status' => array('publish', 'draft', 'private'),
-            'posts_per_page' => 100,
-            'orderby' => array('menu_order' => 'ASC', 'date' => 'DESC'),
-        ));
+        $courses = $this->tutor->get_courses(true, 100);
         ?>
         <div class="wrap">
             <h1>批量创建页码课时</h1>
@@ -71,7 +69,7 @@ class Batch_Manager {
         $topic_title = isset($_POST['topic_title']) ? sanitize_text_field(wp_unslash($_POST['topic_title'])) : '';
 
         if (!$course_id || !$start || !$end || $start > $end || !$topic_title) wp_die('批量任务参数无效。');
-        if (!function_exists('tutor') || tutor()->course_post_type !== get_post_type($course_id)) wp_die('课程不存在或不是 Tutor LMS Course。');
+        if (!$this->tutor->get_course($course_id)) wp_die('课程不存在或不是 Tutor LMS Course。');
         if (!current_user_can('edit_post', $course_id)) wp_die('没有权限编辑这个课程。');
 
         $task_id = wp_generate_uuid4();
@@ -93,6 +91,7 @@ class Batch_Manager {
         check_admin_referer('mathcourse_batch_cancel_' . $task_id);
         $task = $this->get_task($task_id);
         if (!$task) wp_die('任务不存在。');
+        if (!current_user_can('edit_post', (int) $task['course_id'])) wp_die('没有权限操作这个课程。');
         $task['status'] = 'cancelled';
         $task['updated'] = current_time('mysql');
         $this->save_task($task);
@@ -106,11 +105,11 @@ class Batch_Manager {
         $task_id = isset($_POST['task_id']) ? sanitize_key(wp_unslash($_POST['task_id'])) : '';
         $task = $task_id ? $this->get_task($task_id) : null;
         if (!$task) wp_send_json_error(array('message' => '任务不存在。'), 404);
+        if (!current_user_can('edit_post', (int) $task['course_id'])) wp_send_json_error(array('message' => '没有权限操作这个课程。'), 403);
         if (in_array($task['status'], array('completed', 'cancelled'), true)) wp_send_json_success($this->task_response($task));
 
         $task['status'] = 'running';
-        $adapter = new Adapter();
-        if (!$adapter->is_available() || tutor()->course_post_type !== get_post_type($task['course_id'])) {
+        if (!$this->tutor->is_available() || !$this->tutor->get_course($task['course_id'])) {
             $task['status'] = 'paused';
             $this->add_error($task, $task['current'], 'Tutor LMS Course 不可用。');
             $this->save_task($task);
@@ -125,8 +124,7 @@ class Batch_Manager {
             wp_send_json_success($this->task_response($task));
         }
         $task['topic_id'] = $topic_id;
-        $lesson_post_type = tutor()->lesson_post_type;
-        $existing = $this->existing_page_map($topic_id, $lesson_post_type);
+        $existing = $this->existing_page_map($topic_id);
         $processed = 0;
 
         while ($task['current'] <= $task['end'] && $processed < self::BATCH_SIZE) {
@@ -139,8 +137,13 @@ class Batch_Manager {
             }
 
             $lesson_id = wp_insert_post(array(
-                'post_title' => '第' . $page . '页', 'post_type' => $lesson_post_type, 'post_status' => 'publish',
-                'post_author' => get_current_user_id(), 'post_parent' => $topic_id, 'menu_order' => $page, 'post_content' => '',
+                'post_title' => '第' . $page . '页',
+                'post_type' => $this->tutor->get_lesson_post_type(),
+                'post_status' => 'publish',
+                'post_author' => get_current_user_id(),
+                'post_parent' => $topic_id,
+                'menu_order' => $page,
+                'post_content' => '',
             ), true);
             if (is_wp_error($lesson_id)) {
                 $task['failed_count']++;
@@ -170,24 +173,24 @@ class Batch_Manager {
 
     private function ensure_topic(&$task) {
         $topic_id = absint($task['topic_id']);
-        if ($topic_id && 'topics' === get_post_type($topic_id) && (int) get_post_field('post_parent', $topic_id) === (int) $task['course_id']) return $topic_id;
+        $topic_type = $this->tutor->get_topic_post_type();
+        if ($topic_id && $topic_type === get_post_type($topic_id) && (int) get_post_field('post_parent', $topic_id) === (int) $task['course_id']) return $topic_id;
 
-        $topics = get_posts(array('post_type' => 'topics', 'post_parent' => absint($task['course_id']), 'post_status' => array('publish', 'draft', 'private'), 'posts_per_page' => -1, 'orderby' => array('menu_order' => 'ASC', 'ID' => 'ASC')));
+        $topics = $this->tutor->get_topics($task['course_id'], true);
         foreach ($topics as $topic) if ($topic->post_title === $task['topic_title']) return (int) $topic->ID;
 
         $topic_id = wp_insert_post(array(
-            'post_title' => $task['topic_title'], 'post_type' => 'topics', 'post_status' => 'publish',
+            'post_title' => $task['topic_title'], 'post_type' => $topic_type, 'post_status' => 'publish',
             'post_author' => get_current_user_id(), 'post_parent' => absint($task['course_id']), 'menu_order' => 0,
         ), true);
         return is_wp_error($topic_id) ? 0 : absint($topic_id);
     }
 
-    private function existing_page_map($topic_id, $lesson_post_type) {
+    private function existing_page_map($topic_id) {
         $map = array();
-        $lessons = get_posts(array('post_type' => $lesson_post_type, 'post_parent' => absint($topic_id), 'post_status' => array('publish', 'draft', 'private'), 'posts_per_page' => -1));
+        $lessons = $this->tutor->get_lessons($topic_id, true);
         foreach ($lessons as $lesson) {
-            $page = get_post_meta($lesson->ID, '_mathcourse_page_number', true);
-            if ('' === (string) $page) $page = get_post_meta($lesson->ID, '_mathcourse_page', true);
+            $page = $this->tutor->get_lesson_page_number($lesson->ID);
             if ('' !== (string) $page) $map[(string) absint($page)] = (int) $lesson->ID;
         }
         return $map;
