@@ -4,12 +4,15 @@ namespace MathCourse\Progress;
 defined('ABSPATH') || exit;
 
 use MathCourse\Access\Access_Service;
+use MathCourse\Tutor\Adapter;
 
 class Progress_Service {
     private $access;
+    private $tutor;
 
     public function __construct() {
         $this->access = new Access_Service();
+        $this->tutor  = new Adapter();
     }
 
     public function get_course_progress($course_id, $user_id = 0) {
@@ -42,7 +45,7 @@ class Progress_Service {
             return false;
         }
 
-        $course_id = $this->get_lesson_course_id($lesson_id);
+        $course_id = $this->tutor->get_lesson_course_id($lesson_id);
         if (!$course_id) {
             return false;
         }
@@ -230,60 +233,20 @@ class Progress_Service {
 
     private function get_course_lessons($course_id, $include_unpublished = false) {
         $course_id = absint($course_id);
-
-        if (!$course_id || !function_exists('tutor') || empty(tutor()->lesson_post_type)) {
+        if (!$course_id || !$this->tutor->is_available()) {
             return array();
         }
 
-        $topics = get_posts(array(
-            'post_type'      => 'topics',
-            'post_parent'    => $course_id,
-            'post_status'    => array('publish', 'draft', 'private'),
-            'posts_per_page' => -1,
-            'orderby'        => array('menu_order' => 'ASC', 'date' => 'ASC'),
-        ));
-
         $lessons = array();
-
-        foreach ($topics as $topic) {
-            $items = get_posts(array(
-                'post_type'      => tutor()->lesson_post_type,
-                'post_parent'    => $topic->ID,
-                'post_status'    => $include_unpublished ? array('publish', 'draft', 'private') : array('publish'),
-                'posts_per_page' => -1,
-                'orderby'        => array('menu_order' => 'ASC', 'date' => 'ASC'),
-            ));
-
-            foreach ($items as $lesson) {
+        foreach ($this->tutor->get_topics($course_id) as $topic) {
+            foreach ($this->tutor->get_lessons($topic->ID) as $lesson) {
+                if (!$include_unpublished && 'publish' !== $lesson->post_status) {
+                    continue;
+                }
                 $lessons[] = $lesson;
             }
         }
 
         return $lessons;
-    }
-
-    private function get_lesson_course_id($lesson_id) {
-        $lesson_id = absint($lesson_id);
-
-        if (!$lesson_id || !function_exists('tutor') || empty(tutor()->lesson_post_type)) {
-            return 0;
-        }
-
-        $lesson = get_post($lesson_id);
-        if (!$lesson || tutor()->lesson_post_type !== $lesson->post_type) {
-            return 0;
-        }
-
-        $topic = get_post($lesson->post_parent);
-        if (!$topic || 'topics' !== $topic->post_type) {
-            return 0;
-        }
-
-        $course = get_post($topic->post_parent);
-        if (!$course || tutor()->course_post_type !== $course->post_type) {
-            return 0;
-        }
-
-        return (int) $course->ID;
     }
 }
