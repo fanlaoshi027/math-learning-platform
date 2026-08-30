@@ -97,6 +97,12 @@ document.addEventListener('DOMContentLoaded', function () {
             lastTime = val('currentTime');
             lastWallClock = Date.now();
         }
+        function showCompletionPanel() {
+            const panel = document.querySelector('.mc-course-player__completion');
+            if (!panel) return;
+            panel.hidden = false;
+            panel.classList.add('is-visible');
+        }
         function submitCompletion() {
             if (completionSent || completedAt || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
             completionSent = true;
@@ -117,6 +123,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const data = result.data || {};
                     const serverCourseId = Number(data.course_id || courseId || 0);
                     updateProgressUI(data.progress || null, lessonId);
+                    showCompletionPanel();
                     document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
                     document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
                 })
