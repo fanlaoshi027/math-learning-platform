@@ -66,16 +66,13 @@ class Progress_Service {
     }
 
     /**
-     * Returns the furthest completed lesson in Tutor's course order.
-     * Exact playback position is never persisted on the server.
+     * Returns the last completed lesson according to the current Tutor course order.
      */
     public function get_last_completed_lesson($user_id, $course_id = 0) {
         $completed = $this->get_completed_lessons($user_id);
         if (empty($completed)) return 0;
 
-        if (!$course_id) {
-            return (int) end($completed);
-        }
+        if (!$course_id) return (int) end($completed);
 
         $lessons = $this->get_course_lessons(absint($course_id), false);
         $last = 0;
@@ -101,10 +98,10 @@ class Progress_Service {
         }
 
         return array(
-            'completed'      => $completed,
-            'total'          => $total,
-            'percent'        => $total ? round(($completed / $total) * 100) : 0,
-            'last_lesson_id' => $last_lesson_id,
+            'completed'       => $completed,
+            'total'           => $total,
+            'percent'         => $total ? round(($completed / $total) * 100) : 0,
+            'last_lesson_id'  => $last_lesson_id,
         );
     }
 
@@ -127,9 +124,8 @@ class Progress_Service {
         if (!$course_id || !$this->tutor->is_available()) return array();
 
         $lessons = array();
-        foreach ($this->tutor->get_topics($course_id) as $topic) {
-            foreach ($this->tutor->get_lessons($topic->ID) as $lesson) {
-                if (!$include_unpublished && 'publish' !== $lesson->post_status) continue;
+        foreach ($this->tutor->get_topics($course_id, $include_unpublished) as $topic) {
+            foreach ($this->tutor->get_lessons($topic->ID, $include_unpublished) as $lesson) {
                 $lessons[] = $lesson;
             }
         }
