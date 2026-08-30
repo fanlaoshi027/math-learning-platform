@@ -49,10 +49,6 @@ class Adapter {
         ));
     }
 
-    /**
-     * 返回课程实际可见的已发布课时总数。
-     * 统一走 Adapter，避免业务层重复拼装 Tutor 结构。
-     */
     public function get_course_lesson_count($course_id) {
         $count = 0;
         foreach ($this->get_topics($course_id, false) as $topic) {
@@ -61,18 +57,13 @@ class Adapter {
         return $count;
     }
 
-    /**
-     * 返回课程的扁平 Lesson 列表，顺序严格按照 Topic → Lesson 的 menu_order。
-     */
     public function get_course_lessons($course_id, $include_unpublished = false) {
         $lessons = array();
-
         foreach ($this->get_topics($course_id, $include_unpublished) as $topic) {
             foreach ($this->get_lessons($topic->ID, $include_unpublished) as $lesson) {
                 $lessons[] = $lesson;
             }
         }
-
         return $lessons;
     }
 
@@ -108,23 +99,30 @@ class Adapter {
     public function get_lesson_page_number($lesson_id) {
         $lesson_id = absint($lesson_id);
         $value = get_post_meta($lesson_id, '_mathcourse_page_number', true);
-
         if ('' === (string) $value) {
             $value = get_post_meta($lesson_id, '_mathcourse_page', true);
         }
-
         return sanitize_text_field($value);
     }
 
     public function get_lesson_video_id($lesson_id) {
         $lesson_id = absint($lesson_id);
         $value = get_post_meta($lesson_id, '_mathcourse_video_id', true);
-
         if ('' === (string) $value) {
             $value = get_post_meta($lesson_id, '_mathcourse_video', true);
         }
-
         return sanitize_text_field($value);
+    }
+
+    /** 返回 MathCourse 自己维护的视频 HLS 地址；业务层不直接读取 Meta。 */
+    public function get_lesson_hls_url($lesson_id) {
+        $lesson_id = absint($lesson_id);
+        if (!$lesson_id) {
+            return '';
+        }
+
+        $value = get_post_meta($lesson_id, '_mathcourse_hls_url', true);
+        return esc_url_raw($value);
     }
 
     /**
@@ -153,7 +151,6 @@ class Adapter {
         $value = $enabled ? 'yes' : 'no';
         update_post_meta($lesson_id, '_is_preview', $value);
         update_post_meta($lesson_id, '_mathcourse_preview', $value);
-
         return true;
     }
 
