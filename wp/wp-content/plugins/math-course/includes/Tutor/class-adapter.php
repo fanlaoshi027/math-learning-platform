@@ -25,19 +25,21 @@ class Adapter {
     public function get_lesson_course_id($lesson_id) { $lesson=$this->get_lesson($lesson_id); if(!$lesson)return 0; $topic=$this->get_topic($lesson->post_parent); if(!$topic)return 0; $course=$this->get_course($topic->post_parent); return $course?(int)$course->ID:0; }
     public function get_lesson_page_number($lesson_id) { $value=get_post_meta(absint($lesson_id),'_mathcourse_page_number',true); if($value==='')$value=get_post_meta(absint($lesson_id),'_mathcourse_page',true); return sanitize_text_field($value); }
     public function get_lesson_video_id($lesson_id) { $value=get_post_meta(absint($lesson_id),'_mathcourse_video_id',true); if($value==='')$value=get_post_meta(absint($lesson_id),'_mathcourse_video',true); return sanitize_text_field($value); }
-
-    /** Return an absolute source URL; admin may store a full URL or site-relative path. */
-    public function get_lesson_hls_url($lesson_id) {
-        $value=trim((string)get_post_meta(absint($lesson_id),'_mathcourse_hls_url',true));
-        if($value==='')return '';
-        if(preg_match('#^https?://#i',$value))return esc_url_raw($value);
-        if(strpos($value,'//')===0)return esc_url_raw((is_ssl()?'https:':'http:').$value);
-        return esc_url_raw(home_url('/'.ltrim($value,'/')));
-    }
-
+    public function get_lesson_hls_url($lesson_id) { $value=trim((string)get_post_meta(absint($lesson_id),'_mathcourse_hls_url',true)); if($value==='')return ''; if(preg_match('#^https?://#i',$value))return esc_url_raw($value); if(strpos($value,'//')===0)return esc_url_raw((is_ssl()?'https:':'http:').$value); return esc_url_raw(home_url('/'.ltrim($value,'/'))); }
     public function is_preview_lesson($lesson_id) { $native=get_post_meta(absint($lesson_id),'_is_preview',true); if($native==='yes'||$native==='1')return true; return get_post_meta(absint($lesson_id),'_mathcourse_preview',true)==='yes'; }
     public function set_lesson_preview($lesson_id,$enabled) { $value=$enabled?'yes':'no'; update_post_meta(absint($lesson_id),'_is_preview',$value); update_post_meta(absint($lesson_id),'_mathcourse_preview',$value); return true; }
     public function render_lesson_video($lesson_id) { $lesson=$this->get_lesson($lesson_id); if(!$lesson||!function_exists('tutor_lesson_video')||!function_exists('tutor_utils'))return ''; if(get_post_meta($lesson->ID,'_video',true)==='')return ''; global $post; $previous_post=$post; $post=$lesson; setup_postdata($lesson); try{$html=tutor_lesson_video(false);}finally{wp_reset_postdata();$post=$previous_post;} return is_string($html)?$html:''; }
     public function get_course_progress($course_id,$user_id=0) { $user_id=$user_id?absint($user_id):get_current_user_id(); $total=0;$completed=0; foreach($this->get_course_lessons($course_id,false) as $lesson){$total++;if($this->is_lesson_completed($lesson->ID,$user_id))$completed++;} return array('completed'=>$completed,'total'=>$total,'percent'=>$total?round(($completed/$total)*100):0); }
-    public function is_lesson_completed($lesson_id,$user_id=0) { $user_id=$user_id?absint($user_id):get_current_user_id(); return ($user_id&&function_exists('tutor_utils'))?(bool)tutor_utils()->is_completed_lesson(absint($lesson_id),$user_id):false; }
+
+    /**
+     * 统一完成状态：MathCourse 自己的完成记录与 Tutor LMS 原生完成记录取并集。
+     */
+    public function is_lesson_completed($lesson_id,$user_id=0) {
+        $user_id=$user_id?absint($user_id):get_current_user_id();
+        $lesson_id=absint($lesson_id);
+        if(!$user_id||!$lesson_id)return false;
+        $data=get_user_meta($user_id,'mc_completed_lessons',true);
+        if(is_array($data)&&in_array($lesson_id,array_map('intval',$data),true))return true;
+        return function_exists('tutor_utils')?(bool)tutor_utils()->is_completed_lesson($lesson_id,$user_id):false;
+    }
 }
