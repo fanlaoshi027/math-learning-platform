@@ -7,6 +7,8 @@ use MathCourse\Tutor\Adapter;
 
 class Access_Service {
 
+    private static $access_cache = array();
+
     private function table() {
         global $wpdb;
         return $wpdb->prefix . 'mathcourse_access';
@@ -35,9 +37,16 @@ class Access_Service {
         $course_id = absint($course_id);
         $result = array('access' => false, 'status' => 'none', 'expires_at' => null);
         if (!$user_id || !$course_id) return $result;
+
+        $cache_key = $user_id . ':' . $course_id;
+        if (isset(self::$access_cache[$cache_key])) {
+            return self::$access_cache[$cache_key];
+        }
+
         if (user_can($user_id, 'manage_options')) {
             $result['access'] = true;
             $result['status'] = 'admin';
+            self::$access_cache[$cache_key] = $result;
             return $result;
         }
 
@@ -47,16 +56,24 @@ class Access_Service {
             $user_id,
             $course_id
         ));
-        if (!$row) return $result;
+        if (!$row) {
+            self::$access_cache[$cache_key] = $result;
+            return $result;
+        }
 
         $result['status'] = $row->status;
         $result['expires_at'] = $row->expires_at;
-        if ('active' !== $row->status) return $result;
+        if ('active' !== $row->status) {
+            self::$access_cache[$cache_key] = $result;
+            return $result;
+        }
         if (!empty($row->expires_at) && strtotime($row->expires_at) <= current_time('timestamp')) {
             $result['status'] = 'expired';
+            self::$access_cache[$cache_key] = $result;
             return $result;
         }
         $result['access'] = true;
+        self::$access_cache[$cache_key] = $result;
         return $result;
     }
 
@@ -65,7 +82,7 @@ class Access_Service {
         $course_id = absint($course_id);
         if (!$user_id || !$course_id) return false;
         global $wpdb;
-        return false !== $wpdb->replace(
+        $saved = false !== $wpdb->replace(
             $this->table(),
             array(
                 'user_id' => $user_id,
@@ -76,17 +93,23 @@ class Access_Service {
             ),
             array('%d', '%d', '%s', '%s', '%s')
         );
+        if ($saved) unset(self::$access_cache[$user_id . ':' . $course_id]);
+        return $saved;
     }
 
     public function revoke($user_id, $course_id) {
+        $user_id = absint($user_id);
+        $course_id = absint($course_id);
         global $wpdb;
-        return false !== $wpdb->update(
+        $saved = false !== $wpdb->update(
             $this->table(),
             array('status' => 'revoked'),
-            array('user_id' => absint($user_id), 'course_id' => absint($course_id)),
+            array('user_id' => $user_id, 'course_id' => $course_id),
             array('%s'),
             array('%d', '%d')
         );
+        if ($saved) unset(self::$access_cache[$user_id . ':' . $course_id]);
+        return $saved;
     }
 
     public function get_user_courses($user_id) {
