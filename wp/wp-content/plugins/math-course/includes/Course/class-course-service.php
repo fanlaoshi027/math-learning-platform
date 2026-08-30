@@ -68,8 +68,12 @@ class Course_Service {
      * belongs to the dedicated learning page.
      */
     private function lesson_learning_url($course_id, $lesson_id) {
-        $page = get_page_by_path('学习课程');
-        $base = $page ? get_permalink($page) : home_url('/学习课程/');
+        if (function_exists('mc_get_learning_page_url')) {
+            $base = mc_get_learning_page_url();
+        } else {
+            $page = get_page_by_path('learning', OBJECT, 'page');
+            $base = $page ? get_permalink($page) : home_url('/learning/');
+        }
 
         return add_query_arg(
             array(
