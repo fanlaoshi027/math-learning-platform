@@ -19,9 +19,6 @@ class Course_Directory {
         $atts = shortcode_atts(array('course_id' => 0), $atts, 'mathcourse_course_directory');
         $course_id = absint($atts['course_id']);
 
-        // When the shortcode is used on the Course Center page, a course_id
-        // query parameter opens our custom course-detail view. This avoids
-        // sending visitors into Tutor LMS' native single-course template.
         if (!$course_id && isset($_GET['course_id'])) {
             $course_id = absint($_GET['course_id']);
         }
@@ -29,7 +26,6 @@ class Course_Directory {
         return $course_id ? $this->render_single_course($course_id) : $this->render_course_center();
     }
 
-    /** Build the canonical MathCourse course-detail URL. */
     private function course_detail_url($course_id) {
         $page = get_page_by_path('course-center');
         $base = $page ? get_permalink($page) : home_url('/course-center/');
@@ -37,8 +33,8 @@ class Course_Directory {
     }
 
     /**
-     * 公开课程目录：游客和登录用户都看到已发布课程。
-     * 这里不是“我的课程”，因此不按个人授权过滤。
+     * Public course directory. Supports the reference UI filters without
+     * changing the underlying Tutor LMS course data model.
      */
     private function render_course_center() {
         if (!function_exists('tutor')) return '<p>课程系统暂不可用。</p>';
@@ -50,18 +46,40 @@ class Course_Directory {
             'orderby' => array('menu_order' => 'ASC', 'date' => 'DESC'),
         ));
 
-        if (empty($courses)) return '<p class="mathcourse-directory__empty">目前还没有已发布课程。</p>';
+        $type_filter  = isset($_GET['course_type']) ? sanitize_key(wp_unslash($_GET['course_type'])) : '';
+        $grade_filter = isset($_GET['course_grade']) ? sanitize_key(wp_unslash($_GET['course_grade'])) : '';
+        if (!in_array($type_filter, array('', 'topic', 'supplementary'), true)) $type_filter = '';
+        if (!in_array($grade_filter, array('', '7', '8', '9', '10', '11', '12'), true)) $grade_filter = '';
 
         ob_start(); ?>
         <div class="mathcourse-center">
+            <div class="mc-course-filter" role="navigation" aria-label="课程筛选">
+                <a class="<?php echo '' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(remove_query_arg(array('course_id', 'course_type', 'course_grade'), $this->course_detail_url(0))); ?>">全部</a>
+                <a class="<?php echo 'topic' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type', 'topic', remove_query_arg(array('course_id', 'course_grade'), $this->course_detail_url(0)))); ?>">专题课程</a>
+                <a class="<?php echo 'supplementary' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type', 'supplementary', remove_query_arg(array('course_id', 'course_grade'), $this->course_detail_url(0)))); ?>">教辅配套</a>
+            </div>
+            <div class="mc-course-grade-filter" aria-label="年级筛选">
+                <span>年级</span>
+                <?php foreach (array(''=>'全部','7'=>'七年级','8'=>'八年级','9'=>'九年级') as $grade => $label) : ?>
+                    <?php $url_args = array(); if ($type_filter) $url_args['course_type'] = $type_filter; if ($grade) $url_args['course_grade'] = $grade; ?>
+                    <a class="<?php echo (string)$grade_filter === (string)$grade ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg($url_args, remove_query_arg(array('course_id','course_type','course_grade'), home_url('/course-center/')))); ?>"><?php echo esc_html($label); ?></a>
+                <?php endforeach; ?>
+            </div>
             <div class="mathcourse-center__grid">
-                <?php foreach ($courses as $course) :
+                <?php
+                $visible = 0;
+                foreach ($courses as $course) :
                     $data = $this->service->get_course_directory($course->ID, get_current_user_id());
                     if (!$data) continue;
+                    $data_type  = isset($data['type']) ? (string)$data['type'] : 'topic';
+                    $data_grade = isset($data['grade']) ? (string)$data['grade'] : '';
+                    if ($type_filter && $type_filter !== $data_type) continue;
+                    if ($grade_filter && $grade_filter !== $data_grade) continue;
+                    $visible++;
                     $cover = !empty($data['cover']) ? $data['cover'] : '';
                     $detail_url = $this->course_detail_url($data['id']);
                 ?>
-                    <article class="mathcourse-center__card">
+                    <article class="mathcourse-center__card" data-course-type="<?php echo esc_attr($data_type); ?>" data-course-grade="<?php echo esc_attr($data_grade); ?>">
                         <a class="mathcourse-center__cover" href="<?php echo esc_url($detail_url); ?>">
                             <?php if ($cover) : ?>
                                 <img src="<?php echo esc_url($cover); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy">
@@ -72,7 +90,7 @@ class Course_Directory {
                         <div class="mathcourse-center__body">
                             <div class="mathcourse-center__meta">
                                 <?php if (!empty($data['grade'])) : ?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif; ?>
-                                <?php if (!empty($data['type'])) : ?><span><?php echo esc_html($data['type'] === 'supplementary' ? '教辅配套课' : '专题课程'); ?></span><?php endif; ?>
+                                <?php if (!empty($data['type'])) : ?><span><?php echo esc_html($data['type'] === 'supplementary' ? '教辅配套' : '专题课程'); ?></span><?php endif; ?>
                             </div>
                             <h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2>
                             <a class="mathcourse-center__button" href="<?php echo esc_url($detail_url); ?>">查看课程 <span>→</span></a>
@@ -80,6 +98,9 @@ class Course_Directory {
                     </article>
                 <?php endforeach; ?>
             </div>
+            <?php if (!$visible) : ?>
+                <div class="mathcourse-directory__empty"><strong>没有找到符合条件的课程</strong><span>可以切换课程类型或年级重新查看。</span></div>
+            <?php endif; ?>
         </div>
         <?php return ob_get_clean();
     }
@@ -110,8 +131,8 @@ class Course_Directory {
         ob_start(); ?>
         <div class="mathcourse-learning-center">
             <div class="mathcourse-learning-center__heading">
-                <h1>学习中心</h1>
-                <p>我的课程与学习进度</p>
+                <h1>我的课程</h1>
+                <p>已授权课程与学习进度</p>
             </div>
             <?php if (empty($cards)) : ?>
                 <div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div>
