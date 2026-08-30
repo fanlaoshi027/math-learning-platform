@@ -13,6 +13,10 @@ class Course_Page {
         $courses = $adapter->get_courses(true, 50);
         $total_lessons = 0;
         foreach ($courses as $course) $total_lessons += $adapter->get_course_lesson_count((int)$course->ID);
+        $new_course_url = wp_nonce_url(
+            admin_url('admin.php?page=mathcourse-courses&action=new'),
+            'mathcourse_new_course'
+        );
         ?>
         <div class="wrap mathcourse-admin-wrap">
             <div class="mathcourse-admin-header">
@@ -26,7 +30,7 @@ class Course_Page {
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">课程管理</div><div class="mathcourse-stat-num" style="font-size:16px;padding-top:7px;">Course → Topic → Lesson</div></div>
             </div>
             <div class="mathcourse-card">
-                <div class="mathcourse-card-title"><h2>专题课程</h2><a class="button mathcourse-primary" href="<?php echo esc_url(admin_url('admin.php?page=create-course')); ?>">＋ 新增课程</a></div>
+                <div class="mathcourse-card-title"><h2>专题课程</h2><a class="button mathcourse-primary" href="<?php echo esc_url($new_course_url); ?>">＋ 新增课程</a></div>
                 <table class="mathcourse-table"><thead><tr><th>课程</th><th>封面</th><th>类型</th><th>课时</th><th>状态</th><th>操作</th></tr></thead><tbody>
                 <?php if (!$courses): ?><tr><td colspan="6">暂无课程。点击右上角“新增课程”开始创建。</td></tr><?php endif; ?>
                 <?php foreach ($courses as $course): $id=(int)$course->ID; $cover=get_the_post_thumbnail_url($id,'thumbnail'); if(!$cover)$cover=get_post_meta($id,'_mathcourse_cover',true); $type=get_post_meta($id,'_mathcourse_type',true); ?>
