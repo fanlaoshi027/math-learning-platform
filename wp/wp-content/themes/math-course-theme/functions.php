@@ -37,7 +37,7 @@ function mc_theme_assets() {
 	$nav_version          = file_exists($learning_nav_path) ? (string)filemtime($learning_nav_path) : '1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
 	$queried_content = get_post_field('post_content',get_queried_object_id());
-	$load_course_ui = is_page(array('course-center','xueyuan-denglu','learning'));
+	$load_course_ui = is_front_page() || is_page(array('course-center','xueyuan-denglu','learning'));
 	if(!$load_course_ui){
 		$load_course_ui = has_shortcode($queried_content,'mathcourse_course_player') || has_shortcode($queried_content,'mathcourse_course_learning') || has_shortcode($queried_content,'math_course_center_v82') || has_shortcode($queried_content,'math_student_login');
 	}
@@ -45,7 +45,7 @@ function mc_theme_assets() {
 		wp_enqueue_style('mc-reference-ui',get_stylesheet_directory_uri().'/assets/css/reference-ui.css',array('mc-theme-style'),$ui_version);
 		wp_enqueue_style('mc-ui-scale',get_stylesheet_directory_uri().'/assets/css/ui-scale.css',array('mc-reference-ui'),$scale_version);
 	}
-	if($load_course_ui && (isset($_GET['course_id']) || has_shortcode($queried_content,'mathcourse_course_directory'))){
+	if($load_course_ui && (isset($_GET['course_id']) || has_shortcode($queried_content,'mathcourse_course_directory') || is_front_page())){
 		wp_enqueue_style('mc-course-detail',get_stylesheet_directory_uri().'/assets/css/course-detail.css',array('mc-ui-scale'),$detail_version);
 	}
 	if(is_page('learning') || is_page_template('page-learning.php')){
