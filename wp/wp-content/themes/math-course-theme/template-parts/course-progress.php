@@ -14,9 +14,11 @@ $progress = array(
     'percent'   => 0,
 );
 
-$adapter = new Adapter();
-if ($adapter->is_available() && $adapter->get_course($course_id)) {
-    $progress = $adapter->get_course_progress($course_id, $user_id);
+if (class_exists(Adapter::class)) {
+    $adapter = new Adapter();
+    if ($adapter->is_available() && $adapter->get_course($course_id)) {
+        $progress = $adapter->get_course_progress($course_id, $user_id);
+    }
 }
 
 $completed_lessons = absint($progress['completed']);
