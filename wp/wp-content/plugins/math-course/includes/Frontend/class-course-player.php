@@ -6,6 +6,7 @@ use MathCourse\Course\Course_Service;
 class Course_Player {
     private $service;
     public function __construct() { $this->service = new Course_Service(); add_shortcode('mathcourse_course_player', array($this, 'render')); }
+    private function assets() { wp_enqueue_style('mathcourse-course-player', MATHCOURSE_URL . 'assets/course-player.css', array(), MATHCOURSE_VERSION); }
     public function render($atts=array()) {
         $atts=shortcode_atts(array('course_id'=>0),$atts,'mathcourse_course_player');
         $course_id=absint($atts['course_id']); if(!$course_id && isset($_GET['course_id'])) $course_id=absint($_GET['course_id']);
@@ -14,7 +15,7 @@ class Course_Player {
         $selected=isset($_GET['lesson_id'])?absint($_GET['lesson_id']):0; $current=$this->find_lesson($data,$selected); if(!$current) $current=$this->first_accessible($data);
         $progress=isset($data['progress'])?$data['progress']:array('completed'=>0,'total'=>0,'percent'=>0);
         $page=get_page_by_path('course-center'); $base=$page?get_permalink($page):home_url('/course-center/');
-        $navigation=$this->lesson_navigation($data,$current);
+        $navigation=$this->lesson_navigation($data,$current); $this->assets();
         ob_start(); ?>
         <div class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
             <div class="mc-course-player__top"><div><div class="mc-course-player__eyebrow">课程学习</div><h1><?php echo esc_html($data['title']); ?></h1></div><div class="mc-course-player__progress"><span>学习进度 <?php echo esc_html($progress['percent']); ?>%</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?> 课时</strong><div><i style="width:<?php echo esc_attr($progress['percent']); ?>%"></i></div></div></div>
