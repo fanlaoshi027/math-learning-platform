@@ -125,6 +125,10 @@ class Access_Service {
         );
     }
 
+    /**
+     * 返回用户当前有效的课程授权。
+     * 过期授权即使数据库 status 仍为 active，也不能继续出现在学员课程中心。
+     */
     public function get_user_courses($user_id) {
         $user_id = absint($user_id);
         if (!$user_id) {
@@ -132,10 +136,12 @@ class Access_Service {
         }
 
         global $wpdb;
+        $now = current_time('mysql');
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$this->table()} WHERE user_id=%d AND status='active' ORDER BY granted_at DESC",
-                $user_id
+                "SELECT * FROM {$this->table()} WHERE user_id=%d AND status='active' AND (expires_at IS NULL OR expires_at='' OR expires_at > %s) ORDER BY granted_at DESC",
+                $user_id,
+                $now
             )
         );
 
