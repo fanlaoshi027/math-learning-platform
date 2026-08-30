@@ -13,6 +13,25 @@ class Adapter {
         return function_exists('tutor');
     }
 
+    public function get_courses($include_unpublished = true, $limit = -1) {
+        if (!$this->is_available()) {
+            return array();
+        }
+
+        $status = $include_unpublished ? array('publish', 'draft', 'private') : array('publish');
+        $limit = (int) $limit;
+        if (0 === $limit) {
+            return array();
+        }
+
+        return get_posts(array(
+            'post_type'      => tutor()->course_post_type,
+            'post_status'    => $status,
+            'posts_per_page' => $limit,
+            'orderby'        => array('menu_order' => 'ASC', 'date' => 'DESC'),
+        ));
+    }
+
     public function get_course($course_id) {
         $course_id = absint($course_id);
         $course = $course_id ? get_post($course_id) : null;
@@ -125,9 +144,7 @@ class Adapter {
         return esc_url_raw($value);
     }
 
-    /**
-     * Tutor LMS 4.0.4 Preview 的业务适配。
-     */
+    /** Tutor LMS 4.0.4 Preview 的业务适配。 */
     public function is_preview_lesson($lesson_id) {
         $lesson_id = absint($lesson_id);
         if (!$lesson_id) {
