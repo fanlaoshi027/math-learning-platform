@@ -18,7 +18,6 @@ class Course_Service {
         $this->tutor = new Adapter();
         $this->access = new Access_Service();
         $this->progress = new Progress_Service();
-        // URL generation must not register another set of rewrite/template hooks.
         $this->video = new Video_Router(false);
     }
 
@@ -34,10 +33,7 @@ class Course_Service {
         );
     }
 
-    /**
-     * Single source for lesson playback data.
-     * HLS URLs are generated only after the final watch permission passes.
-     */
+    /** Single source for lesson playback data. Raw HLS is never returned. */
     public function get_lesson_video($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
         $user_id = absint($user_id);
@@ -47,8 +43,9 @@ class Course_Service {
         $course_id = $this->tutor->get_lesson_course_id($lesson_id);
         if (!$course_id) return null;
 
-        $accessible = $this->access->can_watch_lesson($user_id, $course_id, $lesson_id);
+        $watch_access = $this->access->can_watch_lesson($user_id, $course_id, $lesson_id);
         $preview = $this->access->can_preview($course_id, $lesson_id);
+        $accessible = $watch_access || $preview;
         $video_id = $this->tutor->get_lesson_video_id($lesson_id);
         $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson_id);
 
@@ -62,11 +59,6 @@ class Course_Service {
         );
     }
 
-    /**
-     * Return the canonical front-end learning URL for a lesson.
-     * Course detail pages should only describe the course; lesson playback
-     * belongs to the dedicated learning page.
-     */
     private function lesson_learning_url($course_id, $lesson_id) {
         if (function_exists('mc_get_learning_page_url')) {
             $base = mc_get_learning_page_url();
@@ -74,14 +66,7 @@ class Course_Service {
             $page = get_page_by_path('learning', OBJECT, 'page');
             $base = $page ? get_permalink($page) : home_url('/learning/');
         }
-
-        return add_query_arg(
-            array(
-                'course_id' => absint($course_id),
-                'lesson_id' => absint($lesson_id),
-            ),
-            $base
-        );
+        return add_query_arg(array('course_id' => absint($course_id), 'lesson_id' => absint($lesson_id)), $base);
     }
 
     public function get_course_directory($course_id, $user_id = 0) {
@@ -99,7 +84,8 @@ class Course_Service {
                 $lesson_id = (int) $lesson->ID;
                 $completed_lesson = ($course_access && $user_id) ? $this->progress->is_completed($user_id, $lesson_id) : false;
                 $preview = $this->access->can_preview($course->ID, $lesson_id);
-                $accessible = $this->access->can_watch_lesson($user_id, $course->ID, $lesson_id);
+                $watch_access = $this->access->can_watch_lesson($user_id, $course->ID, $lesson_id);
+                $accessible = $watch_access || $preview;
                 $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson_id);
 
                 $lessons[] = array(
