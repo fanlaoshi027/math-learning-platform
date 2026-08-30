@@ -197,16 +197,54 @@ class Course_Directory {
         <?php return ob_get_clean();
     }
 
+    /**
+     * Determine the next sensible lesson for the student.
+     *
+     * If some lessons are completed, continue from the first accessible lesson
+     * after the most recently completed lesson. If everything accessible is
+     * completed, fall back to the most recently completed lesson so the button
+     * still has a useful destination.
+     */
     private function find_continue_lesson($data) {
-        if (empty($data['access'])) return null;
-        $last = null;
+        if (empty($data['access']) || empty($data['topics'])) return null;
+
+        $last_completed_index = -1;
+        $last_completed = null;
+        $index = 0;
+
         foreach ($data['topics'] as $topic) {
             foreach ($topic['lessons'] as $lesson) {
-                if ($lesson['completed']) $last = $lesson;
-                elseif (!$last && $lesson['accessible']) return $lesson;
+                if (!empty($lesson['completed'])) {
+                    $last_completed_index = $index;
+                    $last_completed = $lesson;
+                }
+                $index++;
             }
         }
-        return $last;
+
+        // No completed lesson yet: start from the first accessible lesson.
+        if ($last_completed_index < 0) {
+            foreach ($data['topics'] as $topic) {
+                foreach ($topic['lessons'] as $lesson) {
+                    if (!empty($lesson['accessible'])) return $lesson;
+                }
+            }
+            return null;
+        }
+
+        // Continue with the first accessible lesson after the last completed one.
+        $index = 0;
+        foreach ($data['topics'] as $topic) {
+            foreach ($topic['lessons'] as $lesson) {
+                if ($index > $last_completed_index && !empty($lesson['accessible']) && empty($lesson['completed'])) {
+                    return $lesson;
+                }
+                $index++;
+            }
+        }
+
+        // All accessible lessons after the last completion are finished/locked.
+        return $last_completed;
     }
 
     private function grade_label($grade) {
