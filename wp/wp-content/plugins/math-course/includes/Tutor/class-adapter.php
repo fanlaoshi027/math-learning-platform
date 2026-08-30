@@ -28,6 +28,18 @@ class Adapter {
         return 'topics';
     }
 
+    /** 判断给定 Post Type 是否为 Tutor 课程。 */
+    public function is_course_post_type($post_type) {
+        $course_post_type = $this->get_course_post_type();
+        return $course_post_type && $course_post_type === $post_type;
+    }
+
+    /** 判断给定 Post Type 是否为 Tutor 课时。 */
+    public function is_lesson_post_type($post_type) {
+        $lesson_post_type = $this->get_lesson_post_type();
+        return $lesson_post_type && $lesson_post_type === $post_type;
+    }
+
     public function get_courses($include_unpublished = true, $limit = -1) {
         if (!$this->is_available()) return array();
         $post_type = $this->get_course_post_type();
