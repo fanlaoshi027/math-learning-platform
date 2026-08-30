@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         function submitCompletion() {
-            if (completionSent || !courseId || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
+            if (completionSent || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
 
             completionSent = true;
 
@@ -207,7 +207,6 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append('action', 'mathcourse_complete_lesson');
             formData.append('nonce', mathcoursePlayer.nonce);
             formData.append('lesson_id', String(lessonId));
-            formData.append('course_id', String(courseId));
 
             fetch(mathcoursePlayer.ajax_url, {
                 method: 'POST',
@@ -223,13 +222,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     try { localStorage.removeItem(storageKey); } catch (e) {}
 
-                    const progress = result.data && result.data.progress ? result.data.progress : null;
+                    const data = result.data || {};
+                    const serverCourseId = Number(data.course_id || courseId || 0);
+                    const progress = data.progress || null;
                     updateProgressUI(progress, lessonId);
 
                     document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', {
                         detail: {
                             lessonId: lessonId,
-                            courseId: courseId,
+                            courseId: serverCourseId,
                             progress: progress
                         }
                     }));
@@ -237,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', {
                         detail: {
                             lessonId: lessonId,
-                            courseId: courseId,
+                            courseId: serverCourseId,
                             progress: progress
                         }
                     }));
