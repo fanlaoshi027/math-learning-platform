@@ -144,8 +144,7 @@ class Access_Service {
 
     /**
      * 试看权限完全由 MathCourse 课时属性控制。
-     * 同时必须确认 lesson 确实属于传入的 course，避免仅凭 lesson meta
-     * 就把其他课程的试看课时误判为当前课程的试看内容。
+     * 必须确认 lesson/course 均为已发布内容，并且 lesson 确实属于传入的 course。
      */
     public function can_preview($course_id, $lesson_id) {
         $course_id = absint($course_id);
@@ -160,6 +159,16 @@ class Access_Service {
             return false;
         }
 
+        $lesson = $adapter->get_lesson($lesson_id);
+        if (!$lesson || 'publish' !== $lesson->post_status) {
+            return false;
+        }
+
+        $course = $adapter->get_course($course_id);
+        if (!$course || 'publish' !== $course->post_status) {
+            return false;
+        }
+
         if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) {
             return false;
         }
@@ -169,9 +178,9 @@ class Access_Service {
 
     /**
      * 最终播放权限：
-     * 1. 管理员：可直接预览，用于课程维护；
+     * 1. 管理员：可直接维护已发布课程；
      * 2. 已授权学员：全部已发布课时；
-     * 3. 未授权学员/游客：只有当前课程中明确标记为“允许试看”的课时；
+     * 3. 未授权学员/游客：只有当前课程中明确标记为“允许试看”的已发布课时；
      * 4. Tutor LMS Public/Private/Free 设置不会绕过上述规则。
      */
     public function can_watch_lesson($user_id, $course_id, $lesson_id) {
@@ -180,6 +189,21 @@ class Access_Service {
         $lesson_id = absint($lesson_id);
 
         if (!$course_id || !$lesson_id) {
+            return false;
+        }
+
+        $adapter = new Adapter();
+        if (!$adapter->is_available()) {
+            return false;
+        }
+
+        $lesson = $adapter->get_lesson($lesson_id);
+        $course = $adapter->get_course($course_id);
+        if (!$lesson || 'publish' !== $lesson->post_status || !$course || 'publish' !== $course->post_status) {
+            return false;
+        }
+
+        if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) {
             return false;
         }
 
