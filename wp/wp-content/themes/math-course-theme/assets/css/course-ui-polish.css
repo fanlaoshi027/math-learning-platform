@@ -1,0 +1,37 @@
+/* Course cards: image when available, designed color cover when not. */
+body.mathcourse-site .mathcourse-card{overflow:hidden;border:1px solid #e6ebf2;border-radius:18px;background:#fff;box-shadow:0 8px 24px rgba(18,52,107,.06);transition:transform .2s ease,box-shadow .2s ease}
+body.mathcourse-site .mathcourse-card:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(18,52,107,.10)}
+body.mathcourse-site .mathcourse-cover-wrap{aspect-ratio:16/9;overflow:hidden;background:#eef3f8}
+body.mathcourse-site .mathcourse-cover{display:block;width:100%;height:100%;object-fit:cover}
+body.mathcourse-site .mathcourse-color-cover{position:relative;aspect-ratio:16/9;overflow:hidden;padding:24px 26px;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(135deg,var(--mc-cover-color,#12346b),#244f8d);color:#fff}
+body.mathcourse-site .mathcourse-color-cover:after{content:"";position:absolute;width:180px;height:180px;right:-50px;bottom:-70px;border:1px solid rgba(255,255,255,.22);border-radius:50%;box-shadow:0 0 0 28px rgba(255,255,255,.04),0 0 0 58px rgba(255,255,255,.03)}
+body.mathcourse-site .mathcourse-color-cover__tag{position:relative;z-index:1;display:inline-flex;align-self:flex-start;margin-bottom:10px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.16);font-size:14px;font-weight:700}
+body.mathcourse-site .mathcourse-color-cover strong{position:relative;z-index:1;max-width:82%;font-size:26px;line-height:1.3;letter-spacing:-.02em}
+body.mathcourse-site .mathcourse-color-cover small{position:relative;z-index:1;margin-top:10px;font-size:14px;opacity:.86}
+body.mathcourse-site .mathcourse-color-cover i{position:absolute;z-index:1;right:24px;top:18px;font-size:54px;font-style:normal;font-weight:800;opacity:.18}
+body.mathcourse-site .mathcourse-card>h3{margin:0;padding:17px 20px 20px;font-size:19px;line-height:1.5;font-weight:800;color:#10264a}
+
+/* Video player: make the control area easier to use on desktop and touch screens. */
+body.mathcourse-site .mc-video-shell,.mathcourse-player{border-radius:16px;overflow:hidden}
+body.mathcourse-site .video-js .vjs-control-bar{height:4.6em;background:linear-gradient(transparent,rgba(5,15,28,.94));padding:0 8px}
+body.mathcourse-site .video-js .vjs-control{min-width:2.8em}
+body.mathcourse-site .video-js .vjs-progress-control{position:absolute;left:10px;right:10px;top:-14px;width:auto;height:14px}
+body.mathcourse-site .video-js .vjs-play-progress:before{font-size:1.1em}
+body.mathcourse-site .video-js .vjs-time-control{padding:0 4px;font-size:14px;font-weight:700}
+body.mathcourse-site .video-js .vjs-playback-rate{display:none}
+body.mathcourse-site .mc-player-skip-controls{bottom:68px!important;left:14px!important;gap:7px}
+body.mathcourse-site .mc-player-skip-button{min-width:72px!important;min-height:42px!important;border-radius:11px!important;background:rgba(8,24,48,.9)!important;font-size:14px!important;box-shadow:0 3px 12px rgba(0,0,0,.18)}
+body.mathcourse-site .mc-player-speed{position:absolute;right:14px;bottom:68px;z-index:10}
+body.mathcourse-site .mc-player-speed-button{min-width:58px;height:40px;border:0;border-radius:11px;background:rgba(8,24,48,.9);color:#fff;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation}
+body.mathcourse-site .mc-player-speed-menu{position:absolute;right:0;bottom:48px;display:none;min-width:92px;padding:6px;border-radius:12px;background:rgba(8,24,48,.97);box-shadow:0 8px 24px rgba(0,0,0,.28)}
+body.mathcourse-site .mc-player-speed.is-open .mc-player-speed-menu{display:grid;gap:3px}
+body.mathcourse-site .mc-player-speed-menu button{border:0;border-radius:8px;background:transparent;color:#fff;padding:9px 10px;font-size:14px;font-weight:700;text-align:center;cursor:pointer}
+body.mathcourse-site .mc-player-speed-menu button.is-active{background:rgba(255,255,255,.18)}
+@media(max-width:700px){
+ body.mathcourse-site .mathcourse-color-cover{padding:18px 20px}
+ body.mathcourse-site .mathcourse-color-cover strong{font-size:22px}
+ body.mathcourse-site .mathcourse-card>h3{font-size:18px;padding:15px 17px 18px}
+ body.mathcourse-site .mc-player-speed{right:9px;bottom:62px}
+ body.mathcourse-site .mc-player-skip-controls{left:9px!important;bottom:62px!important}
+ body.mathcourse-site .mc-player-speed-button{height:38px;min-width:54px}
+}
