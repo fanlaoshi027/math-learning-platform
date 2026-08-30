@@ -82,8 +82,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const duration = val('duration');
             if (!Number.isFinite(time) || time <= 0) return;
             if (Number.isFinite(duration) && duration > 0 && time >= duration - 0.5) return;
-            // Keep enough precision locally for a smoother resume, without ever
-            // sending this position to the server.
             const value = Math.floor(time * 10) / 10;
             if (!force && Math.floor(value) === lastSavedSecond) return;
             lastSavedSecond = Math.floor(value);
@@ -94,9 +92,13 @@ document.addEventListener('DOMContentLoaded', function () {
             lastTime = val('currentTime');
             lastWallClock = Date.now();
         }
+        function markPlayingInterval() {
+            lastTime = val('currentTime');
+            lastWallClock = Date.now();
+        }
 
         ['loadedmetadata', 'durationchange', 'canplay'].forEach(function (eventName) { on(player, eventName, restore); });
-        on(player, 'play', function () { lastTime = val('currentTime'); lastWallClock = Date.now(); });
+        on(player, 'play', markPlayingInterval);
         on(player, 'timeupdate', function () {
             const time = val('currentTime');
             const duration = val('duration');
@@ -133,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append('nonce', mathcoursePlayer.nonce);
             formData.append('lesson_id', String(lessonId));
 
-            fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: formData })
+            fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: formData, keepalive: true })
                 .then(function (response) {
                     if (!response.ok) throw new Error('HTTP ' + response.status);
                     return response.json();
