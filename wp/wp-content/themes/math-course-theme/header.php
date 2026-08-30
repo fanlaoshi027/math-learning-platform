@@ -11,23 +11,28 @@ defined( 'ABSPATH' ) || exit;
 <?php wp_body_open(); ?>
 <header class="mc-site-header">
     <div class="mc-container mc-site-header__inner">
-        <a class="mc-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="樊老师数学首页">
-            <span class="mc-brand__mark" aria-hidden="true">∑</span>
-            <span class="mc-brand__text">樊老师数学</span>
+        <a class="mc-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="樊老师数学课堂首页">
+            <span class="mc-brand__mark" aria-hidden="true">▣</span>
+            <span class="mc-brand__copy">
+                <strong class="mc-brand__text">樊老师数学课堂</strong>
+                <small>系统学习 · 夯实基础 · 高效提分</small>
+            </span>
         </a>
 
         <nav class="mc-site-nav" aria-label="主导航">
-            <a href="<?php echo esc_url( home_url( '/' ) ); ?>">首页</a>
-            <a href="<?php echo esc_url( add_query_arg( 'course_type', 'topic', home_url( '/course-center/' ) ) ); ?>">专题课程</a>
-            <a href="<?php echo esc_url( add_query_arg( 'course_type', 'supplementary', home_url( '/course-center/' ) ) ); ?>">教辅配套</a>
+            <a class="<?php echo is_front_page() ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/' ) ); ?>">首页</a>
+            <a class="<?php echo is_page_template( 'page-course-center.php' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">课程中心</a>
             <?php if ( is_user_logged_in() ) : ?>
-                <a href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">我的课程</a>
+                <a class="<?php echo is_page_template( 'page-learning-center.php' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">学习中心</a>
+            <?php else : ?>
+                <a href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">学习中心</a>
             <?php endif; ?>
+            <a href="<?php echo esc_url( home_url( '/about-teacher/' ) ); ?>">关于老师</a>
         </nav>
 
         <div class="mc-header-actions">
             <form class="mc-header-search" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
-                <input type="search" name="s" value="<?php echo esc_attr( get_search_query() ); ?>" placeholder="搜索课程、知识点…" aria-label="搜索课程">
+                <input type="search" name="s" value="<?php echo esc_attr( get_search_query() ); ?>" placeholder="搜索课程或知识点" aria-label="搜索课程或知识点">
                 <button type="submit" aria-label="搜索">⌕</button>
             </form>
             <?php if ( is_user_logged_in() ) : ?>
