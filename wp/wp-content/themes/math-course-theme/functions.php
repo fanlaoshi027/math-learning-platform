@@ -53,6 +53,37 @@ function mc_theme_assets() {
 add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
 
 /**
+ * Route course-center links carrying a course_id to the dedicated learning page.
+ * This keeps old course-card URLs compatible while making the learning player
+ * the single entry point for course playback.
+ *
+ * @return void
+ */
+function mc_route_course_to_learning_player() {
+	if ( ! is_page( 'course-center' ) || empty( $_GET['course_id'] ) ) {
+		return;
+	}
+
+	$course_id = absint( $_GET['course_id'] );
+	if ( ! $course_id ) {
+		return;
+	}
+
+	$learning_page = get_page_by_path( '学习课程' );
+	$base = $learning_page ? get_permalink( $learning_page ) : home_url( '/学习课程/' );
+
+	$lesson_id = isset( $_GET['lesson_id'] ) ? absint( $_GET['lesson_id'] ) : 0;
+	$args = array( 'course_id' => $course_id );
+	if ( $lesson_id ) {
+		$args['lesson_id'] = $lesson_id;
+	}
+
+	wp_safe_redirect( add_query_arg( $args, $base ), 302 );
+	exit;
+}
+add_action( 'template_redirect', 'mc_route_course_to_learning_player', 1 );
+
+/**
  * Set up theme features.
  *
  * @return void
