@@ -253,12 +253,16 @@ class Progress_Service {
             return array();
         }
 
-        $status = $include_unpublished ? array( 'publish', 'draft', 'private' ) : array( 'publish' );
+        // Topic 本身有时会被 Tutor/旧数据保存成 draft/private，但只要它属于当前课程，
+        // 里面已经发布的课时仍然应该参与授权学员的课程进度统计。
+        $topic_status = $include_unpublished ? array( 'publish', 'draft', 'private' ) : array( 'publish', 'draft', 'private' );
+        $lesson_status = $include_unpublished ? array( 'publish', 'draft', 'private' ) : array( 'publish' );
+
         $topics = get_posts(
             array(
                 'post_type'      => 'topics',
                 'post_parent'    => $course_id,
-                'post_status'    => $status,
+                'post_status'    => $topic_status,
                 'posts_per_page' => -1,
                 'orderby'        => array( 'menu_order' => 'ASC', 'date' => 'ASC' ),
             )
@@ -270,7 +274,7 @@ class Progress_Service {
                 array(
                     'post_type'      => tutor()->lesson_post_type,
                     'post_parent'    => $topic->ID,
-                    'post_status'    => $status,
+                    'post_status'    => $lesson_status,
                     'posts_per_page' => -1,
                     'orderby'        => array( 'menu_order' => 'ASC', 'date' => 'ASC' ),
                 )
