@@ -14,12 +14,18 @@ class Course_Player {
         $selected=isset($_GET['lesson_id'])?absint($_GET['lesson_id']):0; $current=$this->find_lesson($data,$selected); if(!$current) $current=$this->first_accessible($data);
         $progress=isset($data['progress'])?$data['progress']:array('completed'=>0,'total'=>0,'percent'=>0);
         $page=get_page_by_path('course-center'); $base=$page?get_permalink($page):home_url('/course-center/');
+        $navigation=$this->lesson_navigation($data,$current);
         ob_start(); ?>
         <div class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
             <div class="mc-course-player__top"><div><div class="mc-course-player__eyebrow">课程学习</div><h1><?php echo esc_html($data['title']); ?></h1></div><div class="mc-course-player__progress"><span>学习进度 <?php echo esc_html($progress['percent']); ?>%</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?> 课时</strong><div><i style="width:<?php echo esc_attr($progress['percent']); ?>%"></i></div></div></div>
             <div class="mc-course-player__layout">
                 <section class="mc-course-player__main">
-                <?php if($current && $current['accessible']): ?><div class="mc-course-player__video"><?php if(shortcode_exists('mathcourse_video')) echo do_shortcode('[mathcourse_video lesson_id="'.esc_attr($current['id']).'" course_id="'.esc_attr($course_id).'"]'); ?></div><div class="mc-course-player__lesson-head"><div><span>当前课时</span><h2><?php echo esc_html($current['title']); ?></h2></div><?php if($current['preview']): ?><em>试看</em><?php endif; ?></div><?php else: ?><div class="mc-course-player__empty"><strong>请选择可观看的课时</strong><span>右侧课程列表中，标记“试看”的课时可以直接观看。</span></div><?php endif; ?>
+                <?php if($current && $current['accessible']): ?><div class="mc-course-player__video"><?php if(shortcode_exists('mathcourse_video')) echo do_shortcode('[mathcourse_video lesson_id="'.esc_attr($current['id']).'" course_id="'.esc_attr($course_id).'"]'); ?></div><div class="mc-course-player__lesson-head"><div><span>当前课时</span><h2><?php echo esc_html($current['title']); ?></h2></div><?php if($current['preview']): ?><em>试看</em><?php endif; ?></div>
+                <nav class="mc-course-player__navigation" aria-label="课时导航">
+                    <?php if($navigation['previous']): ?><a class="mc-course-player__nav-button" href="<?php echo esc_url($navigation['previous']['url']); ?>"><span>‹</span><small>上一课</small><strong><?php echo esc_html($navigation['previous']['title']); ?></strong></a><?php else: ?><span class="mc-course-player__nav-button is-disabled"><span>‹</span><small>上一课</small><strong>已经是第一课</strong></span><?php endif; ?>
+                    <?php if($navigation['next']): ?><a class="mc-course-player__nav-button is-next" href="<?php echo esc_url($navigation['next']['url']); ?>"><small>下一课</small><strong><?php echo esc_html($navigation['next']['title']); ?></strong><span>›</span></a><?php else: ?><span class="mc-course-player__nav-button is-disabled is-next"><small>下一课</small><strong>已经是最后一课</strong><span>›</span></span><?php endif; ?>
+                </nav>
+                <?php else: ?><div class="mc-course-player__empty"><strong>请选择可观看的课时</strong><span>右侧课程列表中，标记“试看”的课时可以直接观看。</span></div><?php endif; ?>
                 </section>
                 <aside class="mc-course-player__sidebar"><div class="mc-course-player__sidebar-head"><strong>课程目录</strong><span><?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?></span></div><div class="mc-course-player__topics">
                 <?php foreach($data['topics'] as $index=>$topic): ?><div class="mc-course-player__topic"><h3><?php echo esc_html($index+1); ?>. <?php echo esc_html($topic['title']); ?></h3><div class="mc-course-player__lessons">
@@ -30,4 +36,14 @@ class Course_Player {
     }
     private function find_lesson($data,$id){ if(!$id)return null; foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if((int)$lesson['id']===$id&&!empty($lesson['accessible']))return $lesson; return null; }
     private function first_accessible($data){ foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson; return null; }
+    private function lesson_navigation($data,$current){
+        $result=array('previous'=>null,'next'=>null); if(!$current)return $result;
+        $lessons=array(); foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))$lessons[]=$lesson;
+        $current_index=null; foreach($lessons as $index=>$lesson)if((int)$lesson['id']===(int)$current['id']){$current_index=$index;break;}
+        if(null===$current_index)return $result;
+        $page=get_page_by_path('course-center'); $base=$page?get_permalink($page):home_url('/course-center/'); $course_id=absint($data['id']??0);
+        if($current_index>0){$lesson=$lessons[$current_index-1];$result['previous']=array('id'=>$lesson['id'],'title'=>$lesson['title'],'url'=>add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base));}
+        if($current_index<count($lessons)-1){$lesson=$lessons[$current_index+1];$result['next']=array('id'=>$lesson['id'],'title'=>$lesson['title'],'url'=>add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base));}
+        return $result;
+    }
 }
