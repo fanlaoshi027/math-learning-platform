@@ -4,65 +4,33 @@ namespace MathCourse\Tutor;
 
 defined('ABSPATH') || exit;
 
+/**
+ * Tutor preview compatibility wrapper.
+ * Preview state is owned by the shared Tutor Adapter.
+ */
+class Preview {
 
-class Preview
-{
-
-
-    public function is_preview(
-        $lesson_id
-    )
-    {
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | 试听标记
-        |--------------------------------------------------------------------------
-        |
-        | 后续可连接 Tutor LMS meta
-        |
-        */
-
-
-        $preview =
-        get_post_meta(
-
-            $lesson_id,
-
-            '_mathcourse_preview',
-
-            true
-
-        );
-
-
-
-        return $preview === 'yes';
-
-
+    /**
+     * Determine whether a lesson is explicitly configured as previewable.
+     */
+    public function is_preview($lesson_id) {
+        $adapter = new Adapter();
+        return $adapter->is_preview_lesson(absint($lesson_id));
     }
 
-
-
-    public function enable_preview(
-        $lesson_id
-    )
-    {
-
-
-        update_post_meta(
-
-            $lesson_id,
-
-            '_mathcourse_preview',
-
-            'yes'
-
-        );
-
-
+    /**
+     * Enable preview using the canonical MathCourse/Tutor metadata bridge.
+     */
+    public function enable_preview($lesson_id) {
+        $adapter = new Adapter();
+        return $adapter->set_lesson_preview(absint($lesson_id), true);
     }
 
-
+    /**
+     * Disable preview using the same canonical metadata bridge.
+     */
+    public function disable_preview($lesson_id) {
+        $adapter = new Adapter();
+        return $adapter->set_lesson_preview(absint($lesson_id), false);
+    }
 }
