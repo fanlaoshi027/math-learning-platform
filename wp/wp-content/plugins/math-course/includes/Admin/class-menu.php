@@ -4,6 +4,8 @@ namespace MathCourse\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use MathCourse\Tutor\Adapter;
+
 class Menu {
 
     public function __construct() {
@@ -25,13 +27,18 @@ class Menu {
             return;
         }
 
-        $course_count = function_exists( 'tutor' ) ? count( get_posts( array( 'post_type' => tutor()->course_post_type, 'post_status' => array( 'publish', 'draft', 'private' ), 'posts_per_page' => -1, 'fields' => 'ids' ) ) ) : 0;
-        $user_count   = count( get_users( array( 'fields' => 'ids', 'number' => 9999 ) ) );
+        $tutor = new Adapter();
+        $courses = $tutor->get_courses( true, -1 );
+        $published_courses_list = $tutor->get_courses( false, -1 );
+        $course_count = count( $courses );
+        $published_courses = count( $published_courses_list );
         $lesson_count = 0;
-        if ( function_exists( 'tutor' ) ) {
-            $lesson_count = count( get_posts( array( 'post_type' => tutor()->lesson_post_type, 'post_status' => array( 'publish', 'draft', 'private' ), 'posts_per_page' => -1, 'fields' => 'ids' ) ) );
+
+        foreach ( $courses as $course ) {
+            $lesson_count += $tutor->get_course_lesson_count( $course->ID );
         }
-        $published_courses = function_exists( 'tutor' ) ? count( get_posts( array( 'post_type' => tutor()->course_post_type, 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) ) : 0;
+
+        $user_count = count( get_users( array( 'fields' => 'ids', 'number' => 9999 ) ) );
         ?>
         <div class="wrap mathcourse-admin-wrap">
             <div class="mathcourse-admin-header">
@@ -51,12 +58,12 @@ class Menu {
                     <h2>专题课程管理</h2>
                     <a class="button mathcourse-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=mathcourse-courses' ) ); ?>">进入课程管理</a>
                 </div>
-                <?php if ( function_exists( 'tutor' ) ) : ?>
+                <?php if ( $tutor->is_available() ) : ?>
                     <table class="mathcourse-table">
                         <thead><tr><th>课程名称</th><th>课时</th><th>状态</th><th>操作</th></tr></thead>
                         <tbody>
                         <?php
-                        $courses = get_posts( array( 'post_type' => tutor()->course_post_type, 'post_status' => array( 'publish', 'draft', 'private' ), 'posts_per_page' => 8, 'orderby' => array( 'menu_order' => 'ASC', 'date' => 'DESC' ) ) );
+                        $courses = $tutor->get_courses( true, 8 );
                         foreach ( $courses as $course ) :
                             $edit_url = add_query_arg( array( 'page' => 'mathcourse-course-edit', 'course_id' => $course->ID ), admin_url( 'admin.php' ) );
                             $status_class = 'publish' === $course->post_status ? 'is-published' : 'is-draft';
@@ -64,7 +71,7 @@ class Menu {
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html( $course->post_title ); ?></strong></td>
-                                <td><?php echo esc_html( ( new \MathCourse\Tutor\Adapter() )->get_course_lesson_count( $course->ID ) ); ?></td>
+                                <td><?php echo esc_html( $tutor->get_course_lesson_count( $course->ID ) ); ?></td>
                                 <td><span class="mathcourse-badge <?php echo esc_attr( $status_class ); ?>"><?php echo esc_html( $status_label ); ?></span></td>
                                 <td><a href="<?php echo esc_url( $edit_url ); ?>">编辑课程</a></td>
                             </tr>
