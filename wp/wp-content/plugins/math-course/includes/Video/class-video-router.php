@@ -12,10 +12,6 @@ class Video_Router {
     private $adapter;
     private $token_ttl = 600;
 
-    /**
-     * Hook registration is optional so service classes can generate URLs
-     * without registering duplicate WordPress request handlers.
-     */
     public function __construct($register_hooks = true) {
         $this->access  = new Access_Service();
         $this->adapter = new Adapter();
@@ -89,9 +85,35 @@ class Video_Router {
         exit;
     }
 
+    private function gateway_url($lesson_id, $expires, $file_ref) {
+        $sig = $this->sign($lesson_id, $expires, $file_ref);
+        return add_query_arg('file', rawurlencode($file_ref), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
+    }
+
     /**
-     * Rewrite every media URI in a playlist, including nested m3u8 playlists.
-     * The browser therefore never receives the real HLS origin.
+     * Convert an HLS URI into the signed gateway reference. Absolute URLs are
+     * accepted only when they stay on the exact configured source origin.
+     */
+    private function normalize_file_reference($uri, $source_parts) {
+        $uri = trim((string) $uri);
+        if ($uri === '') return '';
+
+        if (preg_match('#^https?://#i', $uri)) {
+            $target = wp_parse_url($uri);
+            if (!$target || empty($target['scheme']) || empty($target['host'])) return false;
+            if (strtolower($target['scheme']) !== strtolower($source_parts['scheme'])) return false;
+            if (strtolower($target['host']) !== strtolower($source_parts['host'])) return false;
+            if (!empty($source_parts['port']) && (string) $source_parts['port'] !== (string) ($target['port'] ?? '')) return false;
+
+            return (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
+        }
+
+        return $uri;
+    }
+
+    /**
+     * Rewrite URI-bearing playlist lines, including nested m3u8 files and
+     * URI attributes such as EXT-X-KEY / EXT-X-MAP / EXT-X-MEDIA.
      */
     private function rewrite_playlist($lesson_id, $expires, $body, $source) {
         $parts = wp_parse_url($source);
@@ -99,20 +121,23 @@ class Video_Router {
 
         $lines = preg_split('/\r\n|\r|\n/', $body);
         foreach ($lines as $index => $line) {
-            $uri = trim($line);
-            if ($uri === '' || strpos($uri, '#') === 0) continue;
+            $trimmed = trim($line);
+            if ($trimmed === '') continue;
 
-            $file_ref = $uri;
-            if (preg_match('#^https?://#i', $uri)) {
-                $target = wp_parse_url($uri);
-                if (!$target || empty($target['scheme']) || empty($target['host']) || strtolower($target['scheme']) !== strtolower($parts['scheme']) || strtolower($target['host']) !== strtolower($parts['host']) || (!empty($parts['port']) && (string) $parts['port'] !== (string) ($target['port'] ?? ''))) {
-                    return false;
-                }
-                $file_ref = (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
+            if (strpos($trimmed, '#') === 0) {
+                $rewritten = preg_replace_callback('/URI=("|\')([^"\']+)\1/i', function ($match) use ($lesson_id, $expires, $parts) {
+                    $ref = $this->normalize_file_reference($match[2], $parts);
+                    if (false === $ref || '' === $ref) return $match[0];
+                    return 'URI=' . $match[1] . $this->gateway_url($lesson_id, $expires, $ref) . $match[1];
+                }, $line);
+                if (null === $rewritten) return false;
+                $lines[$index] = $rewritten;
+                continue;
             }
 
-            $sig = $this->sign($lesson_id, $expires, $file_ref);
-            $lines[$index] = add_query_arg('file', rawurlencode($file_ref), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
+            $file_ref = $this->normalize_file_reference($trimmed, $parts);
+            if (false === $file_ref || '' === $file_ref) return false;
+            $lines[$index] = $this->gateway_url($lesson_id, $expires, $file_ref);
         }
 
         return implode("\n", $lines);
@@ -199,8 +224,6 @@ class Video_Router {
         $body = wp_remote_retrieve_body($response);
         $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
 
-        // Nested playlists must also be rewritten; otherwise the real origin
-        // would be exposed by the second-level m3u8 response.
         if ($ext === 'm3u8') {
             $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $file);
             if (false === $rewritten) {
