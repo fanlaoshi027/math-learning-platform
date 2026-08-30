@@ -8,30 +8,60 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * Ensure the dedicated learning page exists on a fresh/test installation.
+ *
+ * @return void
+ */
+function mc_ensure_learning_page() {
+	$page = get_page_by_path( '学习课程', OBJECT, 'page' );
+	if ( $page instanceof WP_Post ) {
+		return;
+	}
+
+	$page_id = wp_insert_post(
+		array(
+			'post_title'   => '学习课程',
+			'post_name'    => '学习课程',
+			'post_content' => '',
+			'post_status'  => 'publish',
+			'post_type'    => 'page',
+		),
+		true
+	);
+
+	if ( ! is_wp_error( $page_id ) && $page_id ) {
+		update_post_meta( $page_id, '_wp_page_template', 'page-learning.php' );
+		flush_rewrite_rules( false );
+	}
+}
+add_action( 'init', 'mc_ensure_learning_page', 5 );
+
+/**
  * Enqueue theme assets.
  *
  * @return void
  */
 function mc_theme_assets() {
-	$style_path       = get_stylesheet_directory() . '/style.css';
-	$ui_path          = get_stylesheet_directory() . '/assets/css/reference-ui.css';
-	$detail_path      = get_stylesheet_directory() . '/assets/css/course-detail.css';
-	$learning_path    = get_stylesheet_directory() . '/assets/css/learning.css';
-	$learning_states_path = get_stylesheet_directory() . '/assets/css/learning-states.css';
-	$learning_nav_path = get_stylesheet_directory() . '/assets/css/learning-nav.css';
-	$version          = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
-	$ui_version       = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
-	$detail_version   = file_exists( $detail_path ) ? (string) filemtime( $detail_path ) : '1.0.0';
-	$learning_version = file_exists( $learning_path ) ? (string) filemtime( $learning_path ) : '1.0.0';
+	$style_path              = get_stylesheet_directory() . '/style.css';
+	$ui_path                 = get_stylesheet_directory() . '/assets/css/reference-ui.css';
+	$detail_path             = get_stylesheet_directory() . '/assets/css/course-detail.css';
+	$learning_path           = get_stylesheet_directory() . '/assets/css/learning.css';
+	$learning_states_path    = get_stylesheet_directory() . '/assets/css/learning-states.css';
+	$learning_nav_path       = get_stylesheet_directory() . '/assets/css/learning-nav.css';
+	$version                 = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
+	$ui_version              = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
+	$detail_version          = file_exists( $detail_path ) ? (string) filemtime( $detail_path ) : '1.0.0';
+	$learning_version        = file_exists( $learning_path ) ? (string) filemtime( $learning_path ) : '1.0.0';
 	$learning_states_version = file_exists( $learning_states_path ) ? (string) filemtime( $learning_states_path ) : '1.0.0';
-	$learning_nav_version = file_exists( $learning_nav_path ) ? (string) filemtime( $learning_nav_path ) : '1.0.0';
+	$learning_nav_version    = file_exists( $learning_nav_path ) ? (string) filemtime( $learning_nav_path ) : '1.0.0';
 
 	wp_enqueue_style( 'mc-theme-style', get_stylesheet_uri(), array(), $version );
 
 	$queried_content = get_post_field( 'post_content', get_queried_object_id() );
-	$load_course_ui = is_page( array( 'course-center', 'xueyuan-denglu', '学习课程' ) );
+	$load_course_ui  = is_page( array( 'course-center', 'xueyuan-denglu', '学习课程' ) );
 	if ( ! $load_course_ui ) {
 		$load_course_ui = has_shortcode( $queried_content, 'mathcourse_course_player' )
+			|| has_shortcode( $queried_content, 'mathcourse_course_learning' )
 			|| has_shortcode( $queried_content, 'math_course_center_v82' )
 			|| has_shortcode( $queried_content, 'math_student_login' );
 	}
@@ -54,8 +84,6 @@ add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
 
 /**
  * Route course-center links carrying a course_id to the dedicated learning page.
- * This keeps old course-card URLs compatible while making the learning player
- * the single entry point for course playback.
  *
  * @return void
  */
@@ -69,11 +97,11 @@ function mc_route_course_to_learning_player() {
 		return;
 	}
 
-	$learning_page = get_page_by_path( '学习课程' );
-	$base = $learning_page ? get_permalink( $learning_page ) : home_url( '/学习课程/' );
+	$learning_page = get_page_by_path( '学习课程', OBJECT, 'page' );
+	$base          = $learning_page instanceof WP_Post ? get_permalink( $learning_page ) : home_url( '/学习课程/' );
 
 	$lesson_id = isset( $_GET['lesson_id'] ) ? absint( $_GET['lesson_id'] ) : 0;
-	$args = array( 'course_id' => $course_id );
+	$args      = array( 'course_id' => $course_id );
 	if ( $lesson_id ) {
 		$args['lesson_id'] = $lesson_id;
 	}
