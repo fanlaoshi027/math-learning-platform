@@ -4,25 +4,24 @@
  */
 defined('ABSPATH') || exit;
 
+use MathCourse\Tutor\Adapter;
+
 $course_id = get_the_ID();
 $user_id = get_current_user_id();
+$progress = array(
+    'completed' => 0,
+    'total'     => 0,
+    'percent'   => 0,
+);
 
-$total_lessons = 0;
-$completed_lessons = 0;
-
-if (function_exists('tutor_utils')) {
-    $contents = tutor_utils()->get_course_contents_by_course($course_id);
-    if ($contents) {
-        $total_lessons = count($contents);
-        foreach ($contents as $lesson) {
-            if ($user_id && tutor_utils()->is_completed_lesson($lesson->ID, $user_id)) {
-                $completed_lessons++;
-            }
-        }
-    }
+$adapter = new Adapter();
+if ($adapter->is_available() && $adapter->get_course($course_id)) {
+    $progress = $adapter->get_course_progress($course_id, $user_id);
 }
 
-$percent = $total_lessons ? round(($completed_lessons / $total_lessons) * 100) : 0;
+$completed_lessons = absint($progress['completed']);
+$total_lessons = absint($progress['total']);
+$percent = max(0, min(100, absint($progress['percent'])));
 ?>
 
 <div class="mc-course-progress">
