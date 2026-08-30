@@ -119,15 +119,11 @@ class Video_Router {
     }
 
     private function serve_media($lesson_id, $expires, $file) {
-        // Re-check the signature against the exact media URL. This prevents a
-        // valid token for one segment from being reused for another segment.
         $signature = sanitize_text_field(get_query_var('math_video_sig'));
         if (!$this->valid_signature($lesson_id, $expires, $file, $signature)) {
             status_header(403); exit('视频片段访问链接已失效。');
         }
 
-        // Only proxy media belonging to the configured HLS source. This route
-        // must never become an arbitrary server-side URL fetcher (SSRF).
         $source = $this->get_source_url($lesson_id);
         $source_parts = wp_parse_url($source);
         $file_parts = wp_parse_url($file);
