@@ -18,7 +18,8 @@ class Course_Service {
         $this->tutor = new Adapter();
         $this->access = new Access_Service();
         $this->progress = new Progress_Service();
-        $this->video = new Video_Router();
+        // URL generation must not register another set of rewrite/template hooks.
+        $this->video = new Video_Router(false);
     }
 
     public function get_course($course_id) {
