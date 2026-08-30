@@ -90,13 +90,13 @@ class Video_Router {
         return add_query_arg('file', rawurlencode($file_ref), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
     }
 
-    /**
-     * Convert an HLS URI into the signed gateway reference. Absolute URLs are
-     * accepted only when they stay on the exact configured source origin.
-     */
-    private function normalize_file_reference($uri, $source_parts) {
+    /** Resolve an HLS URI relative to the playlist that declared it. */
+    private function normalize_file_reference($uri, $source_url) {
         $uri = trim((string) $uri);
         if ($uri === '') return '';
+
+        $source_parts = wp_parse_url($source_url);
+        if (!$source_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return false;
 
         if (preg_match('#^https?://#i', $uri)) {
             $target = wp_parse_url($uri);
@@ -104,29 +104,28 @@ class Video_Router {
             if (strtolower($target['scheme']) !== strtolower($source_parts['scheme'])) return false;
             if (strtolower($target['host']) !== strtolower($source_parts['host'])) return false;
             if (!empty($source_parts['port']) && (string) $source_parts['port'] !== (string) ($target['port'] ?? '')) return false;
-
             return (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
         }
 
-        return $uri;
+        $uri_parts = wp_parse_url($uri);
+        if (!$uri_parts || isset($uri_parts['host']) || isset($uri_parts['scheme'])) return false;
+        $base_path = isset($source_parts['path']) ? $source_parts['path'] : '/';
+        $base_dir = trailingslashit(dirname($base_path));
+        $path = $this->resolve_path($base_dir, isset($uri_parts['path']) ? $uri_parts['path'] : '');
+        return $path . (!empty($uri_parts['query']) ? '?' . $uri_parts['query'] : '');
     }
 
-    /**
-     * Rewrite URI-bearing playlist lines, including nested m3u8 files and
-     * URI attributes such as EXT-X-KEY / EXT-X-MAP / EXT-X-MEDIA.
-     */
+    /** Rewrite URI-bearing playlist lines, including EXT-X-KEY / EXT-X-MAP / EXT-X-MEDIA. */
     private function rewrite_playlist($lesson_id, $expires, $body, $source) {
-        $parts = wp_parse_url($source);
-        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) return false;
-
+        if (false === wp_parse_url($source)) return false;
         $lines = preg_split('/\r\n|\r|\n/', $body);
         foreach ($lines as $index => $line) {
             $trimmed = trim($line);
             if ($trimmed === '') continue;
 
             if (strpos($trimmed, '#') === 0) {
-                $rewritten = preg_replace_callback('/URI=("|\')([^"\']+)\1/i', function ($match) use ($lesson_id, $expires, $parts) {
-                    $ref = $this->normalize_file_reference($match[2], $parts);
+                $rewritten = preg_replace_callback('/URI=("|\')([^"\']+)\1/i', function ($match) use ($lesson_id, $expires, $source) {
+                    $ref = $this->normalize_file_reference($match[2], $source);
                     if (false === $ref || '' === $ref) return $match[0];
                     return 'URI=' . $match[1] . $this->gateway_url($lesson_id, $expires, $ref) . $match[1];
                 }, $line);
@@ -135,11 +134,10 @@ class Video_Router {
                 continue;
             }
 
-            $file_ref = $this->normalize_file_reference($trimmed, $parts);
+            $file_ref = $this->normalize_file_reference($trimmed, $source);
             if (false === $file_ref || '' === $file_ref) return false;
             $lines[$index] = $this->gateway_url($lesson_id, $expires, $file_ref);
         }
-
         return implode("\n", $lines);
     }
 
@@ -148,15 +146,10 @@ class Video_Router {
         if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
             status_header(502); exit('视频源暂时无法访问。');
         }
-
         $body = wp_remote_retrieve_body($response);
         if (!$body) { status_header(502); exit('视频播放列表为空。'); }
-
         $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $source);
-        if (false === $rewritten) {
-            status_header(403); exit('视频播放列表包含无效来源。');
-        }
-
+        if (false === $rewritten) { status_header(403); exit('视频播放列表包含无效来源。'); }
         nocache_headers();
         header('Content-Type: application/vnd.apple.mpegurl');
         header('X-Content-Type-Options: nosniff');
@@ -167,20 +160,15 @@ class Video_Router {
         $source_parts = wp_parse_url($source);
         if (!$source_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return '';
         if (preg_match('#^https?://#i', $file_ref)) return '';
-
         $file_parts = wp_parse_url($file_ref);
         if (!$file_parts) return '';
 
         $origin = strtolower($source_parts['scheme']) . '://' . strtolower($source_parts['host']);
         if (!empty($source_parts['port'])) $origin .= ':' . $source_parts['port'];
-
-        if (!empty($file_parts['path']) && strpos($file_parts['path'], '/') === 0) {
-            $path = $file_parts['path'];
-        } else {
-            $base_dir = trailingslashit(dirname(isset($source_parts['path']) ? $source_parts['path'] : '/'));
-            $path = $this->resolve_path($base_dir, $file_parts['path'] ?? '');
-        }
-
+        $base_dir = trailingslashit(dirname(isset($source_parts['path']) ? $source_parts['path'] : '/'));
+        $path = !empty($file_parts['path']) && strpos($file_parts['path'], '/') === 0
+            ? $file_parts['path']
+            : $this->resolve_path($base_dir, $file_parts['path'] ?? '');
         return $origin . $path . (!empty($file_parts['query']) ? '?' . $file_parts['query'] : '');
     }
 
@@ -200,35 +188,22 @@ class Video_Router {
         if (!$this->valid_signature($lesson_id, $expires, $file_ref, $signature)) {
             status_header(403); exit('视频片段访问链接已失效。');
         }
-
         $file = $this->resolve_source_file($source, $file_ref);
-        if (!$file) {
-            status_header(403); exit('视频片段地址无效。');
-        }
+        if (!$file) { status_header(403); exit('视频片段地址无效。'); }
 
         $request_headers = array('Accept' => '*/*');
-        if (!empty($_SERVER['HTTP_RANGE'])) {
-            $request_headers['Range'] = sanitize_text_field(wp_unslash($_SERVER['HTTP_RANGE']));
-        }
-
+        if (!empty($_SERVER['HTTP_RANGE'])) $request_headers['Range'] = sanitize_text_field(wp_unslash($_SERVER['HTTP_RANGE']));
         $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 0, 'sslverify' => true, 'headers' => $request_headers, 'stream' => false));
-        if (is_wp_error($response)) {
-            status_header(502); exit('视频片段暂时无法访问。');
-        }
+        if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
 
         $code = (int) wp_remote_retrieve_response_code($response);
-        if (200 !== $code && 206 !== $code) {
-            status_header(502); exit('视频片段暂时无法访问。');
-        }
-
+        if (200 !== $code && 206 !== $code) { status_header(502); exit('视频片段暂时无法访问。'); }
         $body = wp_remote_retrieve_body($response);
         $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
 
         if ($ext === 'm3u8') {
             $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $file);
-            if (false === $rewritten) {
-                status_header(403); exit('视频子播放列表包含无效来源。');
-            }
+            if (false === $rewritten) { status_header(403); exit('视频子播放列表包含无效来源。'); }
             nocache_headers();
             header('Content-Type: application/vnd.apple.mpegurl');
             header('X-Content-Type-Options: nosniff');
@@ -247,7 +222,6 @@ class Video_Router {
             if ($content_range) header('Content-Range: ' . $content_range);
             header('Accept-Ranges: bytes');
         }
-
         nocache_headers();
         header('Content-Type: ' . $type);
         header('Content-Length: ' . strlen($body));
