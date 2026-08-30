@@ -25,7 +25,7 @@ class Adapter {
         return get_posts(array(
             'post_type'      => 'topics',
             'post_parent'    => absint($course_id),
-            'post_status'    => 'publish',
+            'post_status'    => array('publish', 'draft', 'private'),
             'posts_per_page' => -1,
             'orderby'        => array('menu_order' => 'ASC', 'ID' => 'ASC'),
         ));
@@ -37,7 +37,7 @@ class Adapter {
         return get_posts(array(
             'post_type'      => $lesson_post_type,
             'post_parent'    => absint($topic_id),
-            'post_status'    => 'publish',
+            'post_status'    => array('publish', 'draft', 'private'),
             'posts_per_page' => -1,
             'orderby'        => array('menu_order' => 'ASC', 'ID' => 'ASC'),
         ));
@@ -75,7 +75,6 @@ class Adapter {
         $lesson_id = absint($lesson_id);
         $value = get_post_meta($lesson_id, '_mathcourse_page_number', true);
 
-        // 兼容当前 MathCourse 后台早期版本写入的 _mathcourse_page。
         if ('' === (string) $value) {
             $value = get_post_meta($lesson_id, '_mathcourse_page', true);
         }
@@ -87,7 +86,6 @@ class Adapter {
         $lesson_id = absint($lesson_id);
         $value = get_post_meta($lesson_id, '_mathcourse_video_id', true);
 
-        // 兼容当前 MathCourse 后台早期版本写入的 _mathcourse_video。
         if ('' === (string) $value) {
             $value = get_post_meta($lesson_id, '_mathcourse_video', true);
         }
@@ -95,8 +93,38 @@ class Adapter {
         return sanitize_text_field($value);
     }
 
+    /**
+     * Tutor LMS 4.0.4 使用 _is_preview 作为原生 Lesson Preview 字段。
+     * 同时兼容 MathCourse 早期版本的业务字段。
+     */
     public function is_preview_lesson($lesson_id) {
-        return 'yes' === get_post_meta(absint($lesson_id), '_mathcourse_preview', true);
+        $lesson_id = absint($lesson_id);
+        if (!$lesson_id) {
+            return false;
+        }
+
+        $native = get_post_meta($lesson_id, '_is_preview', true);
+        if ('yes' === $native || '1' === (string) $native) {
+            return true;
+        }
+
+        return 'yes' === get_post_meta($lesson_id, '_mathcourse_preview', true);
+    }
+
+    /**
+     * 设置 Tutor LMS 原生 Preview，并同步 MathCourse 业务字段。
+     */
+    public function set_lesson_preview($lesson_id, $enabled) {
+        $lesson_id = absint($lesson_id);
+        if (!$lesson_id) {
+            return false;
+        }
+
+        $value = $enabled ? 'yes' : 'no';
+        update_post_meta($lesson_id, '_is_preview', $value);
+        update_post_meta($lesson_id, '_mathcourse_preview', $value);
+
+        return true;
     }
 
     public function get_course_progress($course_id, $user_id = 0) {
