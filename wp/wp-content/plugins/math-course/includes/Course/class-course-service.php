@@ -12,11 +12,13 @@ class Course_Service {
     private $tutor;
     private $access;
     private $progress;
+    private $video;
 
     public function __construct() {
         $this->tutor = new Adapter();
         $this->access = new Access_Service();
         $this->progress = new Progress_Service();
+        $this->video = new Video_Router();
     }
 
     public function get_course($course_id) {
@@ -31,6 +33,10 @@ class Course_Service {
         );
     }
 
+    /**
+     * Single source for lesson playback data.
+     * HLS URLs are generated only after the final watch permission passes.
+     */
     public function get_lesson_video($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
         $user_id = absint($user_id);
@@ -42,13 +48,14 @@ class Course_Service {
 
         $accessible = $this->access->can_watch_lesson($user_id, $course_id, $lesson_id);
         $preview = $this->access->can_preview($course_id, $lesson_id);
+        $video_id = $this->tutor->get_lesson_video_id($lesson_id);
         $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson_id);
 
         return array(
             'id' => $lesson_id,
             'course_id' => $course_id,
-            'video_id' => $this->tutor->get_lesson_video_id($lesson_id),
-            'hls_url' => ($accessible && $has_hls) ? (new Video_Router())->get_protected_url($lesson_id) : '',
+            'video_id' => $video_id,
+            'hls_url' => ($accessible && $has_hls) ? $this->video->get_protected_url($lesson_id) : '',
             'preview' => $preview,
             'accessible' => $accessible,
         );
@@ -66,17 +73,18 @@ class Course_Service {
         foreach ($this->tutor->get_topics($course->ID, false) as $topic) {
             $lessons = array();
             foreach ($this->tutor->get_lessons($topic->ID, false) as $lesson) {
-                $completed_lesson = ($course_access && $user_id) ? $this->progress->is_completed($user_id, $lesson->ID) : false;
-                $preview = $this->access->can_preview($course->ID, $lesson->ID);
-                $accessible = $this->access->can_watch_lesson($user_id, $course->ID, $lesson->ID);
-                $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson->ID);
+                $lesson_id = (int) $lesson->ID;
+                $completed_lesson = ($course_access && $user_id) ? $this->progress->is_completed($user_id, $lesson_id) : false;
+                $preview = $this->access->can_preview($course->ID, $lesson_id);
+                $accessible = $this->access->can_watch_lesson($user_id, $course->ID, $lesson_id);
+                $has_hls = (bool) $this->tutor->get_lesson_hls_url($lesson_id);
 
                 $lessons[] = array(
-                    'id' => (int) $lesson->ID,
+                    'id' => $lesson_id,
                     'title' => get_the_title($lesson),
-                    'page_number' => $this->tutor->get_lesson_page_number($lesson->ID),
-                    'video_id' => $this->tutor->get_lesson_video_id($lesson->ID),
-                    'hls_url' => ($accessible && $has_hls) ? (new Video_Router())->get_protected_url($lesson->ID) : '',
+                    'page_number' => $this->tutor->get_lesson_page_number($lesson_id),
+                    'video_id' => $this->tutor->get_lesson_video_id($lesson_id),
+                    'hls_url' => ($accessible && $has_hls) ? $this->video->get_protected_url($lesson_id) : '',
                     'url' => $accessible ? get_permalink($lesson) : '',
                     'completed' => $completed_lesson,
                     'preview' => $preview,
