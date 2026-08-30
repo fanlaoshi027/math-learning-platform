@@ -143,6 +143,32 @@ class Adapter {
         return true;
     }
 
+    /**
+     * 渲染 Tutor 原生课时视频。
+     * Tutor API/全局上下文只允许在 Adapter 内部使用，业务层不要直接调用。
+     */
+    public function render_lesson_video($lesson_id) {
+        $lesson = $this->get_lesson($lesson_id);
+        if (!$lesson || !function_exists('tutor_lesson_video') || !function_exists('tutor_utils')) return '';
+        if ('' === (string)get_post_meta($lesson->ID, '_video', true)) return '';
+
+        global $post;
+        $previous_post = $post;
+        $post = $lesson;
+        setup_postdata($lesson);
+
+        try {
+            $video_info = tutor_utils()->get_video_info();
+            if (!$video_info) return '';
+            $html = tutor_lesson_video(false);
+        } finally {
+            wp_reset_postdata();
+            $post = $previous_post;
+        }
+
+        return is_string($html) ? $html : '';
+    }
+
     public function get_course_progress($course_id, $user_id = 0) {
         $user_id = $user_id ? absint($user_id) : get_current_user_id();
         $total = 0; $completed = 0;
