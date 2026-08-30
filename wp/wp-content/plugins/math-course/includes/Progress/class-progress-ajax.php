@@ -53,6 +53,8 @@ class Progress_Ajax {
             wp_send_json_error(array('message'=>'unable to save progress'),500);
         }
 
+        // Keep the persisted server-side state minimal: completion only.
+        // Do not store exact playback time, seek position, or heartbeat data.
         update_user_meta($user_id, 'mc_last_completed_course', $course_id);
 
         wp_send_json_success(array(
