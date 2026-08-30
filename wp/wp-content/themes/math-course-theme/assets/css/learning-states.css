@@ -1,0 +1,12 @@
+/* Math Course Theme — learning lesson states. */
+.mc-learning-page .mc-outline-card { overflow: hidden; }
+.mc-learning-page .mc-outline-card a { -webkit-tap-highlight-color: transparent; }
+.mc-learning-page .mc-outline-card .is-current,
+.mc-learning-page .mc-outline-card .current { font-weight: 700; }
+.mc-learning-page .mc-outline-card .is-completed,
+.mc-learning-page .mc-outline-card .completed { color: #16834a; }
+.mc-learning-page .mc-outline-card .is-locked,
+.mc-learning-page .mc-outline-card .locked { opacity: .58; }
+@media (max-width: 767px) {
+  .mc-learning-page .mc-outline-card a { min-height: 44px; display: flex; align-items: center; }
+}
