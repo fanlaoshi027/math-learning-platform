@@ -18,11 +18,13 @@ function mc_theme_assets() {
 	$detail_path      = get_stylesheet_directory() . '/assets/css/course-detail.css';
 	$learning_path    = get_stylesheet_directory() . '/assets/css/learning.css';
 	$learning_states_path = get_stylesheet_directory() . '/assets/css/learning-states.css';
+	$learning_nav_path = get_stylesheet_directory() . '/assets/css/learning-nav.css';
 	$version          = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
 	$ui_version       = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
 	$detail_version   = file_exists( $detail_path ) ? (string) filemtime( $detail_path ) : '1.0.0';
 	$learning_version = file_exists( $learning_path ) ? (string) filemtime( $learning_path ) : '1.0.0';
 	$learning_states_version = file_exists( $learning_states_path ) ? (string) filemtime( $learning_states_path ) : '1.0.0';
+	$learning_nav_version = file_exists( $learning_nav_path ) ? (string) filemtime( $learning_nav_path ) : '1.0.0';
 
 	wp_enqueue_style( 'mc-theme-style', get_stylesheet_uri(), array(), $version );
 
@@ -45,6 +47,7 @@ function mc_theme_assets() {
 	if ( is_page_template( 'page-learning.php' ) ) {
 		wp_enqueue_style( 'mc-learning', get_stylesheet_directory_uri() . '/assets/css/learning.css', array( 'mc-theme-style' ), $learning_version );
 		wp_enqueue_style( 'mc-learning-states', get_stylesheet_directory_uri() . '/assets/css/learning-states.css', array( 'mc-learning' ), $learning_states_version );
+		wp_enqueue_style( 'mc-learning-nav', get_stylesheet_directory_uri() . '/assets/css/learning-nav.css', array( 'mc-learning-states' ), $learning_nav_version );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
