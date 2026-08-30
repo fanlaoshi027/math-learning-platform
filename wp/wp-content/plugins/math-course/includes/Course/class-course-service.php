@@ -62,6 +62,24 @@ class Course_Service {
         );
     }
 
+    /**
+     * Return the canonical front-end learning URL for a lesson.
+     * Course detail pages should only describe the course; lesson playback
+     * belongs to the dedicated learning page.
+     */
+    private function lesson_learning_url($course_id, $lesson_id) {
+        $page = get_page_by_path('学习课程');
+        $base = $page ? get_permalink($page) : home_url('/学习课程/');
+
+        return add_query_arg(
+            array(
+                'course_id' => absint($course_id),
+                'lesson_id' => absint($lesson_id),
+            ),
+            $base
+        );
+    }
+
     public function get_course_directory($course_id, $user_id = 0) {
         $course = $this->tutor->get_course($course_id);
         if (!$course) return null;
@@ -86,7 +104,7 @@ class Course_Service {
                     'page_number' => $this->tutor->get_lesson_page_number($lesson_id),
                     'video_id' => $this->tutor->get_lesson_video_id($lesson_id),
                     'hls_url' => ($accessible && $has_hls) ? $this->video->get_protected_url($lesson_id) : '',
-                    'url' => $accessible ? get_permalink($lesson) : '',
+                    'url' => $accessible ? $this->lesson_learning_url($course->ID, $lesson_id) : '',
                     'completed' => $completed_lesson,
                     'preview' => $preview,
                     'accessible' => $accessible,
