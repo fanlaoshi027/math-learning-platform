@@ -13,7 +13,7 @@ class Video_Router {
     private $token_ttl = 600;
 
     /**
-     * Hook registration is optional so service classes can use URL generation
+     * Hook registration is optional so service classes can generate URLs
      * without registering duplicate WordPress request handlers.
      */
     public function __construct($register_hooks = true) {
@@ -50,7 +50,6 @@ class Video_Router {
     }
 
     private function get_source_url($lesson_id) {
-        // Keep the real HLS origin behind the server-side Tutor/MathCourse layer.
         return $this->adapter->get_lesson_hls_url($lesson_id);
     }
 
@@ -90,29 +89,24 @@ class Video_Router {
         exit;
     }
 
-    private function serve_playlist($lesson_id, $expires, $source) {
-        $response = wp_remote_get($source, array('timeout' => 15, 'redirection' => 3, 'sslverify' => true));
-        if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
-            status_header(502); exit('视频源暂时无法访问。');
-        }
-
-        $body = wp_remote_retrieve_body($response);
-        if (!$body) { status_header(502); exit('视频播放列表为空。'); }
-
+    /**
+     * Rewrite every media URI in a playlist, including nested m3u8 playlists.
+     * The browser therefore never receives the real HLS origin.
+     */
+    private function rewrite_playlist($lesson_id, $expires, $body, $source) {
         $parts = wp_parse_url($source);
-        $lines = preg_split('/\r\n|\r|\n/', $body);
+        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) return false;
 
+        $lines = preg_split('/\r\n|\r|\n/', $body);
         foreach ($lines as $index => $line) {
             $uri = trim($line);
             if ($uri === '' || strpos($uri, '#') === 0) continue;
 
-            // Do not expose the real HLS origin in the browser. The client receives
-            // only an opaque-ish relative file reference; the server resolves it.
             $file_ref = $uri;
             if (preg_match('#^https?://#i', $uri)) {
                 $target = wp_parse_url($uri);
                 if (!$target || empty($target['scheme']) || empty($target['host']) || strtolower($target['scheme']) !== strtolower($parts['scheme']) || strtolower($target['host']) !== strtolower($parts['host']) || (!empty($parts['port']) && (string) $parts['port'] !== (string) ($target['port'] ?? ''))) {
-                    status_header(403); exit('视频片段来源无效。');
+                    return false;
                 }
                 $file_ref = (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
             }
@@ -121,10 +115,27 @@ class Video_Router {
             $lines[$index] = add_query_arg('file', rawurlencode($file_ref), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
         }
 
+        return implode("\n", $lines);
+    }
+
+    private function serve_playlist($lesson_id, $expires, $source) {
+        $response = wp_remote_get($source, array('timeout' => 15, 'redirection' => 3, 'sslverify' => true, 'headers' => array('Accept' => 'application/vnd.apple.mpegurl, application/x-mpegURL, */*')));
+        if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
+            status_header(502); exit('视频源暂时无法访问。');
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        if (!$body) { status_header(502); exit('视频播放列表为空。'); }
+
+        $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $source);
+        if (false === $rewritten) {
+            status_header(403); exit('视频播放列表包含无效来源。');
+        }
+
         nocache_headers();
         header('Content-Type: application/vnd.apple.mpegurl');
         header('X-Content-Type-Options: nosniff');
-        echo implode("\n", $lines);
+        echo $rewritten;
     }
 
     private function resolve_source_file($source, $file_ref) {
@@ -170,18 +181,49 @@ class Video_Router {
             status_header(403); exit('视频片段地址无效。');
         }
 
-        $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 0, 'sslverify' => true, 'headers' => array('Accept' => '*/*')));
-        if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
+        $request_headers = array('Accept' => '*/*');
+        if (!empty($_SERVER['HTTP_RANGE'])) {
+            $request_headers['Range'] = sanitize_text_field(wp_unslash($_SERVER['HTTP_RANGE']));
+        }
+
+        $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 0, 'sslverify' => true, 'headers' => $request_headers, 'stream' => false));
+        if (is_wp_error($response)) {
+            status_header(502); exit('视频片段暂时无法访问。');
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        if (200 !== $code && 206 !== $code) {
             status_header(502); exit('视频片段暂时无法访问。');
         }
 
         $body = wp_remote_retrieve_body($response);
         $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
+
+        // Nested playlists must also be rewritten; otherwise the real origin
+        // would be exposed by the second-level m3u8 response.
+        if ($ext === 'm3u8') {
+            $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $file);
+            if (false === $rewritten) {
+                status_header(403); exit('视频子播放列表包含无效来源。');
+            }
+            nocache_headers();
+            header('Content-Type: application/vnd.apple.mpegurl');
+            header('X-Content-Type-Options: nosniff');
+            echo $rewritten;
+            return;
+        }
+
         $type = 'application/octet-stream';
         if ($ext === 'ts') $type = 'video/mp2t';
         elseif ($ext === 'm4s') $type = 'video/iso.segment';
         elseif ($ext === 'aac') $type = 'audio/aac';
-        elseif ($ext === 'm3u8') $type = 'application/vnd.apple.mpegurl';
+
+        if (206 === $code) {
+            status_header(206);
+            $content_range = wp_remote_retrieve_header($response, 'content-range');
+            if ($content_range) header('Content-Range: ' . $content_range);
+            header('Accept-Ranges: bytes');
+        }
 
         nocache_headers();
         header('Content-Type: ' . $type);
