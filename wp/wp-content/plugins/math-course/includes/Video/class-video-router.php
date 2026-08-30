@@ -12,11 +12,18 @@ class Video_Router {
     private $adapter;
     private $token_ttl = 600;
 
-    public function __construct() {
+    /**
+     * Hook registration is optional so service classes can use URL generation
+     * without registering duplicate WordPress request handlers.
+     */
+    public function __construct($register_hooks = true) {
         $this->access  = new Access_Service();
         $this->adapter = new Adapter();
-        add_action('init', array($this, 'register_route'));
-        add_action('template_redirect', array($this, 'handle'));
+
+        if ($register_hooks) {
+            add_action('init', array($this, 'register_route'));
+            add_action('template_redirect', array($this, 'handle'));
+        }
     }
 
     public function register_route() {
@@ -93,8 +100,6 @@ class Video_Router {
         if (!$body) { status_header(502); exit('视频播放列表为空。'); }
 
         $parts = wp_parse_url($source);
-        $origin = (!empty($parts['scheme']) && !empty($parts['host'])) ? $parts['scheme'] . '://' . $parts['host'] . (!empty($parts['port']) ? ':' . $parts['port'] : '') : '';
-        $base_dir = trailingslashit(dirname(isset($parts['path']) ? $parts['path'] : '/'));
         $lines = preg_split('/\r\n|\r|\n/', $body);
 
         foreach ($lines as $index => $line) {
@@ -125,10 +130,7 @@ class Video_Router {
     private function resolve_source_file($source, $file_ref) {
         $source_parts = wp_parse_url($source);
         if (!$source_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return '';
-
-        if (preg_match('#^https?://#i', $file_ref)) {
-            return '';
-        }
+        if (preg_match('#^https?://#i', $file_ref)) return '';
 
         $file_parts = wp_parse_url($file_ref);
         if (!$file_parts) return '';
@@ -179,6 +181,7 @@ class Video_Router {
         if ($ext === 'ts') $type = 'video/mp2t';
         elseif ($ext === 'm4s') $type = 'video/iso.segment';
         elseif ($ext === 'aac') $type = 'audio/aac';
+        elseif ($ext === 'm3u8') $type = 'application/vnd.apple.mpegurl';
 
         nocache_headers();
         header('Content-Type: ' . $type);
