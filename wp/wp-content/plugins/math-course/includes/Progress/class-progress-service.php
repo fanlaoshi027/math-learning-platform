@@ -29,12 +29,29 @@ class Progress_Service {
         return $this->calculate_progress($course_id, $user_id, true);
     }
 
+    /** Return the Tutor course containing a lesson, or 0 for an invalid lesson. */
+    public function get_lesson_course_id($lesson_id) {
+        $lesson_id = absint($lesson_id);
+        if (!$lesson_id || !$this->tutor->is_available()) return 0;
+
+        $lesson = $this->tutor->get_lesson($lesson_id);
+        if (!$lesson || 'publish' !== $lesson->post_status) return 0;
+
+        $course_id = $this->tutor->get_lesson_course_id($lesson_id);
+        if (!$course_id) return 0;
+
+        $course = $this->tutor->get_course($course_id);
+        if (!$course || 'publish' !== $course->post_status) return 0;
+
+        return (int) $course_id;
+    }
+
     public function complete_lesson($user_id, $lesson_id, $allow_preview = false) {
         $user_id   = absint($user_id);
         $lesson_id = absint($lesson_id);
         if (!$user_id || !$lesson_id) return false;
 
-        $course_id = $this->tutor->get_lesson_course_id($lesson_id);
+        $course_id = $this->get_lesson_course_id($lesson_id);
         if (!$course_id) return false;
 
         $can_access = $this->access->can_access_course($user_id, $course_id);
@@ -65,13 +82,10 @@ class Progress_Service {
         return in_array(absint($lesson_id), $this->get_completed_lessons($user_id), true);
     }
 
-    /**
-     * Returns the last completed lesson according to the current Tutor course order.
-     */
+    /** Returns the last completed lesson according to the current Tutor course order. */
     public function get_last_completed_lesson($user_id, $course_id = 0) {
         $completed = $this->get_completed_lessons($user_id);
         if (empty($completed)) return 0;
-
         if (!$course_id) return (int) end($completed);
 
         $lessons = $this->get_course_lessons(absint($course_id), false);
@@ -113,8 +127,8 @@ class Progress_Service {
     private function empty_progress() {
         return array(
             'completed'      => 0,
-            'total'          => 0,
-            'percent'        => 0,
+            'total'           => 0,
+            'percent'         => 0,
             'last_lesson_id' => 0,
         );
     }
