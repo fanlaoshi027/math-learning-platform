@@ -29,9 +29,12 @@ class Video_Router {
         add_rewrite_tag('%math_video_sig%', '([A-Za-z0-9_-]+)');
     }
 
+    /** Generate a protected URL only when the current viewer can watch the lesson. */
     public function get_protected_url($lesson_id) {
         $lesson_id = absint($lesson_id);
         if (!$lesson_id || !$this->adapter->get_lesson($lesson_id)) return '';
+        if (!$this->can_watch($lesson_id)) return '';
+
         $expires = time() + $this->token_ttl;
         return home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $this->sign($lesson_id, $expires, '') . '/');
     }
@@ -90,7 +93,6 @@ class Video_Router {
         return add_query_arg('file', rawurlencode($file_ref), home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
     }
 
-    /** Resolve an HLS URI relative to the playlist that declared it. */
     private function normalize_file_reference($uri, $source_url) {
         $uri = trim((string) $uri);
         if ($uri === '') return '';
