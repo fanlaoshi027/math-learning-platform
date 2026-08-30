@@ -22,7 +22,6 @@ class Course_Service {
     public function get_course($course_id) {
         $course = $this->tutor->get_course($course_id);
         if (!$course) return null;
-
         return array(
             'id' => (int) $course->ID,
             'title' => get_the_title($course),
@@ -32,10 +31,6 @@ class Course_Service {
         );
     }
 
-    /**
-     * Return player data. Authorized HLS playback uses the protected gateway;
-     * the original storage URL is never exposed to the browser.
-     */
     public function get_lesson_video($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
         $user_id = absint($user_id);
@@ -80,7 +75,6 @@ class Course_Service {
                     'title' => get_the_title($lesson),
                     'page_number' => $this->tutor->get_lesson_page_number($lesson->ID),
                     'video_id' => $this->tutor->get_lesson_video_id($lesson->ID),
-                    // Only a short-lived gateway URL is exposed for accessible HLS.
                     'hls_url' => ($accessible && $has_hls) ? (new Video_Router())->get_protected_url($lesson->ID) : '',
                     'url' => $accessible ? get_permalink($lesson) : '',
                     'completed' => $completed_lesson,
@@ -93,7 +87,7 @@ class Course_Service {
 
         $progress = $user_id
             ? $this->progress->get_course_progress($course->ID, $user_id)
-            : array('completed' => 0, 'total' => $this->count_lessons($topics), 'percent' => 0, 'last_lesson_id' => 0, 'last_time' => 0);
+            : array('completed' => 0, 'total' => $this->count_lessons($topics), 'percent' => 0, 'last_lesson_id' => 0);
 
         return array(
             'id' => (int) $course->ID,
