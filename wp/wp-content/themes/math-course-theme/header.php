@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
         <nav class="mc-site-nav" aria-label="主导航">
             <a href="<?php echo esc_url( home_url( '/' ) ); ?>">首页</a>
-            <a href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">专题课程</a>
+            <a href="<?php echo esc_url( add_query_arg( 'course_type', 'topic', home_url( '/course-center/' ) ) ); ?>">专题课程</a>
             <a href="<?php echo esc_url( add_query_arg( 'course_type', 'supplementary', home_url( '/course-center/' ) ) ); ?>">教辅配套</a>
             <?php if ( is_user_logged_in() ) : ?>
                 <a href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">我的课程</a>
