@@ -25,10 +25,13 @@ class Course_Directory {
         return $course_id ? $this->render_single_course($course_id) : $this->render_course_center();
     }
 
-    private function course_detail_url($course_id) {
+    private function course_center_url() {
         $page = get_page_by_path('course-center');
-        $base = $page ? get_permalink($page) : home_url('/course-center/');
-        return add_query_arg('course_id', absint($course_id), $base);
+        return $page ? get_permalink($page) : home_url('/course-center/');
+    }
+
+    private function course_detail_url($course_id) {
+        return add_query_arg('course_id', absint($course_id), $this->course_center_url());
     }
 
     private function render_course_center() {
@@ -39,19 +42,20 @@ class Course_Directory {
         $grade_filter = isset($_GET['course_grade']) ? sanitize_key(wp_unslash($_GET['course_grade'])) : '';
         if (!in_array($type_filter, array('', 'topic', 'supplementary'), true)) $type_filter = '';
         if (!in_array($grade_filter, array('', '7', '8', '9'), true)) $grade_filter = '';
+        $filter_base = $this->course_center_url();
 
         ob_start(); ?>
         <div class="mathcourse-center">
             <div class="mc-course-filter" role="navigation" aria-label="课程筛选">
-                <a class="<?php echo '' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(remove_query_arg(array('course_id','course_type','course_grade'), $this->course_detail_url(0))); ?>">全部</a>
-                <a class="<?php echo 'topic' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','topic',remove_query_arg(array('course_id','course_grade'),$this->course_detail_url(0)))); ?>">专题课程</a>
-                <a class="<?php echo 'supplementary' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','supplementary',remove_query_arg(array('course_id','course_grade'),$this->course_detail_url(0)))); ?>">教辅配套</a>
+                <a class="<?php echo '' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url($filter_base); ?>">全部</a>
+                <a class="<?php echo 'topic' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','topic',remove_query_arg(array('course_id','course_grade'),$filter_base))); ?>">专题课程</a>
+                <a class="<?php echo 'supplementary' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','supplementary',remove_query_arg(array('course_id','course_grade'),$filter_base))); ?>">教辅配套</a>
             </div>
             <div class="mc-course-grade-filter" aria-label="年级筛选">
                 <span>年级</span>
                 <?php foreach (array(''=>'全部','7'=>'七年级','8'=>'八年级','9'=>'九年级') as $grade=>$label) : ?>
                     <?php $url_args=array(); if($type_filter)$url_args['course_type']=$type_filter; if($grade)$url_args['course_grade']=$grade; ?>
-                    <a class="<?php echo (string)$grade_filter === (string)$grade ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg($url_args,remove_query_arg(array('course_id','course_type','course_grade'),home_url('/course-center/')))); ?>"><?php echo esc_html($label); ?></a>
+                    <a class="<?php echo (string)$grade_filter === (string)$grade ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg($url_args,remove_query_arg(array('course_id','course_type','course_grade'),$filter_base))); ?>"><?php echo esc_html($label); ?></a>
                 <?php endforeach; ?>
             </div>
             <div class="mathcourse-center__grid">
@@ -91,7 +95,12 @@ class Course_Directory {
     }
 
     private function find_continue_lesson($data) {
-        if(empty($data['access'])||empty($data['topics']))return null;$last_completed_index=-1;$last_completed=null;$index=0;
+        if(empty($data['topics']))return null;
+        if(empty($data['access'])){
+            foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson;
+            return null;
+        }
+        $last_completed_index=-1;$last_completed=null;$index=0;
         foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson){if(!empty($lesson['completed'])){$last_completed_index=$index;$last_completed=$lesson;}$index++;}
         if($last_completed_index<0)foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson;
         $index=0;foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson){if($index>$last_completed_index&&!empty($lesson['accessible'])&&empty($lesson['completed']))return $lesson;$index++;}
