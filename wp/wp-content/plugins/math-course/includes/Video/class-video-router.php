@@ -75,7 +75,7 @@ class Video_Router {
         }
 
         if ($file === '') $this->serve_playlist($lesson_id, $expires, $source);
-        else $this->serve_media($file);
+        else $this->serve_media($lesson_id, $expires, $file);
         exit;
     }
 
@@ -118,8 +118,27 @@ class Video_Router {
         return '/' . implode('/', $segments);
     }
 
-    private function serve_media($file) {
-        $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true, 'headers' => array('Accept' => '*/*')));
+    private function serve_media($lesson_id, $expires, $file) {
+        // Re-check the signature against the exact media URL. This prevents a
+        // valid token for one segment from being reused for another segment.
+        $signature = sanitize_text_field(get_query_var('math_video_sig'));
+        if (!$this->valid_signature($lesson_id, $expires, $file, $signature)) {
+            status_header(403); exit('视频片段访问链接已失效。');
+        }
+
+        // Only proxy media belonging to the configured HLS source. This route
+        // must never become an arbitrary server-side URL fetcher (SSRF).
+        $source = $this->get_source_url($lesson_id);
+        $source_parts = wp_parse_url($source);
+        $file_parts = wp_parse_url($file);
+        if (!$source_parts || !$file_parts || empty($source_parts['scheme']) || empty($source_parts['host']) || empty($file_parts['scheme']) || empty($file_parts['host'])) {
+            status_header(403); exit('视频片段地址无效。');
+        }
+        if (strtolower($source_parts['scheme']) !== strtolower($file_parts['scheme']) || strtolower($source_parts['host']) !== strtolower($file_parts['host']) || (!empty($source_parts['port']) && (string) $source_parts['port'] !== (string) ($file_parts['port'] ?? ''))) {
+            status_header(403); exit('视频片段来源无效。');
+        }
+
+        $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 0, 'sslverify' => true, 'headers' => array('Accept' => '*/*')));
         if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) {
             status_header(502); exit('视频片段暂时无法访问。');
         }
