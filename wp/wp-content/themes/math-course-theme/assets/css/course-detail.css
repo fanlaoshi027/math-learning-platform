@@ -3,7 +3,13 @@ body.mathcourse-site .mathcourse-directory { max-width: 1040px; }
 body.mathcourse-site .mathcourse-directory__header { grid-template-columns: minmax(0,1fr) 260px; gap: 18px; margin-bottom: 18px; }
 body.mathcourse-site .mathcourse-directory__heading { position: relative; overflow: hidden; min-height: 154px; padding: 28px 30px; border-radius: 22px; background: linear-gradient(135deg,#0d2942 0%,#153c5d 72%,#1b5a7e 100%); border: 0; box-shadow: 0 18px 45px rgba(13,41,66,.15); }
 body.mathcourse-site .mathcourse-directory__heading::after { content:"∑  ∆  π"; position:absolute; right:24px; bottom:-8px; color:rgba(255,255,255,.08); font-size:54px; font-weight:800; letter-spacing:.08em; pointer-events:none; }
-body.mathcourse-site .mathcourse-directory__heading h1 { position:relative; z-index:1; max-width:680px; margin:0 0 25px; color:#fff; font-size:clamp(24px,3vw,34px); line-height:1.3; letter-spacing:-.035em; }
+body.mathcourse-site .mathcourse-directory__heading h1 { position:relative; z-index:1; max-width:680px; margin:0 0 14px; color:#fff; font-size:clamp(24px,3vw,34px); line-height:1.3; letter-spacing:-.035em; }
+body.mathcourse-site .mathcourse-directory__type { position:relative; z-index:2; display:flex; align-items:center; gap:9px; margin-bottom:11px; }
+body.mathcourse-site .mathcourse-directory__type span { padding:5px 9px; border-radius:7px; color:#fff; background:rgba(255,255,255,.14); font-size:10px; font-weight:800; }
+body.mathcourse-site .mathcourse-directory__type small { color:rgba(255,255,255,.58); font-size:11px; }
+body.mathcourse-site .mathcourse-directory--supplementary .mathcourse-directory__type span { color:#ffe3bb; background:rgba(255,148,24,.18); }
+body.mathcourse-site .mathcourse-directory__summary { position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+body.mathcourse-site .mathcourse-directory__summary span { padding:5px 9px; border:1px solid rgba(255,255,255,.12); border-radius:7px; color:rgba(255,255,255,.68); background:rgba(255,255,255,.06); font-size:10px; }
 body.mathcourse-site .mathcourse-directory__progress-text { position:relative; z-index:1; color:rgba(255,255,255,.72); }
 body.mathcourse-site .mathcourse-directory__progress-text span { color:rgba(255,255,255,.52); }
 body.mathcourse-site .mathcourse-directory__progress-track { position:relative; z-index:1; height:7px; max-width:610px; background:rgba(255,255,255,.16); }
@@ -13,6 +19,13 @@ body.mathcourse-site .mathcourse-directory__continue:hover { transform:translate
 body.mathcourse-site .mathcourse-directory__continue span:first-child { color:var(--mc-orange); font-size:11px; letter-spacing:.04em; }
 body.mathcourse-site .mathcourse-directory__continue strong { color:var(--mc-navy); font-size:14px; line-height:1.55; white-space:normal; }
 body.mathcourse-site .mathcourse-directory__continue span:last-child { color:var(--mc-blue); }
+body.mathcourse-site .mathcourse-directory__notice { margin:0 0 15px; padding:13px 16px; border:1px solid #f0e4d1; border-radius:14px; background:#fffaf3; }
+body.mathcourse-site .mathcourse-directory__notice strong { display:block; margin-bottom:3px; color:#8a570f; font-size:12px; }
+body.mathcourse-site .mathcourse-directory__notice span { color:#9b876c; font-size:11px; line-height:1.6; }
+body.mathcourse-site .mathcourse-directory__outline { display:flex; align-items:end; justify-content:space-between; margin:28px 0 10px; padding:0 2px; }
+body.mathcourse-site .mathcourse-directory__outline div { display:flex; align-items:baseline; gap:9px; }
+body.mathcourse-site .mathcourse-directory__outline span { color:var(--mc-navy); font-size:18px; font-weight:850; letter-spacing:-.03em; }
+body.mathcourse-site .mathcourse-directory__outline small { color:var(--mc-muted); font-size:10px; }
 body.mathcourse-site .mathcourse-directory__topic { margin-top:15px; border-radius:18px; box-shadow:0 7px 28px rgba(13,41,66,.055); }
 body.mathcourse-site .mathcourse-directory__topic-title { min-height:52px; padding:13px 18px; box-sizing:border-box; font-size:15px; }
 body.mathcourse-site .mathcourse-directory__topic-title > span { width:30px; height:30px; flex-basis:30px; border-radius:9px; background:var(--mc-orange-soft); color:#c56c00; }
@@ -27,8 +40,11 @@ body.mathcourse-site .mathcourse-directory__preview, body.mathcourse-site .mathc
  body.mathcourse-site .mathcourse-directory { width:100%; }
  body.mathcourse-site .mathcourse-directory__header { margin-bottom:12px; }
  body.mathcourse-site .mathcourse-directory__heading { min-height:0; padding:23px 20px; border-radius:0 0 18px 18px; }
- body.mathcourse-site .mathcourse-directory__heading h1 { font-size:23px; margin-bottom:22px; }
+ body.mathcourse-site .mathcourse-directory__heading h1 { font-size:23px; margin-bottom:12px; }
+ body.mathcourse-site .mathcourse-directory__type { margin-bottom:9px; }
+ body.mathcourse-site .mathcourse-directory__summary { margin-bottom:18px; }
  body.mathcourse-site .mathcourse-directory__continue { min-height:0; margin:0 12px; border-radius:14px; }
+ body.mathcourse-site .mathcourse-directory__outline { margin:22px 12px 9px; }
  body.mathcourse-site .mathcourse-directory__topic { margin-top:10px; border-radius:12px; }
  body.mathcourse-site .mathcourse-directory__lesson { min-height:51px; padding-left:13px; padding-right:13px; }
  body.mathcourse-site .mathcourse-directory__lesson-title { font-size:12px; }
