@@ -16,6 +16,7 @@ class Menu {
         add_submenu_page( 'mathcourse', '批量创建课时', '批量创建课时', 'manage_options', 'mathcourse-batch', array( $this, 'batch_page' ) );
         add_submenu_page( 'mathcourse', '课程授权', '学员授权', 'manage_options', 'mathcourse-access', array( $this, 'access_page' ) );
         add_submenu_page( 'mathcourse', '学习进度', '学习进度', 'manage_options', 'mathcourse-progress', array( $this, 'progress_page' ) );
+        add_submenu_page( 'mathcourse', '演示数据', '一键导入演示数据', 'manage_options', 'mathcourse-demo', array( $this, 'demo_page' ) );
         add_submenu_page( 'mathcourse', '设置', '系统设置', 'manage_options', 'mathcourse-settings', array( $this, 'settings_page' ) );
         add_submenu_page( null, '编辑课程', '编辑课程', 'manage_options', 'mathcourse-course-edit', array( $this, 'course_edit_page' ) );
     }
@@ -82,6 +83,7 @@ class Menu {
 
     public function courses_page() { if ( class_exists( 'MathCourse\\Admin\\Course_Page' ) ) ( new Course_Page() )->render(); }
     public function batch_page() { if ( class_exists( 'MathCourse\\Admin\\Batch_Manager' ) ) ( new Batch_Manager() )->render(); }
+    public function demo_page() { if ( class_exists( 'MathCourse\\Admin\\Demo_Importer' ) ) ( new Demo_Importer() )->render(); }
     public function course_edit_page() { if ( class_exists( 'MathCourse\\Admin\\Course_Editor' ) ) ( new Course_Editor() )->render(); }
     public function access_page() { if ( class_exists( 'MathCourse\\Admin\\Access_Page' ) ) ( new Access_Page() )->render(); }
     public function progress_page() { if ( class_exists( 'MathCourse\\Admin\\Progress_Page' ) ) ( new Progress_Page() )->render(); }
