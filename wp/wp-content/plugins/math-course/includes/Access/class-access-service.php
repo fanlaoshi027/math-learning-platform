@@ -17,43 +17,24 @@ class Access_Service {
         return !empty($info['access']);
     }
 
-    /**
-     * MathCourse 的课程权限以“授权”为准。
-     * Tutor LMS 的 Public Course / Free Course 不再直接赋予完整观看权限。
-     */
+    /** MathCourse 的课程权限以明确授权为准。 */
     public function is_free_course($course_id) {
         return false;
     }
 
     public function can_access_course($user_id, $course_id) {
-        $user_id   = absint($user_id);
+        $user_id = absint($user_id);
         $course_id = absint($course_id);
-
-        if (!$user_id || !$course_id) {
-            return false;
-        }
-
-        if (user_can($user_id, 'manage_options')) {
-            return true;
-        }
-
+        if (!$user_id || !$course_id) return false;
+        if (user_can($user_id, 'manage_options')) return true;
         return $this->has_access($user_id, $course_id);
     }
 
     public function get_access_info($user_id, $course_id) {
-        $user_id   = absint($user_id);
+        $user_id = absint($user_id);
         $course_id = absint($course_id);
-
-        $result = array(
-            'access'     => false,
-            'status'     => 'none',
-            'expires_at' => null,
-        );
-
-        if (!$user_id || !$course_id) {
-            return $result;
-        }
-
+        $result = array('access' => false, 'status' => 'none', 'expires_at' => null);
+        if (!$user_id || !$course_id) return $result;
         if (user_can($user_id, 'manage_options')) {
             $result['access'] = true;
             $result['status'] = 'admin';
@@ -61,51 +42,35 @@ class Access_Service {
         }
 
         global $wpdb;
-
-        $row = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT status, expires_at FROM {$this->table()} WHERE user_id=%d AND course_id=%d LIMIT 1",
-                $user_id,
-                $course_id
-            )
-        );
-
-        if (!$row) {
-            return $result;
-        }
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT status, expires_at FROM {$this->table()} WHERE user_id=%d AND course_id=%d LIMIT 1",
+            $user_id,
+            $course_id
+        ));
+        if (!$row) return $result;
 
         $result['status'] = $row->status;
         $result['expires_at'] = $row->expires_at;
-
-        if ('active' !== $row->status) {
-            return $result;
-        }
-
+        if ('active' !== $row->status) return $result;
         if (!empty($row->expires_at) && strtotime($row->expires_at) <= current_time('timestamp')) {
             $result['status'] = 'expired';
             return $result;
         }
-
         $result['access'] = true;
         return $result;
     }
 
     public function grant($user_id, $course_id, $expires_at = null) {
-        $user_id   = absint($user_id);
+        $user_id = absint($user_id);
         $course_id = absint($course_id);
-
-        if (!$user_id || !$course_id) {
-            return false;
-        }
-
+        if (!$user_id || !$course_id) return false;
         global $wpdb;
-
         return false !== $wpdb->replace(
             $this->table(),
             array(
-                'user_id'    => $user_id,
-                'course_id'  => $course_id,
-                'status'     => 'active',
+                'user_id' => $user_id,
+                'course_id' => $course_id,
+                'status' => 'active',
                 'granted_at' => current_time('mysql'),
                 'expires_at' => $expires_at ? sanitize_text_field($expires_at) : null,
             ),
@@ -115,7 +80,6 @@ class Access_Service {
 
     public function revoke($user_id, $course_id) {
         global $wpdb;
-
         return false !== $wpdb->update(
             $this->table(),
             array('status' => 'revoked'),
@@ -125,98 +89,50 @@ class Access_Service {
         );
     }
 
-    /**
-     * 返回用户当前有效的课程授权。
-     * 过期授权即使数据库 status 仍为 active，也不能继续出现在学员课程中心。
-     */
     public function get_user_courses($user_id) {
         $user_id = absint($user_id);
-        if (!$user_id) {
-            return array();
-        }
-
+        if (!$user_id) return array();
         global $wpdb;
         $now = current_time('mysql');
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM {$this->table()} WHERE user_id=%d AND status='active' AND (expires_at IS NULL OR expires_at='' OR expires_at > %s) ORDER BY granted_at DESC",
-                $user_id,
-                $now
-            )
-        );
-
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table()} WHERE user_id=%d AND status='active' AND (expires_at IS NULL OR expires_at='' OR expires_at > %s) ORDER BY granted_at DESC",
+            $user_id,
+            $now
+        ));
         return $rows ?: array();
     }
 
-    /**
-     * 试看权限完全由 MathCourse 课时属性控制。
-     * 必须确认 lesson/course 均为已发布内容，并且 lesson 确实属于传入的 course。
-     */
+    /** 试看只允许已发布且确实属于该课程的课时。 */
     public function can_preview($course_id, $lesson_id) {
         $course_id = absint($course_id);
         $lesson_id = absint($lesson_id);
-
-        if (!$course_id || !$lesson_id) {
-            return false;
-        }
+        if (!$course_id || !$lesson_id) return false;
 
         $adapter = new Adapter();
-        if (!$adapter->is_available()) {
-            return false;
-        }
+        if (!$adapter->is_available()) return false;
 
         $lesson = $adapter->get_lesson($lesson_id);
-        if (!$lesson || 'publish' !== $lesson->post_status) {
-            return false;
-        }
-
         $course = $adapter->get_course($course_id);
-        if (!$course || 'publish' !== $course->post_status) {
-            return false;
-        }
-
-        if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) {
-            return false;
-        }
-
+        if (!$lesson || 'publish' !== $lesson->post_status || !$course || 'publish' !== $course->post_status) return false;
+        if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) return false;
         return $adapter->is_preview_lesson($lesson_id);
     }
 
-    /**
-     * 最终播放权限：
-     * 1. 管理员：可直接维护已发布课程；
-     * 2. 已授权学员：全部已发布课时；
-     * 3. 未授权学员/游客：只有当前课程中明确标记为“允许试看”的已发布课时；
-     * 4. Tutor LMS Public/Private/Free 设置不会绕过上述规则。
-     */
+    /** 最终播放权限：授权学员可观看已发布课时，游客仅可观看明确允许试看且已发布的课时。 */
     public function can_watch_lesson($user_id, $course_id, $lesson_id) {
-        $user_id   = absint($user_id);
+        $user_id = absint($user_id);
         $course_id = absint($course_id);
         $lesson_id = absint($lesson_id);
-
-        if (!$course_id || !$lesson_id) {
-            return false;
-        }
+        if (!$course_id || !$lesson_id) return false;
 
         $adapter = new Adapter();
-        if (!$adapter->is_available()) {
-            return false;
-        }
+        if (!$adapter->is_available()) return false;
 
         $lesson = $adapter->get_lesson($lesson_id);
         $course = $adapter->get_course($course_id);
-        if (!$lesson || 'publish' !== $lesson->post_status || !$course || 'publish' !== $course->post_status) {
-            return false;
-        }
-
-        if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) {
-            return false;
-        }
-
-        if ($user_id && $this->can_access_course($user_id, $course_id)) {
-            return true;
-        }
-
+        if (!$lesson || 'publish' !== $lesson->post_status || !$course || 'publish' !== $course->post_status) return false;
+        if ($adapter->get_lesson_course_id($lesson_id) !== $course_id) return false;
+        if ($user_id && $this->can_access_course($user_id, $course_id)) return true;
         return $this->can_preview($course_id, $lesson_id);
     }
 }
