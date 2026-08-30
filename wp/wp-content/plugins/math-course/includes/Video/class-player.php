@@ -37,8 +37,6 @@ class Player {
 		$course_id = absint( $atts['course_id'] );
 		$is_demo   = false;
 
-		// Lesson playback must resolve through the access layer. A visitor cannot
-		// bypass course permission by supplying an arbitrary HLS URL in the shortcode.
 		if ( $lesson_id ) {
 			$service = new Course_Service();
 			$video   = $service->get_lesson_video( $lesson_id, get_current_user_id() );
@@ -47,14 +45,13 @@ class Player {
 				return '<div class="mc-video-locked">该课时需要课程授权后才能观看。</div>';
 			}
 
-			$atts['url'] = $video['hls_url'];
+			// HLS is preferred after migration. Existing Tutor LMS videos remain
+			// playable through the native Tutor LMS player until migrated.
+			$atts['url'] = ! empty( $video['hls_url'] ) ? $video['hls_url'] : '';
 			$course_id  = absint( $video['course_id'] );
 			$is_demo    = 'yes' === get_post_meta( $lesson_id, '_mathcourse_demo', true );
 		}
 
-		// Demo lessons intentionally have no real media URL. Render a visual player
-		// placeholder so the one-click demo can validate the learning-page layout
-		// without introducing a third-party or permanent media dependency.
 		if ( $is_demo && empty( $atts['url'] ) ) {
 			ob_start();
 			?>
@@ -69,23 +66,59 @@ class Player {
 			return ob_get_clean();
 		}
 
-		if ( empty( $atts['url'] ) ) {
-			return '<div class="mc-video-locked">播放器暂不可用，请先配置本课时的视频地址。</div>';
+		if ( ! empty( $atts['url'] ) ) {
+			ob_start();
+			?>
+			<video
+				id="mathcourse-player-<?php echo esc_attr( $lesson_id ); ?>"
+				class="video-js vjs-big-play-centered mathcourse-player"
+				controls
+				preload="metadata"
+				playsinline
+				data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>"
+				data-course-id="<?php echo esc_attr( $course_id ); ?>">
+				<source src="<?php echo esc_url( $atts['url'] ); ?>" type="application/x-mpegURL">
+			</video>
+			<?php
+			return ob_get_clean();
 		}
 
-		ob_start();
-		?>
-		<video
-			id="mathcourse-player-<?php echo esc_attr( $lesson_id ); ?>"
-			class="video-js vjs-big-play-centered mathcourse-player"
-			controls
-			preload="metadata"
-			playsinline
-			data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>"
-			data-course-id="<?php echo esc_attr( $course_id ); ?>">
-			<source src="<?php echo esc_url( $atts['url'] ); ?>" type="application/x-mpegURL">
-		</video>
-		<?php
-		return ob_get_clean();
+		// Backward compatibility: videos previously uploaded in Tutor LMS use
+		// the _video metadata and should not require re-uploading or an HLS URL.
+		$tutor_player = $this->render_tutor_video( $lesson_id );
+		if ( $tutor_player ) {
+			return $tutor_player;
+		}
+
+		return '<div class="mc-video-missing">本课时暂未配置可播放的视频资源。</div>';
+	}
+
+	private function render_tutor_video( $lesson_id ) {
+		if ( ! $lesson_id || ! function_exists( 'tutor_lesson_video' ) || ! function_exists( 'tutor_utils' ) ) {
+			return '';
+		}
+
+		$lesson = get_post( $lesson_id );
+		if ( ! $lesson || empty( get_post_meta( $lesson_id, '_video', true ) ) ) {
+			return '';
+		}
+
+		global $post;
+		$previous_post = $post;
+		$post = $lesson;
+		setup_postdata( $lesson );
+
+		try {
+			$video_info = tutor_utils()->get_video_info();
+			if ( ! $video_info ) {
+				return '';
+			}
+			$html = tutor_lesson_video( false );
+		} finally {
+			wp_reset_postdata();
+			$post = $previous_post;
+		}
+
+		return is_string( $html ) ? $html : '';
 	}
 }
