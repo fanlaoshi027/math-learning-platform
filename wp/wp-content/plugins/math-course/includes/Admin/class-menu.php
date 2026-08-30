@@ -22,6 +22,7 @@ class Menu {
         );
 
         add_submenu_page( 'mathcourse', '课程管理', '课程管理', 'manage_options', 'mathcourse-courses', array( $this, 'courses_page' ) );
+        add_submenu_page( 'mathcourse', '批量创建课时', '批量创建课时', 'manage_options', 'mathcourse-batch', array( $this, 'batch_page' ) );
         add_submenu_page( 'mathcourse', '课程授权', '学员授权', 'manage_options', 'mathcourse-access', array( $this, 'access_page' ) );
         add_submenu_page( 'mathcourse', '学习进度', '学习进度', 'manage_options', 'mathcourse-progress', array( $this, 'progress_page' ) );
         add_submenu_page( 'mathcourse', '设置', '系统设置', 'manage_options', 'mathcourse-settings', array( $this, 'settings_page' ) );
@@ -35,6 +36,12 @@ class Menu {
     public function courses_page() {
         if ( class_exists( 'MathCourse\\Admin\\Course_Page' ) ) {
             ( new Course_Page() )->render();
+        }
+    }
+
+    public function batch_page() {
+        if ( class_exists( 'MathCourse\\Admin\\Batch_Manager' ) ) {
+            ( new Batch_Manager() )->render();
         }
     }
 
