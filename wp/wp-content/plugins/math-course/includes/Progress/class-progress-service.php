@@ -26,52 +26,43 @@ class Progress_Service {
     public function complete_lesson($user_id,$lesson_id){
         $user_id=absint($user_id); $lesson_id=absint($lesson_id);
         if(!$user_id||!$lesson_id)return false;
-
         $course_id=$this->get_lesson_course_id($lesson_id);
         if(!$course_id||!$this->access->can_access_course($user_id,$course_id))return false;
 
         global $wpdb;
         $table=$wpdb->prefix.'mathcourse_learning';
         $now=current_time('mysql');
-
-        // 数据库表作为主记录；UNIQUE(user_id,lesson_id) 保证重复提交安全。
-        $saved=$wpdb->replace(
-            $table,
-            array(
-                'user_id'=>$user_id,
-                'course_id'=>$course_id,
-                'lesson_id'=>$lesson_id,
-                'completed_time'=>$now,
-            ),
-            array('%d','%d','%d','%s')
-        );
+        $saved=$wpdb->replace($table,array(
+            'user_id'=>$user_id,
+            'course_id'=>$course_id,
+            'lesson_id'=>$lesson_id,
+            'completed_time'=>$now,
+        ),array('%d','%d','%d','%s'));
         if(false===$saved)return false;
 
         // 保留旧 meta，兼容旧版本代码及已有数据。
-        $completed=$this->get_completed_lessons($user_id);
+        $completed=$this->get_legacy_completed_lessons($user_id);
         if(!in_array($lesson_id,$completed,true)){
             $completed[]=$lesson_id;
             update_user_meta($user_id,'mc_completed_lessons',array_values(array_unique(array_map('intval',$completed))));
         }
-        $times=$this->get_completed_times($user_id);
+        $times=$this->get_legacy_completed_times($user_id);
         $times[$lesson_id]=current_time('timestamp');
         update_user_meta($user_id,'mc_lesson_completed_time',$times);
-
         return true;
     }
 
     public function uncomplete_lesson($user_id,$lesson_id){
         $user_id=absint($user_id); $lesson_id=absint($lesson_id);
         if(!$user_id||!$lesson_id)return false;
-
         global $wpdb;
         $table=$wpdb->prefix.'mathcourse_learning';
         $wpdb->delete($table,array('user_id'=>$user_id,'lesson_id'=>$lesson_id),array('%d','%d'));
 
-        $completed=$this->get_completed_lessons($user_id);
+        $completed=$this->get_legacy_completed_lessons($user_id);
         $completed=array_values(array_diff($completed,array($lesson_id)));
         update_user_meta($user_id,'mc_completed_lessons',array_values(array_map('intval',$completed)));
-        $times=$this->get_completed_times($user_id);
+        $times=$this->get_legacy_completed_times($user_id);
         unset($times[$lesson_id]);
         if(empty($times))delete_user_meta($user_id,'mc_lesson_completed_time');
         else update_user_meta($user_id,'mc_lesson_completed_time',$times);
@@ -118,15 +109,14 @@ class Progress_Service {
         return array('completed'=>$completed,'total'=>$total,'percent'=>$total?round(($completed/$total)*100):0,'last_lesson_id'=>$last_lesson_id,'last_time'=>$last_time);
     }
 
-    /** 合并数据库记录与旧 user_meta，数据库优先。 */
+    /** 合并数据库记录与旧 user_meta，数据库作为主记录。 */
     private function get_completed_lessons($user_id){
         $user_id=absint($user_id); $ids=array();
         global $wpdb;
         $table=$wpdb->prefix.'mathcourse_learning';
         $rows=$wpdb->get_col($wpdb->prepare("SELECT lesson_id FROM {$table} WHERE user_id=%d",$user_id));
         if(is_array($rows))$ids=array_map('intval',$rows);
-        $legacy=$this->get_legacy_completed_lessons($user_id);
-        return array_values(array_unique(array_merge($ids,$legacy)));
+        return array_values(array_unique(array_merge($ids,$this->get_legacy_completed_lessons($user_id))));
     }
 
     private function get_legacy_completed_lessons($user_id){
@@ -139,9 +129,24 @@ class Progress_Service {
         global $wpdb;
         $table=$wpdb->prefix.'mathcourse_learning';
         $rows=$wpdb->get_results($wpdb->prepare("SELECT lesson_id, completed_time FROM {$table} WHERE user_id=%d",$user_id));
-        if(is_array($rows))foreach($rows as $row){$id=absint($row->lesson_id);if($id&&$row->completed_time)$times[$id]=absint(mysql2date('U',$row->completed_time,current_time('timestamp')));}
-        $legacy=get_user_meta($user_id,'mc_lesson_completed_time',true);
-        if(is_array($legacy))foreach($legacy as $id=>$timestamp){$id=absint($id);$timestamp=absint($timestamp);if($id&&$timestamp&&!isset($times[$id]))$times[$id]=$timestamp;}
+        if(is_array($rows))foreach($rows as $row){
+            $id=absint($row->lesson_id);
+            if($id&&$row->completed_time){
+                $parsed=strtotime($row->completed_time);
+                if(false!==$parsed)$times[$id]=$parsed;
+            }
+        }
+        foreach($this->get_legacy_completed_times($user_id) as $id=>$timestamp){
+            $id=absint($id); $timestamp=absint($timestamp);
+            if($id&&$timestamp&&!isset($times[$id]))$times[$id]=$timestamp;
+        }
+        return $times;
+    }
+
+    private function get_legacy_completed_times($user_id){
+        $data=get_user_meta(absint($user_id),'mc_lesson_completed_time',true);
+        if(!is_array($data))return array();
+        $times=array(); foreach($data as $id=>$timestamp){$id=absint($id);$timestamp=absint($timestamp);if($id&&$timestamp)$times[$id]=$timestamp;}
         return $times;
     }
 
