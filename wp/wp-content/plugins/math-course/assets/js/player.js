@@ -150,7 +150,13 @@ document.addEventListener('DOMContentLoaded', function () {
         on(player, 'pause', function () { savePosition(true); resetWatchWindow(); });
         on(player, 'seeking', function () { seeking = true; resetWatchWindow(); });
         on(player, 'seeked', function () { seeking = false; resetWatchWindow(); });
-        on(player, 'ended', function () { clearSavedTime(); submitCompletion(); });
+        on(player, 'ended', function () {
+            // A direct seek to the end must not mark a lesson complete.
+            // Require genuine playback after the last seek, matching the
+            // completion threshold used by the timeupdate path.
+            if (playedSinceSeek >= 1.2) submitCompletion();
+            else savePosition(true);
+        });
 
         function persistBeforeLeave() { savePosition(true); }
         window.addEventListener('pagehide', persistBeforeLeave);
