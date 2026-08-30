@@ -4,7 +4,7 @@
  */
 defined('ABSPATH') || exit;
 
-use MathCourse\Tutor\Adapter;
+use MathCourse\Progress\Progress_Service;
 
 $course_id = get_the_ID();
 $user_id = get_current_user_id();
@@ -14,27 +14,25 @@ $progress = array(
     'percent'   => 0,
 );
 
-if (class_exists(Adapter::class)) {
-    $adapter = new Adapter();
-    if ($adapter->is_available() && $adapter->get_course($course_id)) {
-        $progress = $adapter->get_course_progress($course_id, $user_id);
-    }
+if ( class_exists( Progress_Service::class ) ) {
+    $service = new Progress_Service();
+    $progress = $service->get_course_progress( $course_id, $user_id );
 }
 
-$completed_lessons = absint($progress['completed']);
-$total_lessons = absint($progress['total']);
-$percent = max(0, min(100, absint($progress['percent'])));
+$completed_lessons = absint( $progress['completed'] );
+$total_lessons     = absint( $progress['total'] );
+$percent           = max( 0, min( 100, absint( $progress['percent'] ) ) );
 ?>
 
 <div class="mc-course-progress">
     <div class="mc-progress-title">学习进度</div>
     <div class="mc-progress-number">
-        <?php echo esc_html($completed_lessons); ?> / <?php echo esc_html($total_lessons); ?> 课时
+        <?php echo esc_html( $completed_lessons ); ?> / <?php echo esc_html( $total_lessons ); ?> 课时
     </div>
     <div class="mc-progress-bar">
-        <span style="width:<?php echo esc_attr($percent); ?>%"></span>
+        <span style="width:<?php echo esc_attr( $percent ); ?>%"></span>
     </div>
     <div class="mc-progress-percent">
-        <?php echo esc_html($percent); ?>%
+        <?php echo esc_html( $percent ); ?>%
     </div>
 </div>
