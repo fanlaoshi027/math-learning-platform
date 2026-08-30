@@ -11,9 +11,9 @@ $grade      = isset( $_GET['course_grade'] ) ? sanitize_key( wp_unslash( $_GET['
 
 <main class="mc-page mc-course-center">
 	<div class="mc-container">
-		<?php if ( $course_id && shortcode_exists( 'mathcourse_course_player' ) ) : ?>
+		<?php if ( $course_id && shortcode_exists( 'mathcourse_course_directory' ) ) : ?>
 			<div class="mc-course-center__back"><a href="<?php echo esc_url( $center_url ); ?>">← 返回课程中心</a></div>
-			<?php echo do_shortcode( '[mathcourse_course_player course_id="' . esc_attr( $course_id ) . '"]' ); ?>
+			<?php echo do_shortcode( '[mathcourse_course_directory course_id="' . esc_attr( $course_id ) . '"]' ); ?>
 		<?php else : ?>
 			<header class="mc-course-center__hero">
 				<div>
