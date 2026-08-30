@@ -4,6 +4,8 @@ namespace MathCourse\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use MathCourse\Tutor\Adapter;
+
 /**
  * Handles course actions before the admin page outputs anything.
  */
@@ -14,7 +16,7 @@ class Course_Actions {
 	}
 
 	public function handle() {
-		if ( ! is_admin() || ! current_user_can( 'manage_options' ) || ! function_exists( 'tutor' ) ) {
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
@@ -25,13 +27,18 @@ class Course_Actions {
 			return;
 		}
 
+		$adapter = new Adapter();
+		if ( ! $adapter->is_available() ) {
+			return;
+		}
+
 		if ( 'new' === $action ) {
 			check_admin_referer( 'mathcourse_new_course' );
 
 			$course_id = wp_insert_post(
 				array(
 					'post_title'  => '新课程',
-					'post_type'   => tutor()->course_post_type,
+					'post_type'   => $this->get_course_post_type( $adapter ),
 					'post_status' => 'draft',
 					'post_author' => get_current_user_id(),
 				),
@@ -63,10 +70,25 @@ class Course_Actions {
 
 			check_admin_referer( 'mathcourse_trash_course_' . $course_id );
 
-			if ( tutor()->course_post_type === get_post_type( $course_id ) && current_user_can( 'delete_post', $course_id ) ) {
+			$course = $adapter->get_course( $course_id );
+			if ( $course && current_user_can( 'delete_post', $course_id ) ) {
 				wp_trash_post( $course_id );
 			}
 		}
+	}
+
+	/**
+	 * Return the Tutor course post type through the adapter rather than calling Tutor directly.
+	 */
+	private function get_course_post_type( Adapter $adapter ) {
+		$courses = $adapter->get_courses( true, 1 );
+		if ( ! empty( $courses ) ) {
+			return $courses[0]->post_type;
+		}
+
+		// Tutor LMS uses courses as its course post type. Keep this fallback
+		// only for an installed Tutor version with no existing course posts.
+		return 'courses';
 	}
 
 	/**
