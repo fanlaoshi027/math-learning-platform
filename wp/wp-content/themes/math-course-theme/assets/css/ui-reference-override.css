@@ -82,3 +82,22 @@ body.mathcourse-site .mathcourse-center__button{margin-top:12px;padding:9px 10px
  body.mathcourse-site .mc-home-types,body.mathcourse-site .mc-home-courses{padding:42px 0}
  body.mathcourse-site .mc-section-heading h2{font-size:21px}
 }
+
+/* Final mobile priority: keep the compact header from becoming a second navigation row. */
+@media(max-width:760px){
+ body.mathcourse-site .mc-site-header__inner{min-height:58px;gap:8px;flex-wrap:nowrap;padding:0}
+ body.mathcourse-site .mc-site-nav{order:initial;width:auto;min-width:0;flex:1;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;margin-left:6px}
+ body.mathcourse-site .mc-site-nav::-webkit-scrollbar{display:none}
+ body.mathcourse-site .mc-site-nav a{padding:8px 9px;font-size:12px;flex:0 0 auto}
+ body.mathcourse-site .mc-header-search{display:none}
+ body.mathcourse-site .mc-header-actions{margin-left:auto;flex:0 0 auto}
+ body.mathcourse-site .mc-header-register{display:none}
+ body.mathcourse-site .mc-header-login{padding:7px 9px;font-size:12px;white-space:nowrap}
+ body.mathcourse-site .mc-user-pill{padding:7px 9px;font-size:12px;white-space:nowrap}
+}
+@media(max-width:390px){
+ body.mathcourse-site .mc-brand__text{font-size:16px}
+ body.mathcourse-site .mc-site-nav{margin-left:2px}
+ body.mathcourse-site .mc-site-nav a{padding-left:7px;padding-right:7px}
+ body.mathcourse-site .mc-header-login,body.mathcourse-site .mc-user-pill{padding-left:7px;padding-right:7px}
+}
