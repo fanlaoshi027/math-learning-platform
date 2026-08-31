@@ -20,5 +20,18 @@
 .mc-course-player__item.is-active .mc-course-player__check{color:#2563eb}
 .mc-course-player__item.is-complete .mc-course-player__check{color:#16a36d}
 .mc-course-player__item small{padding:3px 7px;border-radius:999px;background:#fff7ed;color:#c96b08;font-size:9px}
+/* Learning header and progress: visual-only layer, data and navigation remain unchanged. */
+.mc-course-player__top{align-items:center;gap:28px;margin-bottom:20px;padding:4px 2px}
+.mc-course-player__top>div:first-child{min-width:0;flex:1}
+.mc-course-player__eyebrow{display:inline-flex;align-items:center;gap:7px;margin-bottom:7px;color:#2563eb;font-size:10px;font-weight:800;letter-spacing:.14em}
+.mc-course-player__eyebrow:before{content:"";width:4px;height:4px;border-radius:50%;background:#ff9418}
+.mc-course-player__top h1{font-size:27px;line-height:1.3;letter-spacing:-.035em;color:#0f2942;font-weight:800}
+.mc-course-player__progress{position:relative;width:270px;flex:0 0 270px;padding:12px 14px 13px;border:1px solid #e2e8f0;border-radius:13px;background:#fff;box-shadow:0 4px 16px rgba(15,23,42,.035)}
+.mc-course-player__progress span{margin-bottom:3px;color:#64748b;font-size:11px}
+.mc-course-player__progress strong{margin-bottom:8px;color:#0f172a;font-size:13px;font-weight:750}
+.mc-course-player__progress>div{height:6px;background:#edf2f7}
+.mc-course-player__progress i{background:linear-gradient(90deg,#2563eb,#4f8df7);box-shadow:0 0 7px rgba(37,99,235,.18)}
+@media(max-width:900px){.mc-course-player__top{align-items:flex-start;gap:14px;margin-bottom:15px}.mc-course-player__progress{width:100%;max-width:420px;flex-basis:auto}}
+@media(max-width:600px){.mc-course-player__top{padding:10px 0 0;margin-bottom:10px;gap:9px}.mc-course-player__eyebrow{margin-bottom:5px;font-size:9px}.mc-course-player__top h1{font-size:20px}.mc-course-player__progress{padding:10px 12px 11px;border-radius:11px}.mc-course-player__progress span{font-size:10px}.mc-course-player__progress strong{font-size:12px;margin-bottom:6px}.mc-course-player__progress>div{height:5px}}
 @media(max-width:900px){.mc-course-player__sidebar{border-radius:14px}.mc-course-player__topics{max-height:430px}}
 @media(max-width:600px){.mc-course-player__sidebar{margin-top:18px;border-radius:14px}.mc-course-player__sidebar-head{min-height:54px;padding:0 14px}.mc-course-player__topics{max-height:none;padding:4px 0 6px}.mc-course-player__topic h3{padding:13px 14px}.mc-course-player__lessons{padding:4px 7px 7px}.mc-course-player__item{min-height:43px;padding:9px 9px}}
