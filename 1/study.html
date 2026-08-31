@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>课程学习 - 全等三角形 - 樊老师数学课堂</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#f8fafc] text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+  
+  <div>
+    
+  <!-- Top Navigation Bar -->
+  <header class="bg-[#0f1f3d] text-white sticky top-0 z-40 shadow-lg border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <a href="index.html" class="flex items-center gap-3 select-none group shrink-0">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md border border-blue-400/30">
+          <svg class="w-6 h-6 text-white stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="text-lg md:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            樊老师数学课堂
+          </div>
+          <div class="text-[11px] text-blue-300 tracking-wider font-light">
+            跟中考名师 学扎实数学
+          </div>
+        </div>
+      </a>
+
+      <!-- Navigation Links -->
+      <nav class="hidden md:flex items-center gap-1 lg:gap-2">
+        <a href="index.html" class="px-4 py-2 rounded-md text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-white/5">首页</a>
+        <a href="courses.html" class="px-4 py-2 rounded-md text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-white/5">课程中心</a>
+        <a href="study.html" class="px-4 py-2 rounded-md text-sm font-medium transition-colors text-white bg-white/10">学习中心</a>
+        <a href="index.html#features" class="px-4 py-2 rounded-md text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-white/5">关于老师</a>
+      </nav>
+
+      <!-- Search & User -->
+      <div class="flex items-center gap-3">
+        <div class="relative hidden sm:block">
+          <input type="text" placeholder="搜索课程或专题" class="w-40 lg:w-56 bg-slate-900/80 border border-slate-700 rounded-full py-1.5 pl-3.5 pr-8 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-400" />
+          <svg class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+        <button class="px-3.5 py-1.5 border border-slate-600 hover:border-slate-400 rounded-md text-xs font-medium text-slate-200 hover:text-white hover:bg-white/5 transition-colors">
+          登录 / 注册
+        </button>
+      </div>
+
+    </div>
+  </header>
+  
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      <!-- Breadcrumbs -->
+      <nav class="flex items-center gap-1.5 text-xs text-slate-500">
+        <a href="courses.html" class="hover:text-blue-600">课程中心</a> &gt;
+        <a href="courses.html#geometry" class="hover:text-blue-600">几何</a> &gt;
+        <a href="topic-detail.html" class="hover:text-blue-600">全等三角形</a> &gt;
+        <span>全等三角形 - 系统精讲</span> &gt;
+        <span id="current-crumb" class="text-blue-600 font-medium">第 1 讲 全等三角形的概念与表示</span>
+      </nav>
+
+      <!-- 2-Column Split: Player on Left, Syllabus on Right -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left: Video & Controls -->
+        <section class="lg:col-span-8 space-y-4">
+          <div class="bg-white px-5 py-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <h1 id="lesson-title-display" class="text-base sm:text-lg font-bold text-slate-900">
+              第 1 讲 全等三角形的概念与表示
+            </h1>
+            <span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">时长: 28:45</span>
+          </div>
+
+          <!-- Blackboard Video Player Box -->
+          <div class="bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800">
+            <div class="aspect-video w-full bg-[#14231b] border-4 border-[#2b3a32] p-6 text-white flex flex-col justify-between">
+              <div>
+                <h3 class="text-lg font-bold text-amber-300">全等三角形的定义：</h3>
+                <p class="text-slate-100 text-sm mt-1">能够完全重合的两个三角形叫做<span class="text-amber-300 font-bold border-b border-amber-300">全等三角形</span>。</p>
+              </div>
+              <div class="flex justify-center items-center py-2">
+                <svg class="w-full max-w-sm h-32" viewBox="0 0 320 140" fill="none">
+                  <polygon points="60,20 15,115 125,115" stroke="#fef08a" stroke-width="2.5" class="fill-yellow-300/10" />
+                  <polygon points="230,20 185,115 295,115" stroke="#fef08a" stroke-width="2.5" class="fill-yellow-300/10" />
+                  <text x="56" y="14" fill="#fef08a" font-size="12" font-weight="bold">A</text>
+                  <text x="3" y="125" fill="#fef08a" font-size="12" font-weight="bold">B</text>
+                  <text x="130" y="125" fill="#fef08a" font-size="12" font-weight="bold">C</text>
+                  <text x="226" y="14" fill="#fef08a" font-size="12" font-weight="bold">A'</text>
+                  <text x="171" y="125" fill="#fef08a" font-size="12" font-weight="bold">B'</text>
+                  <text x="300" y="125" fill="#fef08a" font-size="12" font-weight="bold">C'</text>
+                </svg>
+              </div>
+              <div class="text-center">
+                <span class="text-base font-bold font-serif text-cyan-300 bg-black/40 px-4 py-1 rounded-full">
+                  △ABC ≌ △A'B'C'
+                </span>
+              </div>
+            </div>
+
+            <!-- Control Bar -->
+            <div class="bg-slate-950 px-4 py-2.5 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
+              <div class="flex items-center gap-3">
+                <button class="text-white font-bold">▶</button>
+                <span class="font-mono text-slate-400"><span class="text-white">05:12</span> / 28:45</span>
+              </div>
+              <div class="flex-1 mx-4">
+                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div class="w-[20%] h-full bg-blue-500"></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="bg-slate-800 px-1.5 py-0.5 rounded text-[11px]">1.0x</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Action Bar (Prev / Next) -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
+            <button class="px-4 py-2 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50">&larr; 上一讲</button>
+            <div class="text-xs font-medium text-slate-500">已学 <span class="text-blue-600 font-bold">1</span> / 18 讲</div>
+            <button class="px-5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm">下一讲 &rarr;</button>
+          </div>
+        </section>
+
+        <!-- Right: Course Directory -->
+        <aside class="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+            <h2 class="text-sm font-bold text-slate-900">课程目录</h2>
+            <span class="text-xs text-slate-500">共 18 讲</span>
+          </div>
+
+          <div class="divide-y divide-slate-100 text-xs">
+            <!-- Chapter 1 (Open) -->
+            <div>
+              <div class="px-4 py-3 font-bold text-slate-800 bg-slate-50/50 flex justify-between items-center cursor-pointer">
+                <span>第1章 全等三角形的概念与判定</span>
+                <span>▲</span>
+              </div>
+              <div class="p-2 space-y-1 bg-white">
+                <a href="#" class="block px-3 py-2.5 rounded-lg bg-blue-600 text-white font-medium flex justify-between items-center">
+                  <span>1. 全等三角形的概念与表示</span>
+                  <span class="text-blue-100 font-mono text-[11px]">28:45</span>
+                </a>
+                <a href="#" class="block px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-100 flex justify-between items-center">
+                  <span>2. 边边边 (SSS)</span>
+                  <span class="text-slate-400 font-mono text-[11px]">24:30</span>
+                </a>
+                <a href="#" class="block px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-100 flex justify-between items-center">
+                  <span>3. 边角边 (SAS)</span>
+                  <span class="text-slate-400 font-mono text-[11px]">26:15</span>
+                </a>
+                <a href="#" class="block px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-100 flex justify-between items-center">
+                  <span>4. 角边角 (ASA)</span>
+                  <span class="text-slate-400 font-mono text-[11px]">24:40</span>
+                </a>
+                <a href="#" class="block px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-100 flex justify-between items-center">
+                  <span>5. 角角边 (AAS)</span>
+                  <span class="text-slate-400 font-mono text-[11px]">22:10</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Chapter 2 -->
+            <div>
+              <div class="px-4 py-3 font-bold text-slate-800 hover:bg-slate-50 flex justify-between items-center cursor-pointer">
+                <span>第2章 全等三角形的性质</span>
+                <span>▼</span>
+              </div>
+            </div>
+
+            <!-- Chapter 3 -->
+            <div>
+              <div class="px-4 py-3 font-bold text-slate-800 hover:bg-slate-50 flex justify-between items-center cursor-pointer">
+                <span>第3章 常见模型</span>
+                <span>▼</span>
+              </div>
+            </div>
+
+            <!-- Chapter 4 -->
+            <div>
+              <div class="px-4 py-3 font-bold text-slate-800 hover:bg-slate-50 flex justify-between items-center cursor-pointer">
+                <span>第4章 综合应用</span>
+                <span>▼</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+      </div>
+    </main>
+  </div>
+
+  
+  <!-- Footer -->
+  <footer class="bg-[#0b1528] text-slate-400 text-xs border-t border-slate-800/80 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-slate-400">
+        <a href="#" class="hover:text-slate-200 transition-colors">关于我们</a>
+        <span class="text-slate-700">|</span>
+        <a href="#" class="hover:text-slate-200 transition-colors">联系我们</a>
+        <span class="text-slate-700">|</span>
+        <a href="#" class="hover:text-slate-200 transition-colors">帮助中心</a>
+        <span class="text-slate-700">|</span>
+        <a href="#" class="hover:text-slate-200 transition-colors">隐私政策</a>
+        <span class="text-slate-700">|</span>
+        <a href="#" class="hover:text-slate-200 transition-colors">用户协议</a>
+      </div>
+      <div class="text-slate-500 text-center md:text-right">
+        <span>© 2024 樊老师数学课堂 All Rights Reserved.</span>
+        <span class="ml-3 hover:text-slate-400 transition-colors">浙ICP备2024000000号-1</span>
+      </div>
+    </div>
+  </footer>
+  
+</body>
+</html>
