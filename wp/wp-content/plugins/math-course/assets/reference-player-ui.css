@@ -5,12 +5,14 @@
 .mathcourse-player.video-js .vjs-control-bar{height:56px;padding:0 10px;background:linear-gradient(180deg,rgba(4,10,18,.02),rgba(4,10,18,.96) 38%);opacity:1!important;visibility:visible!important}
 .mathcourse-player.video-js .vjs-control{height:42px;min-width:38px;color:rgba(255,255,255,.8)}
 .mathcourse-player.video-js .vjs-control:hover{color:#fff}
-.mathcourse-player.video-js .vjs-progress-control{position:absolute;left:9px;right:9px;top:-8px;width:auto;height:9px;margin:0}
-.mathcourse-player.video-js .vjs-progress-holder{height:5px;margin:0;border-radius:999px;background:rgba(255,255,255,.38);box-shadow:0 0 0 1px rgba(0,0,0,.22)}
+/* Seek bar: keep it inside the control bar hit area so iOS/WeChat WebView can drag it. */
+.mathcourse-player.video-js .vjs-progress-control{position:absolute;left:7px;right:7px;top:0;bottom:auto;width:auto;height:18px;margin:0;z-index:20;cursor:pointer;touch-action:none;pointer-events:auto}
+.mathcourse-player.video-js .vjs-progress-holder{position:absolute;left:0;right:0;top:7px;height:6px;margin:0;border-radius:999px;background:rgba(255,255,255,.58);box-shadow:0 0 0 1px rgba(0,0,0,.45);cursor:pointer}
 .mathcourse-player.video-js .vjs-play-progress{background:#ff9418;border-radius:999px}
-.mathcourse-player.video-js .vjs-load-progress{background:rgba(255,255,255,.22);border-radius:999px}
-.mathcourse-player.video-js .vjs-slider-handle{display:block;width:11px;height:11px;top:-3px;border-radius:50%;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.45)}
-.mathcourse-player.video-js .vjs-time-control{width:auto;min-width:auto;padding:0 3px;font-size:12px;font-weight:650;color:rgba(255,255,255,.82)}
+.mathcourse-player.video-js .vjs-load-progress{background:rgba(255,255,255,.28);border-radius:999px}
+.mathcourse-player.video-js .vjs-slider-handle{display:block;width:14px;height:14px;top:-4px;border-radius:50%;background:#fff;box-shadow:0 1px 7px rgba(0,0,0,.55);cursor:grab}
+.mathcourse-player.video-js .vjs-slider-handle:before{display:none}
+.mathcourse-player.video-js .vjs-time-control{width:auto;min-width:auto;padding:0 3px;font-size:12px;font-weight:650;color:rgba(255,255,255,.9)}
 .mathcourse-player.video-js .vjs-playback-rate{display:none!important}
 .mathcourse-player.video-js .vjs-picture-in-picture-control{display:none}
 .mathcourse-player.video-js .vjs-fullscreen-control{margin-left:auto!important}
@@ -23,4 +25,4 @@
 .mathcourse-player.video-js .mc-player-speed-menu{bottom:43px;right:0;min-width:66px;padding:4px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(5,13,24,.98);box-shadow:0 10px 24px rgba(0,0,0,.3)}
 .mathcourse-player.video-js .mc-player-speed-menu button{padding:7px 5px;border-radius:6px;color:rgba(255,255,255,.82);font-size:11px}
 .mathcourse-player.video-js .mc-player-speed-menu button:hover,.mathcourse-player.video-js .mc-player-speed-menu button.is-active{background:#1769e0;color:#fff}
-@media(max-width:640px){.mathcourse-player.video-js .vjs-control-bar{height:50px;padding:0 4px}.mathcourse-player.video-js .vjs-control{min-width:32px;height:40px}.mathcourse-player.video-js .vjs-time-control{font-size:10px;padding:0 2px}.mathcourse-player.video-js .vjs-progress-control{left:7px;right:7px;top:-8px;height:10px}.mathcourse-player.video-js .vjs-progress-holder{height:5px}.mathcourse-player.video-js .mc-player-skip-button{min-width:50px;height:32px;padding:0 3px;font-size:10px}.mathcourse-player.video-js .mc-player-speed-button{min-width:39px;height:32px;font-size:10px}.mathcourse-player.video-js .vjs-big-play-button{width:50px;height:50px;line-height:48px;font-size:21px}}
+@media(max-width:640px){.mathcourse-player.video-js .vjs-control-bar{height:52px;padding:0 4px}.mathcourse-player.video-js .vjs-control{min-width:32px;height:40px}.mathcourse-player.video-js .vjs-time-control{font-size:10px;padding:0 2px}.mathcourse-player.video-js .vjs-progress-control{left:6px;right:6px;top:0;height:19px}.mathcourse-player.video-js .vjs-progress-holder{top:7px;height:7px}.mathcourse-player.video-js .vjs-slider-handle{width:15px;height:15px;top:-4px}.mathcourse-player.video-js .mc-player-skip-button{min-width:50px;height:32px;padding:0 3px;font-size:10px}.mathcourse-player.video-js .mc-player-speed-button{min-width:39px;height:32px;font-size:10px}.mathcourse-player.video-js .vjs-big-play-button{width:50px;height:50px;line-height:48px;font-size:21px}}
