@@ -1,23 +1,23 @@
 <?php
 /**
- * Math Course Theme - Single Course Learning Page
+ * Math Course Theme - Legacy Course Route.
  *
- * The course experience is rendered by MathCourse, not Tutor LMS' native
- * single-course template. Tutor LMS remains the underlying data layer.
+ * Course cards use the dedicated learning page directly. Keep the legacy
+ * single-course route as a compatibility entry point, but never render a
+ * separate course-detail UI here.
  */
 defined( 'ABSPATH' ) || exit;
 
-get_header();
-?>
-<main class="mc-page mc-course-single">
-	<section class="mc-container">
-		<?php
-		if ( shortcode_exists( 'mathcourse_course_directory' ) ) {
-			echo do_shortcode( '[mathcourse_course_directory course_id="' . absint( get_the_ID() ) . '"]' );
-		} else {
-			echo '<p>课程系统未启用。</p>';
-		}
-		?>
-	</section>
-</main>
-<?php get_footer();
+$course_id = absint( get_the_ID() );
+
+if ( $course_id ) {
+	$learning_url = add_query_arg(
+		array( 'course_id' => $course_id ),
+		home_url( '/learning/' )
+	);
+	wp_safe_redirect( $learning_url, 302 );
+	exit;
+}
+
+wp_safe_redirect( home_url( '/course-center/' ), 302 );
+exit;
