@@ -1,0 +1,14 @@
+/* wpui-v2 solid-color policy: visual overrides only. */
+body.mathcourse-site .mc-home-hero,
+body.mathcourse-site .mc-home-v2__hero{background:#eef6ff!important}
+body.mathcourse-site .mc-math-card--main{background:#0d2942!important}
+body.mathcourse-site .mathcourse-center__cover{background:#eaf2fb!important}
+body.mathcourse-site .mathcourse-cover--gradient::before,
+body.mathcourse-site .mathcourse-cover--soft::before{background:var(--mc-cover-color,#1769e0)!important}
+body.mathcourse-site .mathcourse-cover::before{background:var(--mc-cover-color,#1769e0)!important}
+body.mathcourse-site .mc-type-card::after{background:#edf5ff!important}
+body.mathcourse-site .mc-type-card--book::after{background:#fff3e3!important}
+body.mathcourse-site .mc-home-v2__note-inner{background:#edf5ff!important}
+body.mathcourse-site .mc-course-center__hero{background:#eef6ff!important}
+body.mathcourse-site .mc-course-center__hero:after{background:transparent!important}
+body.mathcourse-site .mc-course-player__sidebar-head{background:#f8fafc!important}
