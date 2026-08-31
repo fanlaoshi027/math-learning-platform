@@ -1,0 +1,28 @@
+/* MathCourse player UI — theme-only layer, inspired by wpthem */
+.mathcourse-video{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:18px;background:#020617;box-shadow:0 24px 70px rgba(2,6,23,.42);isolation:isolate}
+.mathcourse-video .mathcourse-player{display:block;width:100%;height:100%;object-fit:contain;background:#020617}
+.mathcourse-video.mc-player-enhanced video{controls:none}
+.mc-player-controls{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:38px 16px 12px;color:#fff;background:linear-gradient(transparent,rgba(2,6,23,.94));opacity:1;transition:opacity .2s ease}
+.mc-player-controls.is-hidden{opacity:0;pointer-events:none}
+.mc-player-progress{position:relative;height:4px;margin:0 2px 11px;border-radius:999px;background:rgba(255,255,255,.22);cursor:pointer}
+.mc-player-progress__buffer,.mc-player-progress__value{position:absolute;left:0;top:0;height:100%;border-radius:999px;pointer-events:none}
+.mc-player-progress__buffer{background:rgba(255,255,255,.28);width:0}
+.mc-player-progress__value{background:#ff8a2b;width:0}
+.mc-player-progress__thumb{position:absolute;top:50%;left:0;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.45);transform:translate(-50%,-50%);opacity:0;transition:opacity .15s}
+.mc-player-progress:hover{height:6px}.mc-player-progress:hover .mc-player-progress__thumb{opacity:1}
+.mc-player-toolbar{display:flex;align-items:center;gap:7px;min-height:34px}
+.mc-player-button{border:0;background:transparent;color:rgba(255,255,255,.9);width:32px;height:32px;padding:0;border-radius:8px;display:grid;place-items:center;cursor:pointer;font:inherit;font-size:13px;transition:background .15s,color .15s}
+.mc-player-button:hover{background:rgba(255,255,255,.12);color:#fff}.mc-player-button:focus-visible{outline:2px solid #ff8a2b;outline-offset:2px}
+.mc-player-button--main{width:36px;height:36px;background:rgba(255,255,255,.12);font-size:16px}
+.mc-player-skip{font-size:10px;font-weight:800;letter-spacing:-.02em}
+.mc-player-time{margin-left:4px;color:rgba(255,255,255,.72);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mc-player-spacer{flex:1}
+.mc-player-speed{height:30px;padding:0 9px;border:1px solid rgba(255,255,255,.16);border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font-size:11px;font-weight:750;cursor:pointer}
+.mc-player-speed:hover{background:rgba(255,255,255,.14)}
+.mc-player-badge{margin-left:2px;padding:5px 8px;border-radius:7px;background:rgba(255,138,43,.14);border:1px solid rgba(255,138,43,.25);color:#ffc08d;font-size:9px;font-weight:800;letter-spacing:.04em}
+.mc-player-empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 40%,rgba(23,105,224,.1),transparent 55%),#020617}
+.mc-player-empty__inner{text-align:center;color:#fff}.mc-player-empty__icon{width:58px;height:58px;margin:0 auto 13px;display:grid;place-items:center;border-radius:17px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#ff8a2b;font-size:22px}
+.mc-player-empty__title{font-size:15px;font-weight:800}.mc-player-empty__text{margin-top:6px;color:#8492a8;font-size:11px}
+/* Keep the surrounding learning page visually quiet so the player is the focal point. */
+.mc-learning-page .mathcourse-video{margin:0}.mc-learning-page .mathcourse-video + *{margin-top:14px}
+@media(max-width:700px){.mathcourse-video{border-radius:13px}.mc-player-controls{padding:30px 9px 7px}.mc-player-toolbar{gap:2px}.mc-player-button{width:29px;height:29px}.mc-player-button--main{width:33px;height:33px}.mc-player-time{font-size:10px}.mc-player-badge{display:none}.mc-player-speed{height:28px;padding:0 7px;font-size:10px}}
