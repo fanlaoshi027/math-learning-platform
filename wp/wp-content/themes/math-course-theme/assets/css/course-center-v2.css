@@ -1,0 +1,41 @@
+/* wpui-v2 — course center visual layer. Business markup and routing remain unchanged. */
+body.mathcourse-site .mc-course-center{padding:34px 0 72px;background:transparent}
+body.mathcourse-site .mc-course-center>.mc-container{width:min(1180px,calc(100% - 40px))}
+body.mathcourse-site .mc-course-center__hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;min-height:176px;margin-bottom:28px;padding:34px 42px;border:1px solid #e1e8f2;border-radius:24px;background:linear-gradient(135deg,#f8fbff 0%,#eef5ff 56%,#f8fbff 100%);box-shadow:0 14px 42px rgba(18,59,99,.055)}
+body.mathcourse-site .mc-course-center__hero:after{content:"";position:absolute;width:280px;height:280px;right:-110px;top:-120px;border-radius:50%;border:1px solid rgba(23,105,224,.10);box-shadow:0 0 0 32px rgba(23,105,224,.025),0 0 0 64px rgba(23,105,224,.018)}
+body.mathcourse-site .mc-course-center__hero-copy{position:relative;z-index:2}
+body.mathcourse-site .mc-course-center__eyebrow{display:inline-block;margin-bottom:9px;color:#1769e0;font-size:10px;font-weight:850;letter-spacing:.18em}
+body.mathcourse-site .mc-course-center__hero h1{margin:0;color:#0d2942;font-size:clamp(30px,4vw,42px);line-height:1.15;letter-spacing:-.045em;font-weight:850}
+body.mathcourse-site .mc-course-center__hero p{max-width:560px;margin:12px 0 0;color:#748094;font-size:14px;line-height:1.8}
+body.mathcourse-site .mc-course-center__mark{position:relative;z-index:2;display:grid;place-items:center;width:92px;height:92px;border-radius:26px;background:#0d2942;color:#fff;font-size:38px;font-weight:650;box-shadow:0 18px 36px rgba(13,41,66,.16);transform:rotate(7deg)}
+body.mathcourse-site .mc-course-center__workspace{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;align-items:start}
+body.mathcourse-site .mc-course-center__sidebar{position:sticky;top:92px;padding:18px;border:1px solid #e3e9f0;border-radius:18px;background:#fff;box-shadow:0 9px 28px rgba(13,41,66,.045)}
+body.mathcourse-site .mc-course-center__side-title{padding:2px 3px 10px;color:#0d2942;font-size:13px;font-weight:800}
+body.mathcourse-site .mc-course-center__side-title:before{content:"";display:inline-block;width:3px;height:13px;margin-right:8px;vertical-align:-2px;border-radius:99px;background:#ff9418}
+body.mathcourse-site .mc-course-center__side-nav,.mc-course-center__grade-nav{display:grid;gap:4px}
+body.mathcourse-site .mc-course-center__side-nav a{display:flex;align-items:center;gap:9px;padding:10px 9px;border-radius:10px;color:#657487;font-size:12px;font-weight:650;transition:background .15s,color .15s}
+body.mathcourse-site .mc-course-center__side-nav a i{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#f1f5f9;color:#617084;font-size:11px;font-style:normal;font-weight:800}
+body.mathcourse-site .mc-course-center__side-nav a b{margin-left:auto;color:#a1acba;font-size:16px;font-weight:500}
+body.mathcourse-site .mc-course-center__side-nav a:hover{background:#f6f9fc;color:#0d2942}
+body.mathcourse-site .mc-course-center__side-nav a.is-active{background:#edf5ff;color:#1769e0}
+body.mathcourse-site .mc-course-center__side-nav a.is-active i{background:#1769e0;color:#fff}
+body.mathcourse-site .mc-course-center__side-nav a.is-active b{color:#1769e0}
+body.mathcourse-site .mc-course-center__side-divider{height:1px;margin:17px 0;border-top:1px solid #edf0f3}
+body.mathcourse-site .mc-course-center__side-title--grade{padding-bottom:8px}
+body.mathcourse-site .mc-course-center__grade-nav a{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:9px;color:#718096;font-size:12px}
+body.mathcourse-site .mc-course-center__grade-nav a b{font-size:12px;font-weight:700;color:#a5afbb}
+body.mathcourse-site .mc-course-center__grade-nav a:hover{background:#f7f9fb;color:#0d2942}
+body.mathcourse-site .mc-course-center__grade-nav a.is-active{background:#f1f5f9;color:#0d2942;font-weight:800}
+body.mathcourse-site .mc-course-center__grade-nav a.is-active b{color:#1769e0}
+body.mathcourse-site .mc-course-center__section-title{display:flex;align-items:end;justify-content:space-between;min-height:48px;margin-bottom:14px}
+body.mathcourse-site .mc-course-center__section-title>div>span{display:block;color:#0d2942;font-size:22px;line-height:1.3;font-weight:820;letter-spacing:-.025em}
+body.mathcourse-site .mc-course-center__section-title small{display:block;margin-top:5px;color:#8a96a6;font-size:11px}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center{margin:0}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center__grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center__card{border-radius:17px;box-shadow:0 8px 26px rgba(13,41,66,.05)}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center__card:hover{transform:translateY(-3px);box-shadow:0 15px 34px rgba(13,41,66,.095)}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center__body{padding:15px 16px 16px}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center__title{font-size:16px}
+body.mathcourse-site .mc-course-center__course-list .mathcourse-center__button{margin-top:13px}
+@media (max-width:900px){body.mathcourse-site .mc-course-center__workspace{grid-template-columns:190px minmax(0,1fr);gap:20px}body.mathcourse-site .mc-course-center__course-list .mathcourse-center__grid{grid-template-columns:1fr}}
+@media (max-width:700px){body.mathcourse-site .mc-course-center{padding:20px 0 48px}body.mathcourse-site .mc-course-center>.mc-container{width:min(100% - 28px,620px)}body.mathcourse-site .mc-course-center__hero{min-height:0;margin-bottom:18px;padding:24px 22px;border-radius:19px}body.mathcourse-site .mc-course-center__hero p{font-size:13px}body.mathcourse-site .mc-course-center__mark{width:62px;height:62px;border-radius:18px;font-size:27px}body.mathcourse-site .mc-course-center__workspace{display:block}body.mathcourse-site .mc-course-center__sidebar{position:static;margin-bottom:18px;padding:12px}body.mathcourse-site .mc-course-center__side-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}body.mathcourse-site .mc-course-center__side-nav a{justify-content:center;padding:8px 5px;font-size:11px;gap:5px}body.mathcourse-site .mc-course-center__side-nav a i{width:25px;height:25px}body.mathcourse-site .mc-course-center__side-nav a span{white-space:nowrap}body.mathcourse-site .mc-course-center__side-nav a b{display:none}body.mathcourse-site .mc-course-center__side-divider{margin:11px 0}body.mathcourse-site .mc-course-center__grade-nav{display:flex;gap:5px}body.mathcourse-site .mc-course-center__grade-nav a{flex:1;justify-content:center;padding:7px 6px;font-size:11px}body.mathcourse-site .mc-course-center__grade-nav a b{display:none}body.mathcourse-site .mc-course-center__section-title{min-height:0;margin-bottom:12px}body.mathcourse-site .mc-course-center__section-title>div>span{font-size:20px}body.mathcourse-site .mc-course-center__course-list .mathcourse-center__grid{grid-template-columns:1fr;gap:14px}}
