@@ -1,0 +1,42 @@
+/*
+Theme Name: 樊老师数学课堂 (Math Learning Platform Theme)
+Theme URI: https://fanmath.com
+Author: 樊老师教学教研团队
+Author URI: https://fanmath.com
+Description: 专为初中数学知识体系与教辅配套打造的 WordPress 表现层主题，100% 严格遵循《Math Learning Platform 前端主题开发接口规范 V1.0》。通过 MathCourse\Course\Course_Service 服务接口解耦，完美对接后台插件业务、Tutor LMS 适配、HLS 视频保护、试看权限与学习中心进度管理。
+Version: 1.0.0
+Requires at least: 5.8
+Tested up to: 6.7
+Requires PHP: 7.4
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: mathcourse
+Tags: education, math, video-course, responsive, tailwindcss, tutor-lms, mobile-first
+*/
+
+/* 基础排版重置与字体加载 */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 数学公式字体样式优化 */
+.math-formula {
+  font-family: "KaTeX_Math", "Cambria Math", "Times New Roman", serif;
+}
+
+/* 章节多层手风琴独立滚动区域样式 */
+.mc-theme-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.mc-theme-scrollbar::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+.mc-theme-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+.mc-theme-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
