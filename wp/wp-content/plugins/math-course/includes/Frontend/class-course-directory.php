@@ -30,8 +30,18 @@ class Course_Directory {
         return $page ? get_permalink($page) : home_url('/course-center/');
     }
 
+    private function learning_player_url($course_id, $lesson_id = 0) {
+        $page = get_page_by_path('learning');
+        if (!$page) $page = get_page_by_path('xueyuan-denglu');
+        $base = $page ? get_permalink($page) : home_url('/learning/');
+        $args = array('course_id' => absint($course_id));
+        if ($lesson_id) $args['lesson_id'] = absint($lesson_id);
+        return add_query_arg($args, $base);
+    }
+
     private function course_detail_url($course_id) {
-        return add_query_arg('course_id', absint($course_id), $this->course_center_url());
+        // Kept as a compatibility wrapper: course cards intentionally skip a detail page.
+        return $this->learning_player_url($course_id);
     }
 
     private function render_course_center() {
@@ -79,7 +89,7 @@ class Course_Directory {
         foreach($courses as $course){$data=$this->service->get_course_directory($course->ID,$user_id);if(!$data||empty($data['access']))continue;$progress=$data['progress']??array('completed'=>0,'total'=>0,'percent'=>0);$continue=$this->find_continue_lesson($data);$cards[]=array('data'=>$data,'progress'=>$progress,'continue'=>$continue);}
         ob_start(); ?>
         <div class="mathcourse-learning-center"><div class="mathcourse-learning-center__heading"><h1>我的课程</h1><p>已授权课程与学习进度</p></div>
-        <?php if(empty($cards)): ?><div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div><?php else: ?><div class="mathcourse-learning-center__grid"><?php foreach($cards as $card):$data=$card['data'];$progress=$card['progress'];$continue=$card['continue'];?><article class="mathcourse-learning-center__card"><div class="mathcourse-learning-center__cover"><?php if(!empty($data['cover'])):?><img src="<?php echo esc_url($data['cover']); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy"><?php else:?><span>数学课程</span><?php endif;?></div><div class="mathcourse-learning-center__body"><h2><?php echo esc_html($data['title']); ?></h2><div class="mathcourse-learning-center__progress-row"><span>学习进度</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong><em><?php echo esc_html($progress['percent']); ?>%</em></div><div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div><a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->course_detail_url($data['id'])); ?>"><?php echo !empty($progress['completed'])?'继续学习':'开始学习'; ?><span>→</span></a></div></article><?php endforeach;?></div><?php endif;?></div>
+        <?php if(empty($cards)): ?><div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div><?php else: ?><div class="mathcourse-learning-center__grid"><?php foreach($cards as $card):$data=$card['data'];$progress=$card['progress'];$continue=$card['continue'];?><article class="mathcourse-learning-center__card"><div class="mathcourse-learning-center__cover"><?php if(!empty($data['cover'])):?><img src="<?php echo esc_url($data['cover']); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy"><?php else:?><span>数学课程</span><?php endif;?></div><div class="mathcourse-learning-center__body"><h2><?php echo esc_html($data['title']); ?></h2><div class="mathcourse-learning-center__progress-row"><span>学习进度</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong><em><?php echo esc_html($progress['percent']); ?>%</em></div><div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div><a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->learning_player_url($data['id'])); ?>"><?php echo !empty($progress['completed'])?'继续学习':'开始学习'; ?><span>→</span></a></div></article><?php endforeach;?></div><?php endif;?></div>
         <?php return ob_get_clean();
     }
 
