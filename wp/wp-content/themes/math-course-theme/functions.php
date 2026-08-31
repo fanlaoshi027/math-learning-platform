@@ -30,6 +30,7 @@ function mc_theme_assets() {
 	$learning_nav_path=get_stylesheet_directory().'/assets/css/learning-nav.css';
 	$polish_path=get_stylesheet_directory().'/assets/css/course-ui-polish.css';
 	$learning_polish_path=get_stylesheet_directory().'/assets/css/learning-ui-polish.css';
+	$learning_center_ui_path=get_stylesheet_directory().'/assets/css/learning-center-ui-v1.css';
 	$home_path=get_stylesheet_directory().'/assets/css/home-ui-v2.css';
 	$reference_override_path=get_stylesheet_directory().'/assets/css/ui-reference-override.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
@@ -43,13 +44,14 @@ function mc_theme_assets() {
 	$nav_version=file_exists($learning_nav_path)?(string)filemtime($learning_nav_path):'1.0.0';
 	$polish_version=file_exists($polish_path)?(string)filemtime($polish_path):'1.0.0';
 	$learning_polish_version=file_exists($learning_polish_path)?(string)filemtime($learning_polish_path):'1.0.0';
+	$learning_center_ui_version=file_exists($learning_center_ui_path)?(string)filemtime($learning_center_ui_path):'1.0.0';
 	$home_version=file_exists($home_path)?(string)filemtime($home_path):'1.0.0';
 	$reference_override_version=file_exists($reference_override_path)?(string)filemtime($reference_override_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
 	$cover_version=file_exists($cover_path)?(string)filemtime($cover_path):'1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
 	$queried_content=get_post_field('post_content',get_queried_object_id());
-	$load_course_ui=is_front_page()||is_page(array('course-center','xueyuan-denglu','learning'));
+	$load_course_ui=is_front_page()||is_page(array('course-center','xueyuan-denglu','learning','learning-center'));
 	if(!$load_course_ui){$load_course_ui=has_shortcode($queried_content,'mathcourse_course_player')||has_shortcode($queried_content,'mathcourse_course_learning')||has_shortcode($queried_content,'math_course_center_v82')||has_shortcode($queried_content,'math_student_login');}
 	if($load_course_ui){
 		wp_enqueue_style('mc-reference-ui',get_stylesheet_directory_uri().'/assets/css/reference-ui.css',array('mc-theme-style'),$ui_version);
@@ -61,6 +63,9 @@ function mc_theme_assets() {
 	if(is_front_page()){
 		wp_enqueue_style('mc-home-ui-v2',get_stylesheet_directory_uri().'/assets/css/home-ui-v2.css',array('mc-course-ui-polish'),$home_version);
 	}
+	if(is_page('learning-center')){
+		wp_enqueue_style('mc-learning-center-ui-v1',get_stylesheet_directory_uri().'/assets/css/learning-center-ui-v1.css',array('mc-course-cover'),$learning_center_ui_version);
+	}
 	if($load_course_ui&&(isset($_GET['course_id'])||has_shortcode($queried_content,'mathcourse_course_directory')||is_front_page())){
 		wp_enqueue_style('mc-course-detail',get_stylesheet_directory_uri().'/assets/css/course-detail.css',array('mc-ui-scale'),$detail_version);
 	}
@@ -69,8 +74,10 @@ function mc_theme_assets() {
 		wp_enqueue_style('mc-learning-states',get_stylesheet_directory_uri().'/assets/css/learning-states.css',array('mc-learning'),$states_version);
 		wp_enqueue_style('mc-learning-nav',get_stylesheet_directory_uri().'/assets/css/learning-nav.css',array('mc-learning-states'),$nav_version);
 		wp_enqueue_style('mc-learning-ui-polish',get_stylesheet_directory_uri().'/assets/css/learning-ui-polish.css',array('mc-learning-nav'),$learning_polish_version);
+		$player_ui_path=get_stylesheet_directory().'/assets/css/course-player-ui-v1.css';
+		if(file_exists($player_ui_path)) wp_enqueue_style('mc-course-player-ui-v1',get_stylesheet_directory_uri().'/assets/css/course-player-ui-v1.css',array('mc-learning-ui-polish'),(string)filemtime($player_ui_path));
 	}
-	wp_enqueue_style('mc-ui-reference-override',get_stylesheet_directory_uri().'/assets/css/ui-reference-override.css',array('mc-course-ui-polish','mc-learning-ui-polish'),$reference_override_version);
+	wp_enqueue_style('mc-ui-reference-override',get_stylesheet_directory_uri().'/assets/css/ui-reference-override.css',array('mc-course-ui-polish'),$reference_override_version);
 }
 add_action('wp_enqueue_scripts','mc_theme_assets');
 
