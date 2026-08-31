@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
             <a class="<?php echo is_front_page() ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/' ) ); ?>">首页</a>
             <a class="<?php echo is_page( 'course-center' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">课程中心</a>
             <a class="<?php echo is_page( 'learning-center' ) || is_page( 'learning' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">学习中心</a>
-            <a href="<?php echo esc_url( home_url( '/about-teacher/' ) ); ?>">关于老师</a>
+            <a href="<?php echo esc_url( home_url( '/#about-teacher' ) ); ?>">关于老师</a>
         </nav>
 
         <div class="mc-header-actions">
