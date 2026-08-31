@@ -20,7 +20,6 @@ if ( $course_id ) {
 	<div class="mc-container">
 		<header class="mc-course-center__hero">
 			<div>
-				<span class="mc-course-center__eyebrow">COURSE LIBRARY</span>
 				<h1>课程中心</h1>
 				<p>按知识体系和学习阶段选择课程，找到适合自己的学习路径。</p>
 			</div>
@@ -29,38 +28,26 @@ if ( $course_id ) {
 
 		<div class="mc-course-center__workspace">
 			<aside class="mc-course-center__sidebar" aria-label="课程筛选">
-				<div class="mc-course-center__side-title">
-					<span>知识体系</span>
-					<small>COURSE MAP</small>
-				</div>
+				<div class="mc-course-center__side-title"><span>知识体系</span></div>
 				<nav class="mc-course-center__side-nav">
 					<?php
 					$all_url   = remove_query_arg( array( 'course_id', 'course_type', 'course_grade' ), $center_url );
 					$topic_url = add_query_arg( array( 'course_type' => 'topic' ), remove_query_arg( array( 'course_id', 'course_grade' ), $center_url ) );
 					$book_url  = add_query_arg( array( 'course_type' => 'supplementary' ), remove_query_arg( array( 'course_id', 'course_grade' ), $center_url ) );
 					?>
-					<a class="<?php echo '' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $all_url ); ?>"><i>全部</i><span>全部课程</span><b>›</b></a>
-					<a class="<?php echo 'topic' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $topic_url ); ?>"><i>代</i><span>专题课程</span><b>›</b></a>
+					<a class="<?php echo '' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $all_url ); ?>"><i>全</i><span>全部课程</span><b>›</b></a>
+					<a class="<?php echo 'topic' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $topic_url ); ?>"><i>专</i><span>专题课程</span><b>›</b></a>
 					<a class="<?php echo 'supplementary' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $book_url ); ?>"><i>辅</i><span>教辅配套</span><b>›</b></a>
 				</nav>
 
 				<div class="mc-course-center__side-divider"></div>
-				<div class="mc-course-center__side-title mc-course-center__side-title--grade">
-					<span>学习阶段</span>
-					<small>GRADE</small>
-				</div>
+				<div class="mc-course-center__side-title mc-course-center__side-title--grade"><span>学习阶段</span></div>
 				<nav class="mc-course-center__grade-nav">
 					<?php
-					$grades = array(
-						'7' => '七年级',
-						'8' => '八年级',
-						'9' => '九年级',
-					);
+					$grades = array( '7' => '七年级', '8' => '八年级', '9' => '九年级' );
 					foreach ( $grades as $grade_value => $grade_label ) {
 						$grade_args = array( 'course_grade' => $grade_value );
-						if ( $type ) {
-							$grade_args['course_type'] = $type;
-						}
+						if ( $type ) $grade_args['course_type'] = $type;
 						$grade_url = add_query_arg( $grade_args, remove_query_arg( array( 'course_id', 'course_type', 'course_grade' ), $center_url ) );
 						$is_active = $grade === $grade_value;
 						echo '<a class="' . ( $is_active ? 'is-active' : '' ) . '" href="' . esc_url( $grade_url ) . '"><span>' . esc_html( $grade_label ) . '</span><b>' . ( $is_active ? '✓' : '›' ) . '</b></a>';
@@ -75,7 +62,6 @@ if ( $course_id ) {
 						<span><?php echo esc_html( 'topic' === $type ? '专题课程' : ( 'supplementary' === $type ? '教辅配套' : '全部课程' ) ); ?></span>
 						<small><?php echo $grade ? esc_html( ( $grades[ $grade ] ?? $grade ) . ' · ' ) : ''; ?>选择课程开始学习</small>
 					</div>
-					<span class="mc-course-center__count-label">COURSES</span>
 				</div>
 				<?php
 				if ( shortcode_exists( 'mathcourse_course_directory' ) ) {
