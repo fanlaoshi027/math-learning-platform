@@ -37,6 +37,7 @@ function mc_theme_assets() {
 	$cover_path = get_stylesheet_directory() . '/assets/css/course-cover.css';
 	$course_center_v2_path = get_stylesheet_directory() . '/assets/css/course-center-v2.css';
 	$learning_v2_path = get_stylesheet_directory() . '/assets/css/learning-v2.css';
+	$course_card_v2_path = get_stylesheet_directory() . '/assets/css/course-card-v2.css';
 	$version = file_exists( $style_path ) ? (string) filemtime( $style_path ) : '0.2.0';
 	$ui_version = file_exists( $ui_path ) ? (string) filemtime( $ui_path ) : '0.3.0';
 	$scale_version = file_exists( $scale_path ) ? (string) filemtime( $scale_path ) : '1.0.0';
@@ -53,6 +54,7 @@ function mc_theme_assets() {
 	$cover_version = file_exists( $cover_path ) ? (string) filemtime( $cover_path ) : '1.0.0';
 	$course_center_v2_version = file_exists( $course_center_v2_path ) ? (string) filemtime( $course_center_v2_path ) : '1.0.0';
 	$learning_v2_version = file_exists( $learning_v2_path ) ? (string) filemtime( $learning_v2_path ) : '1.0.0';
+	$course_card_v2_version = file_exists( $course_card_v2_path ) ? (string) filemtime( $course_card_v2_path ) : '1.0.0';
 
 	wp_enqueue_style( 'mc-theme-style', get_stylesheet_uri(), array(), $version );
 	$queried_content = get_post_field( 'post_content', get_queried_object_id() );
@@ -67,21 +69,21 @@ function mc_theme_assets() {
 		wp_enqueue_style( 'mc-course-cover', get_stylesheet_directory_uri() . '/assets/css/course-cover.css', array( 'mc-course-ui-polish' ), $cover_version );
 	}
 	wp_enqueue_style( 'mc-header-ui-polish', get_stylesheet_directory_uri() . '/assets/css/header-ui-polish.css', array( 'mc-theme-style' ), $header_polish_version );
-
-	/* Legacy/reference overrides load before the final v2 layers. */
 	wp_enqueue_style( 'mc-ui-reference-override', get_stylesheet_directory_uri() . '/assets/css/ui-reference-override.css', array( 'mc-course-ui-polish' ), $reference_override_version );
-
+	if ( $load_course_ui ) {
+		wp_enqueue_style( 'mc-course-card-v2', get_stylesheet_directory_uri() . '/assets/css/course-card-v2.css', array( 'mc-ui-reference-override' ), $course_card_v2_version );
+	}
 	if ( is_front_page() ) {
-		wp_enqueue_style( 'mc-home-ui-v2', get_stylesheet_directory_uri() . '/assets/css/home-ui-v2.css', array( 'mc-ui-reference-override' ), $home_version );
+		wp_enqueue_style( 'mc-home-ui-v2', get_stylesheet_directory_uri() . '/assets/css/home-ui-v2.css', array( 'mc-course-card-v2' ), $home_version );
 	}
 	if ( is_page( 'learning-center' ) ) {
-		wp_enqueue_style( 'mc-learning-center-ui-v1', get_stylesheet_directory_uri() . '/assets/css/learning-center-ui-v1.css', array( 'mc-ui-reference-override' ), $learning_center_ui_version );
+		wp_enqueue_style( 'mc-learning-center-ui-v1', get_stylesheet_directory_uri() . '/assets/css/learning-center-ui-v1.css', array( 'mc-course-card-v2' ), $learning_center_ui_version );
 	}
 	if ( is_page( 'course-center' ) ) {
-		wp_enqueue_style( 'mc-course-center-v2', get_stylesheet_directory_uri() . '/assets/css/course-center-v2.css', array( 'mc-ui-reference-override' ), $course_center_v2_version );
+		wp_enqueue_style( 'mc-course-center-v2', get_stylesheet_directory_uri() . '/assets/css/course-center-v2.css', array( 'mc-course-card-v2' ), $course_center_v2_version );
 	}
 	if ( $load_course_ui && ( isset( $_GET['course_id'] ) || has_shortcode( $queried_content, 'mathcourse_course_directory' ) || is_front_page() ) ) {
-		wp_enqueue_style( 'mc-course-detail', get_stylesheet_directory_uri() . '/assets/css/course-detail.css', array( 'mc-ui-scale' ), $detail_version );
+		wp_enqueue_style( 'mc-course-detail', get_stylesheet_directory_uri() . '/assets/css/course-detail.css', array( 'mc-course-card-v2' ), $detail_version );
 	}
 	if ( is_page( 'learning' ) || is_page_template( 'page-learning.php' ) ) {
 		wp_enqueue_style( 'mc-learning', get_stylesheet_directory_uri() . '/assets/css/learning.css', array( 'mc-ui-scale' ), $learning_version );
