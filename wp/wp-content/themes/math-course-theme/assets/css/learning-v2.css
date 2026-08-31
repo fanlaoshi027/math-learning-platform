@@ -1,0 +1,20 @@
+/* UI v2: learning page visual layer. Business/player markup remains unchanged. */
+body.mathcourse-site .mc-learning-page{padding:24px 0 56px;background:#f8fafc;color:#1e293b}
+body.mathcourse-site .mc-learning-container{width:min(1200px,calc(100% - 32px));margin:0 auto}
+body.mathcourse-site .mc-learning-page .mc-learning-breadcrumb,
+body.mathcourse-site .mc-learning-page nav.mc-breadcrumb{margin:0 0 14px;color:#64748b;font-size:12px}
+body.mathcourse-site .mc-learning-page .mc-learning-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:24px;align-items:start}
+body.mathcourse-site .mc-learning-page .mc-video-card{margin:0 0 14px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 18px rgba(15,23,42,.055);overflow:hidden}
+body.mathcourse-site .mc-learning-page .mc-video-box{background:#0f172a}
+body.mathcourse-site .mc-learning-page .mc-lesson-card{margin:0 0 14px;padding:15px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;box-shadow:0 4px 16px rgba(15,23,42,.04)}
+body.mathcourse-site .mc-learning-page .mc-lesson-header h1{font-size:17px;line-height:1.45;color:#0f172a}
+body.mathcourse-site .mc-learning-page .mc-outline-card{margin:0;padding:0;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 18px rgba(15,23,42,.055);overflow:hidden}
+body.mathcourse-site .mc-learning-page .mc-outline-card h2{margin:0;padding:15px 17px;border-bottom:1px solid #e8edf3;background:#f8fafc;color:#0f172a;font-size:14px;font-weight:750}
+body.mathcourse-site .mc-learning-page .mc-outline-card a{min-height:45px;padding:0 14px;border-radius:9px;font-size:12px;transition:background .15s,color .15s}
+body.mathcourse-site .mc-learning-page .mc-outline-card a:hover{background:#f1f5f9;color:#2563eb}
+body.mathcourse-site .mc-learning-page .mc-outline-card a.is-active,
+body.mathcourse-site .mc-learning-page .mc-outline-card a[aria-current="page"]{background:#2563eb;color:#fff}
+body.mathcourse-site .mc-learning-page .mc-outline-card a+a{border-top:1px solid #f1f5f9}
+body.mathcourse-site .mc-learning-page .mc-complete-banner{border-color:#dbeafe;background:#eff6ff;color:#2563eb}
+@media(max-width:899px){body.mathcourse-site .mc-learning-page{padding:18px 0 40px}body.mathcourse-site .mc-learning-container{width:min(100% - 24px,760px)}body.mathcourse-site .mc-learning-page .mc-learning-layout{grid-template-columns:1fr;gap:14px}}
+@media(max-width:640px){body.mathcourse-site .mc-learning-page{padding:0 0 28px}body.mathcourse-site .mc-learning-container{width:100%;max-width:none}body.mathcourse-site .mc-learning-page .mc-video-card{border-radius:0;border-left:0;border-right:0;box-shadow:none;margin-bottom:10px}body.mathcourse-site .mc-learning-page .mc-lesson-card{margin:0 10px 10px;padding:13px 14px;border-radius:12px}body.mathcourse-site .mc-learning-page .mc-outline-card{margin:0 10px;border-radius:12px;box-shadow:0 3px 14px rgba(15,23,42,.045)}body.mathcourse-site .mc-learning-page .mc-outline-card h2{padding:14px 15px}body.mathcourse-site .mc-learning-page .mc-outline-card a{min-height:46px;padding:0 15px}}
