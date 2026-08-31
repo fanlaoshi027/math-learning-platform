@@ -35,6 +35,7 @@ function mc_theme_assets() {
 	$reference_override_path=get_stylesheet_directory().'/assets/css/ui-reference-override.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
 	$cover_path=get_stylesheet_directory().'/assets/css/course-cover.css';
+	$course_center_v2_path=get_stylesheet_directory().'/assets/css/course-center-v2.css';
 	$version=file_exists($style_path)?(string)filemtime($style_path):'0.2.0';
 	$ui_version=file_exists($ui_path)?(string)filemtime($ui_path):'0.3.0';
 	$scale_version=file_exists($scale_path)?(string)filemtime($scale_path):'1.0.0';
@@ -49,6 +50,7 @@ function mc_theme_assets() {
 	$reference_override_version=file_exists($reference_override_path)?(string)filemtime($reference_override_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
 	$cover_version=file_exists($cover_path)?(string)filemtime($cover_path):'1.0.0';
+	$course_center_v2_version=file_exists($course_center_v2_path)?(string)filemtime($course_center_v2_path):'1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
 	$queried_content=get_post_field('post_content',get_queried_object_id());
 	$load_course_ui=is_front_page()||is_page(array('course-center','xueyuan-denglu','learning','learning-center'));
@@ -65,6 +67,9 @@ function mc_theme_assets() {
 	}
 	if(is_page('learning-center')){
 		wp_enqueue_style('mc-learning-center-ui-v1',get_stylesheet_directory_uri().'/assets/css/learning-center-ui-v1.css',array('mc-course-cover'),$learning_center_ui_version);
+	}
+	if(is_page('course-center')){
+		wp_enqueue_style('mc-course-center-v2',get_stylesheet_directory_uri().'/assets/css/course-center-v2.css',array('mc-course-cover'),$course_center_v2_version);
 	}
 	if($load_course_ui&&(isset($_GET['course_id'])||has_shortcode($queried_content,'mathcourse_course_directory')||is_front_page())){
 		wp_enqueue_style('mc-course-detail',get_stylesheet_directory_uri().'/assets/css/course-detail.css',array('mc-ui-scale'),$detail_version);
