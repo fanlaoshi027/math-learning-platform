@@ -22,7 +22,11 @@ class Course_Directory {
         $atts = shortcode_atts(array('course_id' => 0), $atts, 'mathcourse_course_directory');
         $course_id = absint($atts['course_id']);
         if (!$course_id && isset($_GET['course_id'])) $course_id = absint($_GET['course_id']);
-        return $course_id ? $this->render_single_course($course_id) : $this->render_course_center();
+        if ($course_id) {
+            wp_safe_redirect($this->learning_player_url($course_id));
+            exit;
+        }
+        return $this->render_course_center();
     }
 
     private function course_center_url() {
@@ -40,14 +44,12 @@ class Course_Directory {
     }
 
     private function course_detail_url($course_id) {
-        // Kept as a compatibility wrapper: course cards intentionally skip a detail page.
         return $this->learning_player_url($course_id);
     }
 
     private function render_course_center() {
         if (!$this->tutor->is_available()) return '<p>课程系统暂不可用。</p>';
         $courses = $this->tutor->get_courses(false);
-
         $type_filter = isset($_GET['course_type']) ? sanitize_key(wp_unslash($_GET['course_type'])) : '';
         $grade_filter = isset($_GET['course_grade']) ? sanitize_key(wp_unslash($_GET['course_grade'])) : '';
         if (!in_array($type_filter, array('', 'topic', 'supplementary'), true)) $type_filter = '';
@@ -93,20 +95,6 @@ class Course_Directory {
         <?php return ob_get_clean();
     }
 
-    private function render_single_course($course_id) {
-        if(!$this->tutor->is_available())return '<p>课程系统暂不可用。</p>';
-        $data=$this->service->get_course_directory($course_id,get_current_user_id());if(!$data)return '<p>课程不存在或课程系统暂不可用。</p>';
-        $progress=$data['progress'];$has_access=!empty($data['access']);$is_logged_in=is_user_logged_in();$continue=$this->find_continue_lesson($data);
-        $lesson_count=$this->count_lessons($data['topics']);
-        ob_start(); ?>
-        <div class="mathcourse-directory" data-course-id="<?php echo esc_attr($data['id']); ?>"><div class="mathcourse-directory__header"><div class="mathcourse-directory__heading"><h1><?php echo esc_html($data['title']); ?></h1><?php if($has_access):?><div class="mathcourse-directory__progress"><div class="mathcourse-directory__progress-text">学习进度 <?php echo esc_html($progress['percent']); ?>% <span>（<?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?>）</span></div><div class="mathcourse-directory__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div></div><?php endif;?></div><?php if($continue&&!empty($continue['url'])):?><a class="mathcourse-directory__continue" href="<?php echo esc_url($continue['url']); ?>"><span><?php echo $has_access&&!empty($progress['completed'])?'继续学习':'开始学习'; ?></span><strong><?php echo esc_html($continue['title']); ?></strong><span>→</span></a><?php endif;?></div>
-        <?php if(!$has_access):?><div class="mathcourse-directory__notice"><strong><?php echo $is_logged_in?'你还没有获得本课程的学习授权':'本课程部分内容可免费试看'; ?></strong><span><?php echo $is_logged_in?'标记“试看”的课时可以直接观看，其余课时需要授权。':'标记“试看”的课时可以直接观看，其余课时需要登录并获得课程授权。'; ?></span></div><?php endif;?>
-        <?php if(!$lesson_count): ?><div class="mathcourse-directory__empty"><strong>课程内容正在准备中</strong><span>本课程暂时还没有可学习的课时。</span></div><?php else: ?>
-        <?php foreach($data['topics'] as $index=>$topic): if(empty($topic['lessons'])) continue; ?><section class="mathcourse-directory__topic"><h2 class="mathcourse-directory__topic-title"><span><?php echo esc_html($index+1); ?></span><?php echo esc_html($topic['title']); ?></h2><div class="mathcourse-directory__lessons"><?php foreach($topic['lessons'] as $lesson):?><?php if($lesson['accessible']):?><a class="mathcourse-directory__lesson <?php echo $lesson['completed']?'is-complete':''; ?>" href="<?php echo esc_url($lesson['url']); ?>"><span class="mathcourse-directory__status"><?php echo $lesson['completed']?'✓':'○'; ?></span><span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span><?php if($lesson['preview']):?><span class="mathcourse-directory__preview">试看</span><?php endif;?></a><?php else:?><button type="button" class="mathcourse-directory__lesson is-locked" data-mathcourse-lock="1" data-course-title="<?php echo esc_attr($data['title']); ?>"><span class="mathcourse-directory__status">🔒</span><span class="mathcourse-directory__lesson-title"><?php echo esc_html($lesson['title']); ?></span><span class="mathcourse-directory__locked">需授权</span></button><?php endif;?><?php endforeach;?></div></section><?php endforeach; ?>
-        <?php endif; ?></div>
-        <?php return ob_get_clean();
-    }
-
     private function find_continue_lesson($data) {
         if(empty($data['topics']))return null;
         if(empty($data['access'])){
@@ -122,9 +110,5 @@ class Course_Directory {
 
     private function grade_label($grade) {
         $labels=array('7'=>'七年级','8'=>'八年级','9'=>'九年级');return $labels[(string)$grade]??$grade;
-    }
-
-    private function count_lessons($topics) {
-        $count=0; foreach($topics as $topic) $count += !empty($topic['lessons']) ? count($topic['lessons']) : 0; return $count;
     }
 }
