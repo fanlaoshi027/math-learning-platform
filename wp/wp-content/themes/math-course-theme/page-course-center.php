@@ -8,8 +8,6 @@ $center_url = get_permalink();
 $type       = isset( $_GET['course_type'] ) ? sanitize_key( wp_unslash( $_GET['course_type'] ) ) : '';
 $grade      = isset( $_GET['course_grade'] ) ? sanitize_key( wp_unslash( $_GET['course_grade'] ) ) : '';
 
-// The public product flow has no course-detail page. Any direct course-center
-// course URL is treated as a compatibility entry and sent to the player.
 if ( $course_id ) {
 	$learning_page = get_page_by_path( 'learning' );
 	$learning_url  = $learning_page ? get_permalink( $learning_page ) : home_url( '/learning/' );
@@ -81,7 +79,7 @@ if ( $course_id ) {
 				</div>
 				<?php
 				if ( shortcode_exists( 'mathcourse_course_directory' ) ) {
-					echo do_shortcode( '[mathcourse_course_directory]' );
+					echo do_shortcode( '[mathcourse_course_directory show_filters="0"]' );
 				} else {
 					echo '<div class="mc-course-center__empty">课程中心插件未启用。</div>';
 				}
