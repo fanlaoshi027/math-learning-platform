@@ -10,6 +10,7 @@ class Course_Player {
         wp_enqueue_style('mathcourse-course-player', MATHCOURSE_URL . 'assets/course-player.css', array(), MATHCOURSE_VERSION);
         wp_enqueue_style('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/css/course-outline-accordion.css', array('mathcourse-course-player'), MATHCOURSE_VERSION);
         wp_enqueue_style('mathcourse-lock-modal-ui', MATHCOURSE_URL . 'assets/lock-modal-ui.css', array('mathcourse-course-player'), MATHCOURSE_VERSION);
+        wp_enqueue_style('mathcourse-course-player-ui-v2', MATHCOURSE_URL . 'assets/course-player-ui-v2.css', array('mathcourse-course-player','mathcourse-course-outline-accordion'), MATHCOURSE_VERSION);
         wp_enqueue_script('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/js/course-outline-accordion.js', array(), MATHCOURSE_VERSION, true);
         wp_enqueue_script('mathcourse-course-directory-lock-modal', MATHCOURSE_URL . 'assets/course-directory.js', array(), MATHCOURSE_VERSION, true);
     }
