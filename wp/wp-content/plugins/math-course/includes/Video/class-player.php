@@ -10,6 +10,7 @@ class Player {
         wp_enqueue_style( 'video-js', 'https://vjs.zencdn.net/8.10.0/video-js.css', array(), '8.10.0' );
         wp_enqueue_style( 'mathcourse-course-player-large', MATHCOURSE_URL . 'assets/course-player-large.css', array( 'video-js' ), MATHCOURSE_VERSION );
         wp_enqueue_style( 'mathcourse-reference-player-ui', MATHCOURSE_URL . 'assets/reference-player-ui.css', array( 'mathcourse-course-player-large' ), MATHCOURSE_VERSION );
+        wp_enqueue_style( 'mathcourse-player-ui-v2', MATHCOURSE_URL . 'assets/player-ui-v2.css', array( 'mathcourse-reference-player-ui' ), MATHCOURSE_VERSION );
         wp_enqueue_script( 'video-js', 'https://vjs.zencdn.net/8.10.0/video.min.js', array(), '8.10.0', true );
         wp_enqueue_script( 'mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array( 'video-js' ), MATHCOURSE_VERSION, true );
         wp_enqueue_script( 'mathcourse-player-controls', MATHCOURSE_URL . 'assets/js/player-controls.js', array( 'video-js', 'mathcourse-player' ), MATHCOURSE_VERSION, true );
