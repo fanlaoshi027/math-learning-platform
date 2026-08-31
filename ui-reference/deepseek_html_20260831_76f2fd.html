@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课程中心 - 樊老师数学课堂</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Microsoft YaHei', sans-serif; }
+body { background: #f9f9f9; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+/* 头部样式同上 */
+.header { background: #fff; border-bottom: 1px solid #eee; padding: 15px 0; }
+.header .container { display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 20px; font-weight: bold; color: #111; }
+.logo span { color: #ff8c00; }
+.menu a { text-decoration: none; color: #333; margin: 0 15px; font-size: 14px; }
+.menu a.active { color: #ff8c00; font-weight: bold; }
+.login-btns a { text-decoration: none; font-size: 14px; color: #333; margin-left: 10px; }
+.login-btns a.reg { background: #ff8c00; color: #fff; padding: 8px 15px; border-radius: 20px; }
+
+/* 主体布局 */
+.main-layout { display: flex; margin-top: 20px; background: #fff; border-radius: 10px; overflow: hidden; }
+/* 侧边栏 */
+.sidebar { width: 250px; border-right: 1px solid #eee; padding: 20px; }
+.sidebar-group { margin-bottom: 30px; }
+.sidebar-group h3 { font-size: 16px; margin-bottom: 15px; }
+.sidebar-group ul { list-style: none; }
+.sidebar-group ul li { padding: 10px; margin-bottom: 5px; cursor: pointer; font-size: 14px; color: #666; border-radius: 5px; }
+.sidebar-group ul li:hover, .sidebar-group ul li.active { background: #f0f7ff; color: #4a6cf7; font-weight: bold; }
+/* 主内容 */
+.main-content { flex: 1; padding: 20px 30px; }
+.topic-header { font-size: 24px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px dashed #ddd; padding-bottom: 15px; }
+.topic-header span { font-size: 14px; font-weight: normal; color: #888; margin-left: 10px; }
+/* 网格卡片 */
+.grid-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 40px; }
+.course-card { background: #fff; border: 1px solid #eee; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
+.course-card-img { height: 80px; background: linear-gradient(135deg, #e0eafc, #cfdef3); display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #4a6cf7; }
+.course-card-body { padding: 15px; }
+.course-card-body h4 { font-size: 16px; margin-bottom: 5px; }
+.course-card-body p { font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="container">
+        <div class="logo">樊老师<span>数学课堂</span></div>
+        <div class="menu">
+            <a href="#">首页</a>
+            <a href="#" class="active">课程中心</a>
+            <a href="#">学习中心</a>
+            <a href="#">关于老师</a>
+        </div>
+        <div style="width: 200px;"></div>
+        <div class="login-btns">
+            <a href="#">登录</a>
+            <a href="#" class="reg">注册</a>
+        </div>
+    </div>
+</div>
+
+<div class="container main-layout">
+    <!-- 左侧导航 -->
+    <div class="sidebar">
+        <div class="sidebar-group">
+            <h3>课程中心</h3>
+            <ul>
+                <li class="active">初中数学专题</li>
+            </ul>
+        </div>
+        <div class="sidebar-group">
+            <h3>知识体系</h3>
+            <ul>
+                <li>代数 (10个专题)</li>
+                <li>几何 (6个专题)</li>
+                <li>函数 (4个专题)</li>
+            </ul>
+        </div>
+        <div class="sidebar-group">
+            <h3>学习专题</h3>
+            <ul>
+                <li>七年级</li>
+                <li>八年级</li>
+                <li>九年级</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 右侧内容区 -->
+    <div class="main-content">
+        <div class="topic-header">代数 <span>10个专题</span></div>
+        <div class="grid-cards">
+            <div class="course-card">
+                <div class="course-card-img">有</div>
+                <div class="course-card-body"><h4>有理数</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #fce4ec; color:#e91e63;">整</div>
+                <div class="course-card-body"><h4>整式</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #fff3e0; color:#ff9800;">方</div>
+                <div class="course-card-body"><h4>一元一次方程</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #e8f5e9; color:#4caf50;">不</div>
+                <div class="course-card-body"><h4>一元一次不等式</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #e3f2fd; color:#2196f3;">二</div>
+                <div class="course-card-body"><h4>二元一次方程组</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #f3e5f5; color:#9c27b0;">根</div>
+                <div class="course-card-body"><h4>二次根式</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img">元</div>
+                <div class="course-card-body"><h4>一元二次方程</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #e0f7fa; color:#00bcd4;">分</div>
+                <div class="course-card-body"><h4>分式方程</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #ffebee; color:#f44336;">绝</div>
+                <div class="course-card-body"><h4>不等式组与绝对值</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #fffde7; color:#ffeb3b;">因</div>
+                <div class="course-card-body"><h4>因式分解</h4><p>1讲</p></div>
+            </div>
+        </div>
+
+        <div class="topic-header">几何 <span>6个专题</span></div>
+        <div class="grid-cards">
+            <div class="course-card">
+                <div class="course-card-img" style="background: #fce4ec; color:#e91e63;">线</div>
+                <div class="course-card-body"><h4>线段与角</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #fff3e0; color:#ff9800;">三</div>
+                <div class="course-card-body"><h4>三角形</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #e8f5e9; color:#4caf50;">全</div>
+                <div class="course-card-body"><h4>全等三角形</h4><p>1讲</p></div>
+            </div>
+            <div class="course-card">
+                <div class="course-card-img" style="background: #e3f2fd; color:#2196f3;">相</div>
+                <div class="course-card-body"><h4>相似三角形</h4><p>1讲</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

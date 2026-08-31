@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学习页 - 课程学习</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Microsoft YaHei', sans-serif; }
+body { background: #f5f7fa; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+/* Header 同上 */
+.header { background: #fff; border-bottom: 1px solid #eee; padding: 15px 0; }
+.header .container { display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 20px; font-weight: bold; color: #111; }
+.logo span { color: #ff8c00; }
+.menu a { text-decoration: none; color: #333; margin: 0 15px; font-size: 14px; }
+.menu a.active { color: #ff8c00; font-weight: bold; }
+
+/* 标题进度条 */
+.course-header { background: #fff; padding: 15px 0; margin-bottom: 20px; border-bottom: 1px solid #eee; }
+.course-header .container { display: flex; justify-content: space-between; align-items: center; }
+.course-title { font-size: 18px; font-weight: bold; }
+.course-progress { font-size: 14px; color: #666; }
+.progress-bar { width: 200px; height: 8px; background: #ddd; border-radius: 5px; overflow: hidden; margin-top: 5px; }
+.progress-fill { height: 100%; width: 25%; background: #ff8c00; }
+
+/* 主体布局：侧边栏在左，视频在右 */
+.study-layout { display: flex; gap: 20px; }
+.sidebar { width: 280px; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #eee; height: 600px; overflow-y: auto; }
+.sidebar-header { padding: 15px; font-weight: bold; font-size: 16px; border-bottom: 1px solid #eee; }
+.sidebar-list { list-style: none; }
+.sidebar-list li { padding: 15px; font-size: 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #f9f9f9; cursor: pointer; color: #333; }
+.sidebar-list li.active { background: #fff8e1; border-left: 4px solid #ff8c00; font-weight: bold; }
+.sidebar-list li.completed span:first-child::after { content: " ✔"; color: green; }
+.sidebar-list li span:last-child { color: #999; }
+
+/* 主内容区 */
+.main-area { flex: 1; }
+.video-box { background: #111; border-radius: 10px; overflow: hidden; position: relative; height: 500px; display: flex; justify-content: center; align-items: center; }
+.play-btn { width: 80px; height: 80px; background: rgba(255,255,255,0.8); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; color: #333; cursor: pointer; }
+.video-title { position: absolute; bottom: 20px; left: 20px; color: #fff; font-size: 16px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 5px; }
+
+.nav-buttons { display: flex; justify-content: space-between; margin-top: 20px; background: #fff; padding: 15px; border-radius: 10px; }
+.btn { padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px; border: none; }
+.btn-gray { background: #f0f0f0; color: #333; }
+.btn-orange { background: #ff8c00; color: #fff; }
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="container">
+        <div class="logo">樊老师<span>数学课堂</span></div>
+        <div class="menu">
+            <a href="#">首页</a>
+            <a href="#">课程中心</a>
+            <a href="#" class="active">学习中心</a>
+            <a href="#">关于老师</a>
+        </div>
+    </div>
+</div>
+
+<div class="course-header">
+    <div class="container">
+        <div class="course-title">全等三角形 (第 1 讲 / 共 6 讲)</div>
+        <div class="course-progress">
+            学习进度 25%
+            <div class="progress-bar"><div class="progress-fill"></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="container study-layout">
+    <!-- 左侧侧边栏目录 -->
+    <div class="sidebar">
+        <div class="sidebar-header">课程目录</div>
+        <ul class="sidebar-list">
+            <li class="completed active"><span>第 1 讲 全等三角形的概念与表示</span><span>25:00</span></li>
+            <li class="completed"><span>第 2 讲 全等三角形的判定 (SSS)</span><span>24:30</span></li>
+            <li class="completed"><span>第 3 讲 全等三角形的判定 (SAS)</span><span>20:10</span></li>
+            <li><span>第 4 讲 全等三角形的判定 (ASA)</span><span>22:40</span></li>
+            <li><span>第 5 讲 角平分线的性质</span><span>15:20</span></li>
+            <li><span>第 6 讲 全等三角形的综合应用</span><span>30:00</span></li>
+        </ul>
+    </div>
+
+    <!-- 右侧视频区域 -->
+    <div class="main-area">
+        <div class="video-box">
+            <div class="play-btn">▶</div>
+            <div class="video-title">第 1 讲 全等三角形的概念与表示</div>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-gray">上一讲</button>
+            <button class="btn btn-orange">下一讲 (标记已学)</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
