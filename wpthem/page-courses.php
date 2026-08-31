@@ -1,25 +1,40 @@
 <?php
 /**
  * Template Name: 课程中心 (Course Center)
- * 遵循《前端页面开发规范 V1.0》第 5 条：展示全部公开课程，支持筛选，点击直达 /learning/?course_id={ID}，杜绝独立详情页。
- * 
+ * UI Migration V2 - Mobile first course showcase
+ *
  * @package MathCourse_Theme
  */
 
 get_header();
 ?>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
-  <!-- 页面标题 -->
-  <div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">课程中心</h1>
-    <p class="text-slate-600 text-xs sm:text-sm mt-1">
-      涵盖初中数学全部知识体系与《大培优》经典教辅精讲，点击卡片直接进入学习页面。
-    </p>
-  </div>
+<main class="min-h-screen bg-slate-50 py-6 sm:py-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-  <!-- 课程中心 Shortcode 容器 -->
-  <?php echo do_shortcode('[mathcourse_course_center]'); ?>
-</div>
+    <!-- Hero -->
+    <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0b1329] via-[#132b55] to-[#0f3d6e] px-5 py-8 sm:px-10 sm:py-12 mb-8 shadow-xl">
+      <div class="relative z-10 max-w-3xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs mb-4">
+          <span class="w-2 h-2 rounded-full bg-orange-400"></span>
+          初中数学系统课程
+        </div>
+        <h1 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+          樊老师数学课程中心
+        </h1>
+        <p class="mt-3 text-sm sm:text-base text-blue-100 leading-relaxed">
+          从基础概念到中考专题，配套视频精讲、章节学习与学习进度管理。
+        </p>
+      </div>
+      <div class="absolute right-0 top-0 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl"></div>
+    </section>
+
+    <!-- Course cards are rendered by core plugin -->
+    <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6">
+      <?php echo do_shortcode('[mathcourse_course_center]'); ?>
+    </section>
+
+  </div>
+</main>
 
 <?php get_footer(); ?>
