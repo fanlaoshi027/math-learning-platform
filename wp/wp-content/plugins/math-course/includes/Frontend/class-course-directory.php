@@ -19,14 +19,14 @@ class Course_Directory {
     }
 
     public function render($atts = array()) {
-        $atts = shortcode_atts(array('course_id' => 0), $atts, 'mathcourse_course_directory');
+        $atts = shortcode_atts(array('course_id' => 0, 'show_filters' => 1), $atts, 'mathcourse_course_directory');
         $course_id = absint($atts['course_id']);
         if (!$course_id && isset($_GET['course_id'])) $course_id = absint($_GET['course_id']);
         if ($course_id) {
             wp_safe_redirect($this->learning_player_url($course_id));
             exit;
         }
-        return $this->render_course_center();
+        return $this->render_course_center((bool) absint($atts['show_filters']));
     }
 
     private function course_center_url() {
@@ -60,7 +60,7 @@ class Course_Directory {
         return '<span class="' . esc_attr($classes) . '" style="--mc-cover-color:' . esc_attr($color) . '"><span>' . esc_html($text) . '</span><b>∑</b></span>';
     }
 
-    private function render_course_center() {
+    private function render_course_center($show_filters = true) {
         if (!$this->tutor->is_available()) return '<p>课程系统暂不可用。</p>';
         $courses = $this->tutor->get_courses(false);
         $type_filter = isset($_GET['course_type']) ? sanitize_key(wp_unslash($_GET['course_type'])) : '';
@@ -71,6 +71,7 @@ class Course_Directory {
 
         ob_start(); ?>
         <div class="mathcourse-center">
+            <?php if ($show_filters) : ?>
             <div class="mc-course-filter" role="navigation" aria-label="课程筛选">
                 <a class="<?php echo '' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url($filter_base); ?>">全部</a>
                 <a class="<?php echo 'topic' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','topic',remove_query_arg(array('course_id','course_grade'),$filter_base))); ?>">专题课程</a>
@@ -83,6 +84,7 @@ class Course_Directory {
                     <a class="<?php echo (string)$grade_filter === (string)$grade ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg($url_args,remove_query_arg(array('course_id','course_type','course_grade'),$filter_base))); ?>"><?php echo esc_html($label); ?></a>
                 <?php endforeach; ?>
             </div>
+            <?php endif; ?>
             <div class="mathcourse-center__grid">
                 <?php $visible=0; foreach($courses as $course) : $data=$this->service->get_course_directory($course->ID,get_current_user_id()); if(!$data)continue; $data_type=(string)($data['type']??'topic'); $data_grade=(string)($data['grade']??''); if($type_filter&&$type_filter!==$data_type)continue; if($grade_filter&&$grade_filter!==$data_grade)continue; $visible++; $detail_url=$this->course_detail_url($data['id']); ?>
                     <article class="mathcourse-center__card" data-course-type="<?php echo esc_attr($data_type); ?>" data-course-grade="<?php echo esc_attr($data_grade); ?>">
