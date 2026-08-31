@@ -51,7 +51,7 @@ function mc_theme_assets() {
 		wp_enqueue_style('mc-course-ui-polish',get_stylesheet_directory_uri().'/assets/css/course-ui-polish.css',array('mc-ui-scale'),$polish_version);
 		wp_enqueue_style('mc-reference-ui-v2',get_stylesheet_directory_uri().'/assets/css/reference-ui-v2.css',array('mc-course-ui-polish'),$reference_v2_version);
 	}
-	if(is_page('course-center')&&!$course_id_placeholder){
+	if(is_page('course-center')){
 		wp_enqueue_style('mc-course-center-reference',get_stylesheet_directory_uri().'/assets/css/course-center-reference.css',array('mc-reference-ui-v2'),$course_center_ref_version);
 	}
 	if($load_course_ui&&(isset($_GET['course_id'])||has_shortcode($queried_content,'mathcourse_course_directory')||is_front_page())){
