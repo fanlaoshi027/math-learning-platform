@@ -1,3 +1,5 @@
+.mc-course-player__sidebar{min-width:0}
+.mc-course-player__topics{scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
 .mc-course-player__topic{position:relative}
 .mc-course-player__topic h3{position:relative;padding-left:38px!important;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
 .mc-course-player__topic h3:before{content:"";position:absolute;left:17px;top:50%;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:6px solid #7b8794;transform:translateY(-50%);transition:transform .18s ease,border-left-color .18s ease}
@@ -7,5 +9,8 @@
 .mc-course-player__topic:not(.is-open) .mc-course-player__lessons{display:none}
 .mc-course-player__topic .mc-course-player__lessons{animation:mcOutlineOpen .16s ease-out}
 @keyframes mcOutlineOpen{from{opacity:.45;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+/* Long courses: keep the outline visually independent from the page scroll. */
+@media(min-width:901px){.mc-course-player__sidebar{position:sticky;top:18px;align-self:start;max-height:calc(100vh - 36px);display:flex;flex-direction:column;overflow:hidden}.mc-course-player__sidebar-head{flex:0 0 auto}.mc-course-player__topics{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:3px}.mc-course-player__topics::-webkit-scrollbar{width:7px}.mc-course-player__topics::-webkit-scrollbar-track{background:transparent}.mc-course-player__topics::-webkit-scrollbar-thumb{background:#d5dde6;border-radius:999px}.mc-course-player__topics::-webkit-scrollbar-thumb:hover{background:#b9c5d2}}
+@media(max-width:900px){.mc-course-player__topics{max-height:none;overflow:visible}}
 @media(max-width:600px){.mc-course-player__topic h3{padding-left:38px!important}.mc-course-player__topic h3:before{left:15px}.mc-course-player__topic.is-open h3{background:#f7fafc}}
 @media(prefers-reduced-motion:reduce){.mc-course-player__topic h3:before,.mc-course-player__topic .mc-course-player__lessons{transition:none;animation:none}}
