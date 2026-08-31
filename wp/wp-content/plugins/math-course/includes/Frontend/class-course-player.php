@@ -6,7 +6,7 @@ use MathCourse\Course\Course_Service;
 class Course_Player {
     private $service;
     public function __construct() { $this->service = new Course_Service(); add_shortcode('mathcourse_course_player', array($this, 'render')); }
-    private function assets() { wp_enqueue_style('mathcourse-course-player', MATHCOURSE_URL . 'assets/course-player.css', array(), MATHCOURSE_VERSION); }
+    private function assets() { wp_enqueue_style('mathcourse-course-player', MATHCOURSE_URL . 'assets/course-player.css', array(), MATHCOURSE_VERSION); wp_enqueue_style('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/css/course-outline-accordion.css', array('mathcourse-course-player'), MATHCOURSE_VERSION); wp_enqueue_script('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/js/course-outline-accordion.js', array(), MATHCOURSE_VERSION, true); }
     public function render($atts=array()) {
         $atts=shortcode_atts(array('course_id'=>0),$atts,'mathcourse_course_player');
         $course_id=absint($atts['course_id']); if(!$course_id && isset($_GET['course_id'])) $course_id=absint($_GET['course_id']);
@@ -33,12 +33,13 @@ class Course_Player {
                 <?php else: ?><div class="mc-course-player__empty"><strong>请选择可观看的课时</strong><span>右侧课程列表中，标记“试看”的课时可以直接观看。</span></div><?php endif; ?>
                 </section>
                 <aside class="mc-course-player__sidebar"><div class="mc-course-player__sidebar-head"><strong>课程目录</strong><span><?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?></span></div><div class="mc-course-player__topics">
-                <?php foreach($data['topics'] as $index=>$topic): ?><div class="mc-course-player__topic"><h3><?php echo esc_html($index+1); ?>. <?php echo esc_html($topic['title']); ?></h3><div class="mc-course-player__lessons">
+                <?php foreach($data['topics'] as $index=>$topic): $topic_open=$current&&$this->topic_contains_lesson($topic,$current['id']); ?><div class="mc-course-player__topic<?php echo $topic_open?' is-open':''; ?>"><h3 class="mc-course-player__topic-toggle" tabindex="0" role="button" aria-expanded="<?php echo $topic_open?'true':'false'; ?>"><span class="mc-course-player__topic-chevron" aria-hidden="true">›</span><span><?php echo esc_html($index+1); ?>. <?php echo esc_html($topic['title']); ?></span></h3><div class="mc-course-player__lessons"<?php echo $topic_open?'':' hidden'; ?>>
                 <?php foreach($topic['lessons'] as $lesson): $active=$current&&(int)$current['id']===(int)$lesson['id']; $url=add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base); if($lesson['accessible']): ?><a class="mc-course-player__item <?php echo $active?'is-active ':''; echo $lesson['completed']?'is-complete':''; ?>" href="<?php echo esc_url($url); ?>"><span class="mc-course-player__check"><?php echo $lesson['completed']?'✓':($active?'▶':'○'); ?></span><span><?php echo esc_html($lesson['title']); ?></span><?php if($lesson['preview']): ?><small>试看</small><?php endif; ?></a><?php else: ?><div class="mc-course-player__item is-locked"><span class="mc-course-player__check">🔒</span><span><?php echo esc_html($lesson['title']); ?></span><small>需授权</small></div><?php endif; endforeach; ?></div></div><?php endforeach; ?>
                 </div></aside>
             </div>
         </div><?php return ob_get_clean();
     }
+    private function topic_contains_lesson($topic,$lesson_id){ foreach($topic['lessons'] as $lesson) if((int)$lesson['id']===(int)$lesson_id) return true; return false; }
     private function find_lesson($data,$id){ if(!$id)return null; foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if((int)$lesson['id']===$id&&!empty($lesson['accessible']))return $lesson; return null; }
     private function first_accessible($data){ foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson; return null; }
     private function lesson_navigation($data,$current,$course_id){
