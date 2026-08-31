@@ -64,38 +64,35 @@ body.mathcourse-site .mathcourse-center__meta span{border-radius:5px;padding:4px
 body.mathcourse-site .mathcourse-center__meta span+span{background:#fff8e1;color:#ff8c00}
 body.mathcourse-site .mathcourse-center__button{margin-top:12px;padding:9px 10px;border-radius:5px;background:#fff;color:#ff8c00}
 
+/* Tablet: reduce hero and stack the homepage category cards. */
 @media(max-width:900px){
- body.mathcourse-site .mc-site-header__inner{gap:10px;flex-wrap:wrap;padding:10px 0}
- body.mathcourse-site .mc-site-nav{order:3;width:100%;justify-content:center;overflow-x:auto}
- body.mathcourse-site .mc-site-nav a{padding:9px 12px;font-size:13px;white-space:nowrap}
- body.mathcourse-site .mc-header-search{display:none}
  body.mathcourse-site .mc-home-hero__inner{min-height:0;grid-template-columns:1fr;padding-top:60px;padding-bottom:55px}
  body.mathcourse-site .mc-home-hero__visual{display:none}
  body.mathcourse-site .mc-type-grid{grid-template-columns:1fr}
 }
-@media(max-width:600px){
+
+/* Mobile: one compact header row with horizontally scrollable navigation. */
+@media(max-width:760px){
  body.mathcourse-site .mc-container{width:calc(100% - 30px)}
+ body.mathcourse-site .mc-site-header__inner{min-height:58px;gap:8px;flex-wrap:nowrap;padding:0}
  body.mathcourse-site .mc-brand__text{font-size:18px}
- body.mathcourse-site .mc-header-actions{margin-left:auto}
+ body.mathcourse-site .mc-site-nav{order:initial;width:auto;min-width:0;flex:1;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;margin-left:6px}
+ body.mathcourse-site .mc-site-nav::-webkit-scrollbar{display:none}
+ body.mathcourse-site .mc-site-nav a{padding:8px 9px;font-size:12px;flex:0 0 auto;white-space:nowrap}
+ body.mathcourse-site .mc-header-search{display:none}
+ body.mathcourse-site .mc-header-actions{margin-left:auto;flex:0 0 auto;gap:4px}
+ body.mathcourse-site .mc-header-register{display:none}
+ body.mathcourse-site .mc-header-login{padding:7px 9px;font-size:12px;white-space:nowrap}
+ body.mathcourse-site .mc-user-pill{padding:7px 9px;font-size:12px;white-space:nowrap}
  body.mathcourse-site .mc-home-hero h1{font-size:32px}
  body.mathcourse-site .mc-home-hero__copy>p{font-size:14px}
  body.mathcourse-site .mc-home-types,body.mathcourse-site .mc-home-courses{padding:42px 0}
  body.mathcourse-site .mc-section-heading h2{font-size:21px}
 }
 
-/* Final mobile priority: keep the compact header from becoming a second navigation row. */
-@media(max-width:760px){
- body.mathcourse-site .mc-site-header__inner{min-height:58px;gap:8px;flex-wrap:nowrap;padding:0}
- body.mathcourse-site .mc-site-nav{order:initial;width:auto;min-width:0;flex:1;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;margin-left:6px}
- body.mathcourse-site .mc-site-nav::-webkit-scrollbar{display:none}
- body.mathcourse-site .mc-site-nav a{padding:8px 9px;font-size:12px;flex:0 0 auto}
- body.mathcourse-site .mc-header-search{display:none}
- body.mathcourse-site .mc-header-actions{margin-left:auto;flex:0 0 auto}
- body.mathcourse-site .mc-header-register{display:none}
- body.mathcourse-site .mc-header-login{padding:7px 9px;font-size:12px;white-space:nowrap}
- body.mathcourse-site .mc-user-pill{padding:7px 9px;font-size:12px;white-space:nowrap}
-}
+/* Small phones. */
 @media(max-width:390px){
+ body.mathcourse-site .mc-container{width:calc(100% - 24px)}
  body.mathcourse-site .mc-brand__text{font-size:16px}
  body.mathcourse-site .mc-site-nav{margin-left:2px}
  body.mathcourse-site .mc-site-nav a{padding-left:7px;padding-right:7px}
