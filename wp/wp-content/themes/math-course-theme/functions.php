@@ -36,6 +36,7 @@ function mc_theme_assets() {
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
 	$cover_path=get_stylesheet_directory().'/assets/css/course-cover.css';
 	$course_center_v2_path=get_stylesheet_directory().'/assets/css/course-center-v2.css';
+	$learning_v2_path=get_stylesheet_directory().'/assets/css/learning-v2.css';
 	$version=file_exists($style_path)?(string)filemtime($style_path):'0.2.0';
 	$ui_version=file_exists($ui_path)?(string)filemtime($ui_path):'0.3.0';
 	$scale_version=file_exists($scale_path)?(string)filemtime($scale_path):'1.0.0';
@@ -51,6 +52,7 @@ function mc_theme_assets() {
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
 	$cover_version=file_exists($cover_path)?(string)filemtime($cover_path):'1.0.0';
 	$course_center_v2_version=file_exists($course_center_v2_path)?(string)filemtime($course_center_v2_path):'1.0.0';
+	$learning_v2_version=file_exists($learning_v2_path)?(string)filemtime($learning_v2_path):'1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
 	$queried_content=get_post_field('post_content',get_queried_object_id());
 	$load_course_ui=is_front_page()||is_page(array('course-center','xueyuan-denglu','learning','learning-center'));
@@ -80,7 +82,8 @@ function mc_theme_assets() {
 		wp_enqueue_style('mc-learning-nav',get_stylesheet_directory_uri().'/assets/css/learning-nav.css',array('mc-learning-states'),$nav_version);
 		wp_enqueue_style('mc-learning-ui-polish',get_stylesheet_directory_uri().'/assets/css/learning-ui-polish.css',array('mc-learning-nav'),$learning_polish_version);
 		$player_ui_path=get_stylesheet_directory().'/assets/css/course-player-ui-v1.css';
-		if(file_exists($player_ui_path)) wp_enqueue_style('mc-course-player-ui-v1',get_stylesheet_directory_uri().'/assets/css/course-player-ui-v1.css',array('mc-learning-ui-polish'),(string)filemtime($player_ui_path));
+		if(file_exists($player_ui_path) && !is_page('learning-center')) wp_enqueue_style('mc-course-player-ui-v1',get_stylesheet_directory_uri().'/assets/css/course-player-ui-v1.css',array('mc-learning-ui-polish'),(string)filemtime($player_ui_path));
+		wp_enqueue_style('mc-learning-v2',get_stylesheet_directory_uri().'/assets/css/learning-v2.css',array('mc-learning-ui-polish','mc-course-player-ui-v1'),$learning_v2_version);
 	}
 	wp_enqueue_style('mc-ui-reference-override',get_stylesheet_directory_uri().'/assets/css/ui-reference-override.css',array('mc-course-ui-polish'),$reference_override_version);
 }
