@@ -47,6 +47,19 @@ class Course_Directory {
         return $this->learning_player_url($course_id);
     }
 
+    private function render_course_cover($data) {
+        $cover = !empty($data['cover']) ? $data['cover'] : '';
+        if ($cover) {
+            return '<img src="' . esc_url($cover) . '" alt="' . esc_attr($data['title']) . '" loading="lazy">';
+        }
+        $style = !empty($data['cover_style']) ? sanitize_html_class($data['cover_style']) : 'solid';
+        $color = !empty($data['cover_color']) ? sanitize_hex_color($data['cover_color']) : '#1769e0';
+        if (!$color) $color = '#1769e0';
+        $text = !empty($data['cover_text']) ? $data['cover_text'] : $data['title'];
+        $classes = 'mathcourse-center__cover-placeholder mathcourse-center__cover-placeholder--' . $style;
+        return '<span class="' . esc_attr($classes) . '" style="--mc-cover-color:' . esc_attr($color) . '"><span>' . esc_html($text) . '</span><b>∑</b></span>';
+    }
+
     private function render_course_center() {
         if (!$this->tutor->is_available()) return '<p>课程系统暂不可用。</p>';
         $courses = $this->tutor->get_courses(false);
@@ -71,9 +84,9 @@ class Course_Directory {
                 <?php endforeach; ?>
             </div>
             <div class="mathcourse-center__grid">
-                <?php $visible=0; foreach($courses as $course) : $data=$this->service->get_course_directory($course->ID,get_current_user_id()); if(!$data)continue; $data_type=(string)($data['type']??'topic'); $data_grade=(string)($data['grade']??''); if($type_filter&&$type_filter!==$data_type)continue; if($grade_filter&&$grade_filter!==$data_grade)continue; $visible++; $cover=!empty($data['cover'])?$data['cover']:''; $detail_url=$this->course_detail_url($data['id']); ?>
+                <?php $visible=0; foreach($courses as $course) : $data=$this->service->get_course_directory($course->ID,get_current_user_id()); if(!$data)continue; $data_type=(string)($data['type']??'topic'); $data_grade=(string)($data['grade']??''); if($type_filter&&$type_filter!==$data_type)continue; if($grade_filter&&$grade_filter!==$data_grade)continue; $visible++; $detail_url=$this->course_detail_url($data['id']); ?>
                     <article class="mathcourse-center__card" data-course-type="<?php echo esc_attr($data_type); ?>" data-course-grade="<?php echo esc_attr($data_grade); ?>">
-                        <a class="mathcourse-center__cover" href="<?php echo esc_url($detail_url); ?>"><?php if($cover): ?><img src="<?php echo esc_url($cover); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy"><?php else: ?><span class="mathcourse-center__cover-placeholder">数学课程</span><?php endif; ?></a>
+                        <a class="mathcourse-center__cover" href="<?php echo esc_url($detail_url); ?>"><?php echo $this->render_course_cover($data); ?></a>
                         <div class="mathcourse-center__body"><div class="mathcourse-center__meta"><?php if(!empty($data['grade'])):?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif;?><?php if(!empty($data['type'])):?><span><?php echo esc_html('supplementary'===$data['type']?'教辅配套':'专题课程'); ?></span><?php endif;?></div><h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2><a class="mathcourse-center__button" href="<?php echo esc_url($detail_url); ?>">查看课程 <span>→</span></a></div>
                     </article>
                 <?php endforeach; ?>
@@ -91,7 +104,7 @@ class Course_Directory {
         foreach($courses as $course){$data=$this->service->get_course_directory($course->ID,$user_id);if(!$data||empty($data['access']))continue;$progress=$data['progress']??array('completed'=>0,'total'=>0,'percent'=>0);$continue=$this->find_continue_lesson($data);$cards[]=array('data'=>$data,'progress'=>$progress,'continue'=>$continue);}
         ob_start(); ?>
         <div class="mathcourse-learning-center"><div class="mathcourse-learning-center__heading"><h1>我的课程</h1><p>已授权课程与学习进度</p></div>
-        <?php if(empty($cards)): ?><div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div><?php else: ?><div class="mathcourse-learning-center__grid"><?php foreach($cards as $card):$data=$card['data'];$progress=$card['progress'];$continue=$card['continue'];?><article class="mathcourse-learning-center__card"><div class="mathcourse-learning-center__cover"><?php if(!empty($data['cover'])):?><img src="<?php echo esc_url($data['cover']); ?>" alt="<?php echo esc_attr($data['title']); ?>" loading="lazy"><?php else:?><span>数学课程</span><?php endif;?></div><div class="mathcourse-learning-center__body"><h2><?php echo esc_html($data['title']); ?></h2><div class="mathcourse-learning-center__progress-row"><span>学习进度</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong><em><?php echo esc_html($progress['percent']); ?>%</em></div><div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div><a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->learning_player_url($data['id'])); ?>"><?php echo !empty($progress['completed'])?'继续学习':'开始学习'; ?><span>→</span></a></div></article><?php endforeach;?></div><?php endif;?></div>
+        <?php if(empty($cards)): ?><div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div><?php else: ?><div class="mathcourse-learning-center__grid"><?php foreach($cards as $card):$data=$card['data'];$progress=$card['progress'];$continue=$card['continue'];?><article class="mathcourse-learning-center__card"><div class="mathcourse-learning-center__cover"><?php echo $this->render_course_cover($data); ?></div><div class="mathcourse-learning-center__body"><h2><?php echo esc_html($data['title']); ?></h2><div class="mathcourse-learning-center__progress-row"><span>学习进度</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong><em><?php echo esc_html($progress['percent']); ?>%</em></div><div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div><a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->learning_player_url($data['id'])); ?>"><?php echo !empty($progress['completed'])?'继续学习':'开始学习'; ?><span>→</span></a></div></article><?php endforeach;?></div><?php endif;?></div>
         <?php return ob_get_clean();
     }
 
