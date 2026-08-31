@@ -1,6 +1,6 @@
 /* Course cards: polished front-end card system. Business data and cover source remain unchanged. */
-body.mathcourse-site .mathcourse-center__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
-body.mathcourse-site .mathcourse-card,body.mathcourse-site .mathcourse-center__card{position:relative;overflow:hidden;border:1px solid #e3e9f1;border-radius:20px;background:#fff;box-shadow:0 8px 26px rgba(18,52,107,.065);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+body.mathcourse-site .mathcourse-center__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;align-items:stretch}
+body.mathcourse-site .mathcourse-card,body.mathcourse-site .mathcourse-center__card{position:relative;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e3e9f1;border-radius:20px;background:#fff;box-shadow:0 8px 26px rgba(18,52,107,.065);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
 body.mathcourse-site .mathcourse-card:hover,body.mathcourse-site .mathcourse-center__card:hover{transform:translateY(-4px);border-color:#d2deed;box-shadow:0 18px 42px rgba(18,52,107,.12)}
 body.mathcourse-site .mathcourse-card a{color:inherit;text-decoration:none}
 body.mathcourse-site .mathcourse-cover-wrap,body.mathcourse-site .mathcourse-center__cover{position:relative;aspect-ratio:16/9;overflow:hidden;background:#edf3f8}
@@ -8,21 +8,28 @@ body.mathcourse-site .mathcourse-cover-wrap:after,body.mathcourse-site .mathcour
 body.mathcourse-site .mathcourse-cover,body.mathcourse-site .mathcourse-center__cover img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .35s ease}
 body.mathcourse-site .mathcourse-card:hover .mathcourse-cover,body.mathcourse-site .mathcourse-center__card:hover .mathcourse-center__cover img{transform:scale(1.025)}
 body.mathcourse-site .mathcourse-center__cover-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:linear-gradient(135deg,#12346b,#2673ad);color:#fff;font-size:25px;font-weight:850}
-body.mathcourse-site .mathcourse-card__body,body.mathcourse-site .mathcourse-center__body{padding:17px 19px 19px}
-body.mathcourse-site .mathcourse-card__meta,body.mathcourse-site .mathcourse-center__meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
-body.mathcourse-site .mathcourse-card__meta span,body.mathcourse-site .mathcourse-center__meta span{display:inline-flex;align-items:center;min-height:24px;padding:4px 9px;border-radius:999px;background:#f1f6fc;color:#46617f;font-size:11px;font-weight:800}
-body.mathcourse-site .mathcourse-card__meta span:first-child,body.mathcourse-site .mathcourse-center__meta span:first-child{background:#fff3e5;color:#c66d0a}
-body.mathcourse-site .mathcourse-card__title,body.mathcourse-site .mathcourse-center__title{margin:0;color:#10264a;font-size:18px;line-height:1.5;font-weight:850}
+body.mathcourse-site .mathcourse-center__cover-placeholder:before{content:"";position:absolute;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08);transform:translate(38px,-22px)}
+body.mathcourse-site .mathcourse-center__body{display:flex;flex:1;flex-direction:column;box-sizing:border-box;padding:17px 19px 19px;min-height:194px}
+body.mathcourse-site .mathcourse-card__body{padding:17px 19px 19px}
+body.mathcourse-site .mathcourse-card__meta,body.mathcourse-site .mathcourse-center__meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+body.mathcourse-site .mathcourse-card__meta span,body.mathcourse-site .mathcourse-center__meta span{display:inline-flex;align-items:center;min-height:24px;padding:4px 9px;border:1px solid #e4ebf3;border-radius:999px;background:#f6f8fb;color:#46617f;font-size:11px;font-weight:800;line-height:1}
+body.mathcourse-site .mathcourse-card__meta span:first-child,body.mathcourse-site .mathcourse-center__meta span:first-child{border-color:#ffe2bf;background:#fff5e9;color:#c66d0a}
+body.mathcourse-site .mathcourse-card__title,body.mathcourse-site .mathcourse-center__title{margin:0;color:#10264a;font-size:18px;line-height:1.48;font-weight:850;letter-spacing:-.01em}
 body.mathcourse-site .mathcourse-center__title{min-height:54px}
+body.mathcourse-site .mathcourse-center__description{display:-webkit-box;overflow:hidden;margin:8px 0 0;color:#7a8797;font-size:12px;line-height:1.65;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 body.mathcourse-site .mathcourse-card__info{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #edf1f5;color:#7b8797;font-size:12px}
 body.mathcourse-site .mathcourse-card__info strong{color:#51657c;font-weight:750}
-body.mathcourse-site .mathcourse-card__button,body.mathcourse-site .mathcourse-center__button{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:10px 12px;border-radius:11px;background:#f3f7fc;color:#173d68;font-size:13px;font-weight:800;text-decoration:none;transition:background .2s ease,color .2s ease}
-body.mathcourse-site .mathcourse-card:hover .mathcourse-card__button,body.mathcourse-site .mathcourse-center__card:hover .mathcourse-center__button{background:#eaf3ff;color:#1768a8}
-body.mathcourse-site .mathcourse-card__button span,body.mathcourse-site .mathcourse-center__button span{font-size:17px;line-height:1}
-body.mathcourse-site .mathcourse-center__body{display:flex;flex-direction:column;height:100%;box-sizing:border-box}
+body.mathcourse-site .mathcourse-center__info{display:flex;align-items:center;gap:14px;margin-top:13px;color:#7b8797;font-size:12px}
+body.mathcourse-site .mathcourse-center__info span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+body.mathcourse-site .mathcourse-center__info span:before{content:"";width:5px;height:5px;border-radius:50%;background:#b9c6d5}
+body.mathcourse-site .mathcourse-card__button,body.mathcourse-site .mathcourse-center__button{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:10px 12px;border:1px solid #e1e9f2;border-radius:11px;background:#f7f9fc;color:#173d68;font-size:13px;font-weight:800;text-decoration:none;transition:background .2s ease,color .2s ease,border-color .2s ease,transform .2s ease}
+body.mathcourse-site .mathcourse-card:hover .mathcourse-card__button,body.mathcourse-site .mathcourse-center__card:hover .mathcourse-center__button{border-color:#d4e5f8;background:#edf5ff;color:#1768a8}
+body.mathcourse-site .mathcourse-card__button span,body.mathcourse-site .mathcourse-center__button span{font-size:17px;line-height:1;transition:transform .2s ease}
+body.mathcourse-site .mathcourse-card:hover .mathcourse-card__button span,body.mathcourse-site .mathcourse-center__card:hover .mathcourse-center__button span{transform:translateX(2px)}
 body.mathcourse-site .mathcourse-center__button{margin-top:auto}
+body.mathcourse-site .mathcourse-center__card:focus-within{border-color:#b9d3f3;box-shadow:0 0 0 3px rgba(23,105,224,.08),0 14px 35px rgba(18,52,107,.1)}
 @media(max-width:900px){body.mathcourse-site .mathcourse-center__grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}}
-@media(max-width:600px){body.mathcourse-site .mathcourse-center__grid{grid-template-columns:1fr;gap:15px}body.mathcourse-site .mathcourse-card__body,body.mathcourse-site .mathcourse-center__body{padding:15px 16px 17px}.mathcourse-card__title,.mathcourse-center__title{font-size:17px!important}.mathcourse-center__title{min-height:auto}}
+@media(max-width:600px){body.mathcourse-site .mathcourse-center__grid{grid-template-columns:1fr;gap:15px}body.mathcourse-site .mathcourse-center__body,body.mathcourse-site .mathcourse-card__body{padding:15px 16px 17px}.mathcourse-card__title,.mathcourse-center__title{font-size:17px!important}.mathcourse-center__title{min-height:auto}.mathcourse-center__description{font-size:12px}.mathcourse-center__info{margin-top:10px!important}}
 
 /* Video player visual polish only; existing custom controls remain in place. */
 body.mathcourse-site .mc-video-shell,body.mathcourse-site .mathcourse-player{border-radius:16px;overflow:hidden}
