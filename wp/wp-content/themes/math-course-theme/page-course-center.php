@@ -19,39 +19,65 @@ $grade      = isset( $_GET['course_grade'] ) ? sanitize_key( wp_unslash( $_GET['
 				<div>
 					<span class="mc-course-center__eyebrow">COURSE LIBRARY</span>
 					<h1>课程中心</h1>
-					<p>选择适合你的课程，按自己的节奏一步一步学习。</p>
+					<p>按知识体系和学习阶段选择课程，找到适合自己的学习路径。</p>
 				</div>
 				<div class="mc-course-center__mark" aria-hidden="true">∑</div>
 			</header>
 
-			<nav class="mc-course-center__types" aria-label="课程分类">
-				<?php
-				$topic_url = add_query_arg( array( 'course_type' => 'topic' ), remove_query_arg( array( 'course_id', 'course_grade' ), $center_url ) );
-				$book_url  = add_query_arg( array( 'course_type' => 'supplementary' ), remove_query_arg( array( 'course_id', 'course_grade' ), $center_url ) );
-				?>
-				<a class="is-topic <?php echo 'topic' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $topic_url ); ?>" aria-current="<?php echo 'topic' === $type ? 'page' : 'false'; ?>">
-					<span>01</span><strong>专题课</strong><small>重点专题 · 系统突破</small><b>→</b>
-				</a>
-				<a class="is-book <?php echo 'supplementary' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $book_url ); ?>" aria-current="<?php echo 'supplementary' === $type ? 'page' : 'false'; ?>">
-					<span>02</span><strong>教辅配套</strong><small>跟着教辅 · 逐题讲解</small><b>→</b>
-				</a>
-			</nav>
-
-			<section class="mc-course-center__library">
-				<div class="mc-course-center__section-title">
-					<div>
-						<span><?php echo esc_html( 'topic' === $type ? '专题课程' : ( 'supplementary' === $type ? '教辅配套' : '全部课程' ) ); ?></span>
-						<small><?php echo $grade ? esc_html( $grade . ' 年级 · ' ) : ''; ?>按类型和年级选择</small>
+			<div class="mc-course-center__workspace">
+				<aside class="mc-course-center__sidebar" aria-label="课程筛选">
+					<div class="mc-course-center__side-title">
+						<span>知识体系</span>
+						<small>COURSE MAP</small>
 					</div>
-				</div>
-				<?php
-				if ( shortcode_exists( 'mathcourse_course_directory' ) ) {
-					echo do_shortcode( '[mathcourse_course_directory]' );
-				} else {
-					echo '<div class="mc-course-center__empty">课程中心插件未启用。</div>';
-				}
-				?>
-			</section>
+					<nav class="mc-course-center__side-nav">
+						<?php
+						$all_url = remove_query_arg( array( 'course_id', 'course_type', 'course_grade' ), $center_url );
+						$topic_url = add_query_arg( array( 'course_type' => 'topic' ), remove_query_arg( array( 'course_id', 'course_grade' ), $center_url ) );
+						$book_url  = add_query_arg( array( 'course_type' => 'supplementary' ), remove_query_arg( array( 'course_id', 'course_grade' ), $center_url ) );
+						?>
+						<a class="<?php echo '' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $all_url ); ?>"><i>全部</i><span>全部课程</span><b>›</b></a>
+						<a class="<?php echo 'topic' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $topic_url ); ?>"><i>代</i><span>专题课程</span><b>›</b></a>
+						<a class="<?php echo 'supplementary' === $type ? 'is-active' : ''; ?>" href="<?php echo esc_url( $book_url ); ?>"><i>辅</i><span>教辅配套</span><b>›</b></a>
+					</nav>
+
+					<div class="mc-course-center__side-divider"></div>
+					<div class="mc-course-center__side-title mc-course-center__side-title--grade">
+						<span>学习阶段</span>
+						<small>GRADE</small>
+					</div>
+					<nav class="mc-course-center__grade-nav">
+						<?php
+						$grades = array( '七年级', '八年级', '九年级' );
+						foreach ( $grades as $grade_item ) {
+							$grade_url = add_query_arg( array( 'course_grade' => $grade_item ), remove_query_arg( array( 'course_id', 'course_type', 'course_grade' ), $center_url ) );
+							if ( $type ) {
+								$grade_url = add_query_arg( 'course_type', $type, $grade_url );
+							}
+							$is_active = $grade === $grade_item;
+							echo '<a class="' . ( $is_active ? 'is-active' : '' ) . '" href="' . esc_url( $grade_url ) . '"><span>' . esc_html( $grade_item ) . '</span><b>' . ( $is_active ? '✓' : '›' ) . '</b></a>';
+						}
+						?>
+					</nav>
+				</aside>
+
+				<section class="mc-course-center__library">
+					<div class="mc-course-center__section-title">
+						<div>
+							<span><?php echo esc_html( 'topic' === $type ? '专题课程' : ( 'supplementary' === $type ? '教辅配套' : '全部课程' ) ); ?></span>
+							<small><?php echo $grade ? esc_html( $grade . ' · ' ) : ''; ?>选择课程开始学习</small>
+						</div>
+						<span class="mc-course-center__count-label">COURSES</span>
+					</div>
+					<?php
+					if ( shortcode_exists( 'mathcourse_course_directory' ) ) {
+						echo do_shortcode( '[mathcourse_course_directory]' );
+					} else {
+						echo '<div class="mc-course-center__empty">课程中心插件未启用。</div>';
+					}
+					?>
+				</section>
+			</div>
 		<?php endif; ?>
 	</div>
 </main>
