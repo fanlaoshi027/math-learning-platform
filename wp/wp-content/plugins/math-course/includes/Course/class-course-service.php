@@ -21,10 +21,29 @@ class Course_Service {
         $this->video = new Video_Router(false);
     }
 
+    private function get_cover_data($course_id) {
+        $course_id = absint($course_id);
+        return array(
+            'cover'       => (string) get_post_meta($course_id, '_mathcourse_cover', true),
+            'cover_style' => (string) get_post_meta($course_id, '_mathcourse_cover_style', true),
+            'cover_color' => (string) get_post_meta($course_id, '_mathcourse_cover_color', true),
+            'cover_text'  => (string) get_post_meta($course_id, '_mathcourse_cover_text', true),
+        );
+    }
+
     public function get_course($course_id) {
         $course = $this->tutor->get_course($course_id);
         if (!$course) return null;
-        return array('id'=>(int)$course->ID,'title'=>get_the_title($course),'type'=>get_post_meta($course->ID,'_mathcourse_type',true),'grade'=>get_post_meta($course->ID,'_mathcourse_grade',true),'cover'=>get_post_meta($course->ID,'_mathcourse_cover',true));
+        $cover = $this->get_cover_data($course->ID);
+        return array_merge(
+            array(
+                'id'    => (int) $course->ID,
+                'title' => get_the_title($course),
+                'type'  => get_post_meta($course->ID, '_mathcourse_type', true),
+                'grade' => get_post_meta($course->ID, '_mathcourse_grade', true),
+            ),
+            $cover
+        );
     }
 
     public function get_lesson_video($lesson_id, $user_id=0) {
@@ -49,8 +68,6 @@ class Course_Service {
             $lessons=array();
             foreach($this->tutor->get_lessons($topic->ID,false) as $lesson) {
                 $lesson_id=(int)$lesson->ID;
-                // Completion is independent of access. A logged-in student who completes a
-                // preview/free lesson must see the completed state in the MathCourse UI.
                 $completed_lesson=$user_id?$this->progress->is_completed($user_id,$lesson_id):false;
                 $preview=$this->access->can_preview($course->ID,$lesson_id); $watch_access=$this->access->can_watch_lesson($user_id,$course->ID,$lesson_id); $accessible=$watch_access||$preview; $has_hls=(bool)$this->tutor->get_lesson_hls_url($lesson_id);
                 $lessons[]=array('id'=>$lesson_id,'title'=>get_the_title($lesson),'page_number'=>$this->tutor->get_lesson_page_number($lesson_id),'video_id'=>$this->tutor->get_lesson_video_id($lesson_id),'hls_url'=>($accessible&&$has_hls)?$this->video->get_protected_url($lesson_id):'','url'=>$accessible?$this->lesson_learning_url($course->ID,$lesson_id):'','completed'=>$completed_lesson,'preview'=>$preview,'accessible'=>$accessible);
@@ -58,7 +75,11 @@ class Course_Service {
             $topics[]=array('id'=>(int)$topic->ID,'title'=>get_the_title($topic),'lessons'=>$lessons);
         }
         $progress=$user_id?$this->progress->get_course_progress($course->ID,$user_id):array('completed'=>0,'total'=>$this->count_lessons($topics),'percent'=>0,'last_lesson_id'=>0);
-        return array('id'=>(int)$course->ID,'title'=>get_the_title($course),'type'=>get_post_meta($course->ID,'_mathcourse_type',true),'grade'=>get_post_meta($course->ID,'_mathcourse_grade',true),'cover'=>get_post_meta($course->ID,'_mathcourse_cover',true),'is_free'=>$course_free,'topics'=>$topics,'access'=>$course_access,'progress'=>$progress);
+        $cover=$this->get_cover_data($course->ID);
+        return array_merge(
+            array('id'=>(int)$course->ID,'title'=>get_the_title($course),'type'=>get_post_meta($course->ID,'_mathcourse_type',true),'grade'=>get_post_meta($course->ID,'_mathcourse_grade',true),'is_free'=>$course_free,'topics'=>$topics,'access'=>$course_access,'progress'=>$progress),
+            $cover
+        );
     }
 
     private function count_lessons($topics) { $count=0; foreach($topics as $topic)$count+=count($topic['lessons']); return $count; }
