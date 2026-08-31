@@ -2,11 +2,15 @@
 /**
  * Template Name: 学习中心
  *
- * Personalized student learning center. The MathCourse plugin owns
- * authorization and progress; the theme only provides the page shell.
+ * Personalized student learning center. Only authenticated students can
+ * access this page; the MathCourse plugin owns authorization and progress.
  */
-
 defined( 'ABSPATH' ) || exit;
+
+if ( ! is_user_logged_in() ) {
+	wp_safe_redirect( wp_login_url( home_url( '/learning-center/' ) ) );
+	exit;
+}
 
 get_header();
 ?>
