@@ -8,7 +8,20 @@ document.addEventListener('DOMContentLoaded', function () {
             var lessons = topic.querySelector(':scope > .mc-course-player__lessons');
             if (!heading || !lessons) return;
 
+            function closeOtherTopics() {
+                topicList.forEach(function (other) {
+                    if (other !== topic) {
+                        other.classList.remove('is-open');
+                        var otherHeading = other.querySelector(':scope > h3');
+                        var otherLessons = other.querySelector(':scope > .mc-course-player__lessons');
+                        if (otherHeading) otherHeading.setAttribute('aria-expanded', 'false');
+                        if (otherLessons) otherLessons.hidden = true;
+                    }
+                });
+            }
+
             function setOpen(open) {
+                if (open) closeOtherTopics();
                 topic.classList.toggle('is-open', open);
                 heading.setAttribute('aria-expanded', open ? 'true' : 'false');
                 lessons.hidden = !open;
@@ -29,8 +42,20 @@ document.addEventListener('DOMContentLoaded', function () {
                     toggle();
                 }
             });
+        });
 
-            setOpen(topic.classList.contains('is-open') || !!topic.querySelector('.mc-course-player__item.is-active'));
+        var initialOpen = topicList.find(function (topic) {
+            return topic.classList.contains('is-open') || !!topic.querySelector('.mc-course-player__item.is-active');
+        }) || topicList[0];
+
+        topicList.forEach(function (topic) {
+            var heading = topic.querySelector(':scope > h3');
+            var lessons = topic.querySelector(':scope > .mc-course-player__lessons');
+            if (!heading || !lessons) return;
+            var shouldOpen = topic === initialOpen;
+            topic.classList.toggle('is-open', shouldOpen);
+            heading.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+            lessons.hidden = !shouldOpen;
         });
     });
 });
