@@ -14,6 +14,9 @@ class Player {
         wp_enqueue_script( 'mathcourse-player-controls', MATHCOURSE_URL . 'assets/js/player-controls.js', array( 'video-js', 'mathcourse-player' ), MATHCOURSE_VERSION, true );
         wp_localize_script( 'mathcourse-player', 'mathcoursePlayer', array( 'ajax_url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'mathcourse_progress_nonce' ) ) );
     }
+    private function missing_player_markup( $message = '本节视频暂未上传' ) {
+        return '<div class="mathcourse-player-placeholder" role="status" aria-label="' . esc_attr( $message ) . '"><div class="mathcourse-player-placeholder__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m10 9 5 3-5 3V9Z"></path></svg></div><div class="mathcourse-player-placeholder__title">' . esc_html( $message ) . '</div><div class="mathcourse-player-placeholder__text">老师正在准备课程内容，请稍后再来学习</div></div>';
+    }
     public function render( $atts ) {
         $atts = shortcode_atts( array( 'url' => '', 'lesson_id' => 0, 'course_id' => 0 ), $atts );
         $lesson_id = absint( $atts['lesson_id'] ); $course_id = absint( $atts['course_id'] ); $user_id = get_current_user_id();
@@ -30,6 +33,6 @@ class Player {
         }
         $tutor_player = $this->tutor->render_lesson_video( $lesson_id );
         if ( $tutor_player ) return $tutor_player;
-        return '<div class="mc-video-missing">本课时暂未配置可播放的视频资源。</div>';
+        return $this->missing_player_markup();
     }
 }
