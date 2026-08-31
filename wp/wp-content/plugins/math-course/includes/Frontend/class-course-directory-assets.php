@@ -14,6 +14,7 @@ class Course_Directory_Assets {
 
         wp_enqueue_style('mathcourse-course-directory', MATHCOURSE_URL . 'assets/frontend-course-directory.css', array(), MATHCOURSE_VERSION);
         wp_enqueue_style('mathcourse-course-directory-ui-polish', MATHCOURSE_URL . 'assets/course-directory-ui-polish.css', array('mathcourse-course-directory'), MATHCOURSE_VERSION);
+        wp_enqueue_style('mathcourse-lock-modal-ui', MATHCOURSE_URL . 'assets/lock-modal-ui.css', array('mathcourse-course-directory'), MATHCOURSE_VERSION);
         wp_enqueue_script('mathcourse-course-directory', MATHCOURSE_URL . 'assets/course-directory.js', array(), MATHCOURSE_VERSION, true);
     }
 }
