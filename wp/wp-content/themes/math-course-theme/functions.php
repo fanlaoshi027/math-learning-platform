@@ -33,6 +33,7 @@ function mc_theme_assets() {
 	$home_path=get_stylesheet_directory().'/assets/css/home-ui-v2.css';
 	$reference_override_path=get_stylesheet_directory().'/assets/css/ui-reference-override.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
+	$cover_path=get_stylesheet_directory().'/assets/css/course-cover.css';
 	$version=file_exists($style_path)?(string)filemtime($style_path):'0.2.0';
 	$ui_version=file_exists($ui_path)?(string)filemtime($ui_path):'0.3.0';
 	$scale_version=file_exists($scale_path)?(string)filemtime($scale_path):'1.0.0';
@@ -45,6 +46,7 @@ function mc_theme_assets() {
 	$home_version=file_exists($home_path)?(string)filemtime($home_path):'1.0.0';
 	$reference_override_version=file_exists($reference_override_path)?(string)filemtime($reference_override_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
+	$cover_version=file_exists($cover_path)?(string)filemtime($cover_path):'1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
 	$queried_content=get_post_field('post_content',get_queried_object_id());
 	$load_course_ui=is_front_page()||is_page(array('course-center','xueyuan-denglu','learning'));
@@ -53,6 +55,7 @@ function mc_theme_assets() {
 		wp_enqueue_style('mc-reference-ui',get_stylesheet_directory_uri().'/assets/css/reference-ui.css',array('mc-theme-style'),$ui_version);
 		wp_enqueue_style('mc-ui-scale',get_stylesheet_directory_uri().'/assets/css/ui-scale.css',array('mc-reference-ui'),$scale_version);
 		wp_enqueue_style('mc-course-ui-polish',get_stylesheet_directory_uri().'/assets/css/course-ui-polish.css',array('mc-ui-scale'),$polish_version);
+		wp_enqueue_style('mc-course-cover',get_stylesheet_directory_uri().'/assets/css/course-cover.css',array('mc-course-ui-polish'),$cover_version);
 	}
 	wp_enqueue_style('mc-header-ui-polish',get_stylesheet_directory_uri().'/assets/css/header-ui-polish.css',array('mc-theme-style'),$header_polish_version);
 	if(is_front_page()){
