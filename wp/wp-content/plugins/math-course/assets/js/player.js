@@ -1,5 +1,28 @@
 document.addEventListener('DOMContentLoaded', function () {
     const players = document.querySelectorAll('video.mathcourse-player, video.video-js[data-lesson-id]');
+    function formatTime(seconds) {
+        seconds = Math.max(0, Math.floor(Number(seconds) || 0));
+        const m = Math.floor(seconds / 60), s = seconds % 60;
+        return m + ':' + String(s).padStart(2, '0');
+    }
+    function updateLessonTime(lessonId, time, duration) {
+        if (!lessonId) return;
+        document.querySelectorAll('.mc-course-player__item').forEach(function (item) {
+            const href = item.getAttribute('href') || '';
+            if (href.indexOf('lesson_id=' + lessonId) === -1) return;
+            let progress = item.querySelector('.mc-course-player__lesson-time');
+            if (!progress) {
+                progress = document.createElement('small');
+                progress.className = 'mc-course-player__lesson-time';
+                const meta = item.querySelector('small:last-child');
+                if (meta && meta.parentNode === item) item.appendChild(progress); else item.appendChild(progress);
+            }
+            progress.textContent = duration > 0 ? ('已学 ' + formatTime(time) + ' / ' + formatTime(duration)) : ('已学 ' + formatTime(time));
+            progress.hidden = !(time > 0);
+            const percent = duration > 0 ? Math.min(100, Math.round(time / duration * 100)) : 0;
+            item.style.setProperty('--mc-lesson-progress', percent + '%');
+        });
+    }
     function updateProgressUI(progress, lessonId) {
         if (!progress) return;
         document.querySelectorAll('.mc-course-player__progress span').forEach(function (el) { el.textContent = '学习进度 ' + Number(progress.percent || 0) + '%'; });
@@ -25,11 +48,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!saved) { restorePending = false; lastTime = 0; return; }
             if (!Number.isFinite(duration) || duration <= 0) return;
             if (saved >= duration - 5) { clearSavedTime(); restorePending = false; lastTime = 0; return; }
-            try { setTime(Math.min(saved, Math.max(0, duration - 1))); lastTime = saved; restorePending = false; } catch (e) {}
+            try { setTime(Math.min(saved, Math.max(0, duration - 1))); lastTime = saved; restorePending = false; updateLessonTime(lessonId, saved, duration); } catch (e) {}
         }
         function savePosition(force) {
             const time = val('currentTime'), duration = val('duration');
             if (!Number.isFinite(time) || time <= 0) return;
+            updateLessonTime(lessonId, time, duration);
             if (Number.isFinite(duration) && duration > 0 && time >= duration - 0.5) return;
             const value = Math.floor(time * 10) / 10;
             if (!force && Math.floor(value) === lastSavedSecond) return;
@@ -63,7 +87,6 @@ document.addEventListener('DOMContentLoaded', function () {
         on(player, 'pause', function () { savePosition(true); resetWatchWindow(); });
         on(player, 'seeking', function () { seeking = true; resetWatchWindow(); });
         on(player, 'seeked', function () { seeking = false; resetWatchWindow(); });
-        // 只有真正播放到视频结束才记录课时完成；拖动进度条到末尾不会误标完成。
         on(player, 'ended', function () { submitCompletion(); });
         function persistBeforeLeave() { savePosition(true); }
         window.addEventListener('pagehide', persistBeforeLeave); window.addEventListener('beforeunload', persistBeforeLeave);
