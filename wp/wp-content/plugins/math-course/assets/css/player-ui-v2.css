@@ -1,0 +1,23 @@
+/* MathCourse Player UI v2 — minimal, readable and touch friendly. */
+.mc-player-skip-controls,.mc-player-mobile-actions,.mc-player-speed{display:flex;align-items:center;gap:4px;}
+.mc-player-skip-button,.mc-player-speed-button{border:0;cursor:pointer;touch-action:manipulation;}
+.mc-player-speed{position:relative;}
+.mc-player-speed-menu{position:absolute;right:0;bottom:calc(100% + 8px);display:none;flex-direction:column;gap:2px;z-index:1000;}
+.mc-player-speed.is-open .mc-player-speed-menu{display:flex;}
+.mc-player-speed-menu button{border:0;cursor:pointer;padding:6px 10px;}
+
+@media (max-width:767px){
+ .video-js .vjs-control-bar{transition:opacity .22s ease,transform .22s ease;}
+ .video-js.mc-controls-hidden .vjs-control-bar{opacity:0;pointer-events:none;transform:translateY(8px);}
+ .video-js.mc-controls-hidden .vjs-big-play-button{opacity:.15;transition:opacity .22s ease;}
+ .video-js:not(.mc-controls-hidden) .vjs-big-play-button{transition:opacity .22s ease,transform .22s ease;}
+ .video-js .vjs-big-play-button{width:58px;height:58px;line-height:56px;margin-top:-29px;margin-left:-29px;border:1px solid rgba(255,255,255,.72);border-radius:50%;background:rgba(8,18,32,.58);backdrop-filter:blur(5px);box-shadow:0 8px 28px rgba(0,0,0,.28);}
+ .video-js .vjs-big-play-button:hover{background:rgba(8,18,32,.72);}
+ .mc-player-feedback{position:absolute;top:50%;z-index:40;display:flex;align-items:center;justify-content:center;min-width:82px;height:54px;margin-top:-27px;padding:0 14px;border-radius:999px;background:rgba(8,18,32,.76);color:#fff;font-size:15px;font-weight:800;opacity:0;transform:translateY(5px) scale(.94);pointer-events:none;backdrop-filter:blur(5px);}
+ .mc-player-feedback--back{left:22%;}
+ .mc-player-feedback--forward{right:22%;}
+ .mc-player-feedback.is-visible{animation:mc-player-feedback-pop .62s ease both;}
+ .mc-player-feedback-icon{font-size:19px;margin-right:6px;}
+}
+@keyframes mc-player-feedback-pop{0%{opacity:0;transform:translateY(5px) scale(.94)}18%,72%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-3px) scale(1.02)}}
+@media (prefers-reduced-motion:reduce){.video-js .vjs-control-bar,.video-js .vjs-big-play-button{transition:none!important}.mc-player-feedback.is-visible{animation:none;opacity:1;}}
