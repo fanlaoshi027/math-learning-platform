@@ -13,7 +13,6 @@ class Video_Router {
     private function get_source_url($lesson_id){return $this->adapter->get_lesson_hls_url($lesson_id);}
     private function can_watch($lesson_id){$course_id=$this->adapter->get_lesson_course_id($lesson_id);if(!$course_id)return false;if(is_user_logged_in()&&$this->access->can_watch_lesson(get_current_user_id(),$course_id,$lesson_id))return true;return $this->access->can_preview($course_id,$lesson_id);}
     public function handle(){ $lesson_id=absint(get_query_var('math_video'));if(!$lesson_id)return; $expires=absint(get_query_var('math_video_exp'));$signature=sanitize_text_field(get_query_var('math_video_sig'));$file=isset($_GET['file'])?wp_unslash($_GET['file']):'';if(!is_string($file))$file='';
-        // 播放列表 token 与具体媒体文件 token 是两种不同签名：播放列表使用空 file，分片/子播放列表必须使用其 file_ref 签名。
         if(!$this->valid_signature($lesson_id,$expires,$file,$signature)){status_header(403);exit('视频访问链接已失效。');}
         if(!$this->can_watch($lesson_id)){status_header(403);exit('暂无观看权限，请联系老师开通课程。');}$source=$this->get_source_url($lesson_id);if(!$source){status_header(404);exit('视频不存在。');}if($file==='')$this->serve_playlist($lesson_id,$expires,$source);else$this->serve_media($lesson_id,$expires,$file,$source);exit; }
     private function gateway_url($lesson_id,$expires,$file_ref){$sig=$this->sign($lesson_id,$expires,$file_ref);return add_query_arg('file',$file_ref,home_url('/math-video/'.$lesson_id.'/'.$expires.'/'.$sig.'/'));}
