@@ -13,7 +13,7 @@
 $is_logged_in = is_user_logged_in();
 $current_user = $is_logged_in ? wp_get_current_user() : null;
 $learning_center_url = home_url('/learning-center/');
-$course_center_url = home_url('/courses/');
+$course_center_url = home_url('/course-center/');
 ?>
 
 <!-- 顶部导航：游客只有首页/课程中心/学员登录；登录学员才显示学习中心 -->
