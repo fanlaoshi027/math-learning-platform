@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded',function(){
  if(!window.videojs)return;
+ var isMobile=window.matchMedia&&window.matchMedia('(max-width: 767px)').matches;
  document.querySelectorAll('video.mathcourse-player.video-js').forEach(function(el){
   var p=videojs.getPlayer(el.id); if(!p)return;
   var speeds=[0.5,0.75,1,1.25,1.5,1.75,2];
   try{if(typeof p.playbackRates==='function')p.playbackRates(speeds);}catch(e){}
+  /* Mobile: keep Video.js/native controls only. Do not inject the desktop custom controls. */
+  if(isMobile)return;
   function addButton(parent,label,title,delta){
    var b=document.createElement('button');b.type='button';b.className='mc-player-skip-button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
    b.onclick=function(e){e.preventDefault();e.stopPropagation();var t=Number(p.currentTime()||0),d=Number(p.duration()||0);p.currentTime(Math.max(0,Math.min(d||Infinity,t+delta)));};
