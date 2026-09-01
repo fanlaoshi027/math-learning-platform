@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const storageKey = 'mathcourse_lesson_' + lessonId + '_time';
         let completionSent = false;
-        let restorePending = true;
         let lastSavedSecond = -1;
 
         function savedTime() {
@@ -97,6 +96,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function createPlayer() {
+            let invertEnabled = false;
+
             const art = new Artplayer({
                 container: container,
                 url: url,
@@ -112,9 +113,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 playsInline: true,
                 autoOrientation: true,
                 setting: true,
-                playbackRate: true,
-                aspectRatio: false,
+                playbackRate: false,
                 flip: false,
+                aspectRatio: false,
                 lock: true,
                 moreVideoAttr: {
                     'webkit-playsinline': true,
@@ -122,6 +123,37 @@ document.addEventListener('DOMContentLoaded', function () {
                     controlsList: 'nodownload noplaybackrate',
                     disablePictureInPicture: true,
                 },
+                settings: [
+                    {
+                        name: 'math-speed',
+                        html: '播放速度',
+                        tooltip: '播放速度',
+                        selector: speeds.map(function (speed) {
+                            return {
+                                html: speed + '×',
+                                value: speed,
+                                default: speed === 1,
+                            };
+                        }),
+                        onSelect: function (item) {
+                            const speed = Number(item.value);
+                            if (Number.isFinite(speed)) {
+                                art.playbackRate = speed;
+                            }
+                            return item.html;
+                        }
+                    },
+                    {
+                        name: 'math-invert',
+                        html: '反色播放',
+                        tooltip: '反色播放',
+                        onClick: function () {
+                            invertEnabled = !invertEnabled;
+                            container.classList.toggle('is-inverted', invertEnabled);
+                            return invertEnabled ? '已开启' : '已关闭';
+                        }
+                    }
+                ],
                 customType: {
                     m3u8: function (video, sourceUrl) {
                         if (window.Hls && Hls.isSupported()) {
@@ -162,31 +194,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         html: '<button type="button" class="mc-art-skip" aria-label="前进10秒">10 ↷</button>',
                         tooltip: '前进 10 秒',
                         click: function () { art.currentTime = Math.min(art.duration || Infinity, art.currentTime + 10); }
-                    },
-                    {
-                        name: 'invert',
-                        position: 'right',
-                        index: 97,
-                        html: '<button type="button" class="mc-art-skip mc-art-invert" aria-label="反色">◐</button>',
-                        tooltip: '画面反色',
-                        click: function () {
-                            container.classList.toggle('is-inverted');
-                        }
-                    },
-                    {
-                        name: 'speed',
-                        position: 'right',
-                        index: 98,
-                        html: '<button type="button" class="mc-art-skip mc-art-speed" aria-label="播放速度">1×</button>',
-                        tooltip: '播放速度',
-                        selector: speeds.map(function (speed) {
-                            return { default: speed === 1, html: speed + '×', value: speed };
-                        }),
-                        onSelect: function (item) {
-                            const speed = Number(item.value || String(item.html).replace('×', ''));
-                            if (Number.isFinite(speed)) art.playbackRate = speed;
-                            return item.html;
-                        }
                     }
                 ]
             });
@@ -198,7 +205,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else if (saved >= art.duration - 5) {
                     clearSavedTime();
                 }
-                restorePending = false;
             });
 
             art.on('timeupdate', function () {
