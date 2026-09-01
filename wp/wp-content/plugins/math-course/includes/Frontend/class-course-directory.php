@@ -60,6 +60,30 @@ class Course_Directory {
         return '<span class="' . esc_attr($classes) . '" style="--mc-cover-color:' . esc_attr($color) . '"><span>' . esc_html($text) . '</span><b>∑</b></span>';
     }
 
+    private function render_course_state($data) {
+        $progress = isset($data['progress']) && is_array($data['progress']) ? $data['progress'] : array('completed' => 0, 'total' => 0, 'percent' => 0);
+        $completed = max(0, absint($progress['completed'] ?? 0));
+        $total = max(0, absint($progress['total'] ?? 0));
+        $percent = max(0, min(100, absint($progress['percent'] ?? 0)));
+        $has_access = !empty($data['access']);
+        if (!$has_access) {
+            return '<div class="mathcourse-center__state mathcourse-center__state--preview"><span>试看课程</span><small>登录后学习完整课程</small></div>';
+        }
+        if ($total > 0 && $completed >= $total) {
+            return '<div class="mathcourse-center__state mathcourse-center__state--complete"><span>已完成</span><small>' . esc_html($completed) . ' / ' . esc_html($total) . ' 课时</small></div>';
+        }
+        if ($completed > 0 || $percent > 0) {
+            return '<div class="mathcourse-center__state mathcourse-center__state--learning"><span>学习中</span><small>' . esc_html($completed) . ' / ' . esc_html($total) . ' 课时</small></div>';
+        }
+        return '<div class="mathcourse-center__state"><span>未开始</span><small>' . esc_html($total) . ' 课时</small></div>';
+    }
+
+    private function render_course_progress($data) {
+        $progress = isset($data['progress']) && is_array($data['progress']) ? $data['progress'] : array('completed' => 0, 'total' => 0, 'percent' => 0);
+        $percent = max(0, min(100, absint($progress['percent'] ?? 0)));
+        return '<div class="mathcourse-center__progress" aria-label="课程学习进度"><span><i style="width:' . esc_attr($percent) . '%"></i></span></div>';
+    }
+
     private function render_course_center($show_filters = true) {
         if (!$this->tutor->is_available()) return '<p>课程系统暂不可用。</p>';
         $courses = $this->tutor->get_courses(false);
@@ -89,7 +113,7 @@ class Course_Directory {
                 <?php $visible=0; foreach($courses as $course) : $data=$this->service->get_course_directory($course->ID,get_current_user_id()); if(!$data)continue; $data_type=(string)($data['type']??'topic'); $data_grade=(string)($data['grade']??''); if($type_filter&&$type_filter!==$data_type)continue; if($grade_filter&&$grade_filter!==$data_grade)continue; $visible++; $detail_url=$this->course_detail_url($data['id']); ?>
                     <article class="mathcourse-center__card" data-course-type="<?php echo esc_attr($data_type); ?>" data-course-grade="<?php echo esc_attr($data_grade); ?>">
                         <a class="mathcourse-center__cover" href="<?php echo esc_url($detail_url); ?>"><?php echo $this->render_course_cover($data); ?></a>
-                        <div class="mathcourse-center__body"><div class="mathcourse-center__meta"><?php if(!empty($data['grade'])):?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif;?><?php if(!empty($data['type'])):?><span><?php echo esc_html('supplementary'===$data['type']?'教辅配套':'专题课程'); ?></span><?php endif;?></div><h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2><a class="mathcourse-center__button" href="<?php echo esc_url($detail_url); ?>">查看课程 <span>→</span></a></div>
+                        <div class="mathcourse-center__body"><div class="mathcourse-center__meta"><?php if(!empty($data['grade'])):?><span><?php echo esc_html($this->grade_label($data['grade'])); ?></span><?php endif;?><?php if(!empty($data['type'])):?><span><?php echo esc_html('supplementary'===$data['type']?'教辅配套':'专题课程'); ?></span><?php endif;?></div><div class="mathcourse-center__title-row"><h2 class="mathcourse-center__title"><?php echo esc_html($data['title']); ?></h2><?php echo $this->render_course_state($data); ?></div><?php echo $this->render_course_progress($data); ?><a class="mathcourse-center__button" href="<?php echo esc_url($detail_url); ?>"><span><?php echo !empty($data['access']) ? '继续学习' : '开始试看'; ?></span><span>→</span></a></div>
                     </article>
                 <?php endforeach; ?>
             </div>
