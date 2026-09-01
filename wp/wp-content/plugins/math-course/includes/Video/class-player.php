@@ -27,8 +27,9 @@ class Player {
         if ( empty( $video['id'] ) || empty( $video['accessible'] ) ) return '<div class="mc-video-locked">该课时需要课程授权或试看权限后才能观看。</div>';
         $course_id = absint( $video['course_id'] ?: $course_id );
         if ( ! empty( $video['hls_url'] ) ) {
-            $this->assets(); ob_start(); ?>
-            <video id="mathcourse-player-<?php echo esc_attr( $lesson_id ); ?>" class="video-js vjs-big-play-centered mathcourse-player" controls preload="metadata" playsinline data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>" data-course-id="<?php echo esc_attr( $course_id ); ?>">
+            $this->assets();
+            ob_start(); ?>
+            <video id="mathcourse-player-<?php echo esc_attr( $lesson_id ); ?>" class="video-js vjs-big-play-centered mathcourse-player" controls preload="metadata" playsinline webkit-playsinline data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>" data-course-id="<?php echo esc_attr( $course_id ); ?>">
                 <source src="<?php echo esc_url( $video['hls_url'] ); ?>" type="application/x-mpegURL">
             </video>
             <?php return ob_get_clean();
