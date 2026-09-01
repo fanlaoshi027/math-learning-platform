@@ -119,12 +119,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                 ],
                 customType: {
-                    m3u8: function (video, sourceUrl) {
+                    m3u8: function (video, sourceUrl, instance) {
                         if (window.Hls && Hls.isSupported()) {
                             const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
                             hls.loadSource(sourceUrl);
                             hls.attachMedia(video);
-                            art._mathcourseHls = hls;
+                            instance._mathcourseHls = hls;
                         } else {
                             video.src = sourceUrl;
                         }
@@ -136,8 +136,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 container.classList.toggle('is-inverted', invertEnabled);
             }
 
-            // Keep the custom invert class when ArtPlayer changes fullscreen state.
-            // ArtPlayer has two fullscreen modes: window fullscreen and web fullscreen.
             art.on('fullscreen', applyInvertState);
             art.on('fullscreenWeb', applyInvertState);
             art.on('fullscreenError', applyInvertState);
@@ -175,6 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
+            // 只有真正播放到结尾才计为完成课时，不因拖动进度条到末尾而误完成。
             art.on('ended', submitCompletion);
             container._mathcourseArt = art;
         }
