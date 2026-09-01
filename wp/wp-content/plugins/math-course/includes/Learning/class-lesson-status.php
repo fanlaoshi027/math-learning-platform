@@ -35,18 +35,21 @@ class Lesson_Status {
             );
         }
 
+        $access = new Access_Service();
+        $is_preview = $access->can_preview($course_id, $lesson_id);
+        $can_watch = $user_id ? $access->can_watch_lesson($user_id, $course_id, $lesson_id) : false;
+        $has_access = $is_preview || $can_watch;
+
+        // 完成状态只描述学习记录；allow 仍必须经过当前实时访问权限。
+        // 这样即使用户授权后来被撤销，历史“已完成”也不会变成可绕过权限的入口。
         if ($user_id && $progress->is_completed($user_id, $lesson_id)) {
             return array(
                 'type'  => 'completed',
                 'label' => '已完成',
                 'icon'  => '✅',
-                'allow' => true,
+                'allow' => $has_access,
             );
         }
-
-        $access = new Access_Service();
-        $is_preview = $access->can_preview($course_id, $lesson_id);
-        $can_watch = $user_id ? $access->can_watch_lesson($user_id, $course_id, $lesson_id) : false;
 
         if ($is_preview) {
             return array(
