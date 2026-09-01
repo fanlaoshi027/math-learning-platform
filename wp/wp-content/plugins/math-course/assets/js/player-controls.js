@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   if(typeof p.ready==='function')p.ready(setupDesktopControls);else setupDesktopControls();
   if(mobileQuery){var refresh=function(){if(!isMobile())setupDesktopControls();};if(typeof mobileQuery.addEventListener==='function')mobileQuery.addEventListener('change',refresh);else if(typeof mobileQuery.addListener==='function')mobileQuery.addListener(refresh);}
+  // Fullscreen changes close the desktop speed menu; mobile keeps the native Video.js controls untouched.
+  if(typeof p.on==='function')p.on('fullscreenchange',function(){
+   if(isMobile())return;
+   var menu=el.parentElement&&el.parentElement.querySelector('.mc-player-speed');
+   if(menu)menu.classList.remove('is-open');
+  });
   function keyboard(e){if(isMobile())return;var tag=(e.target&&e.target.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select'||e.target.isContentEditable)return;if(!p||p.isDisposed())return;if(e.key==='ArrowLeft'){e.preventDefault();p.currentTime(Math.max(0,Number(p.currentTime()||0)-10));}else if(e.key==='ArrowRight'){e.preventDefault();var d=Number(p.duration()||0);p.currentTime(Math.min(d||Infinity,Number(p.currentTime()||0)+10));}else if(e.code==='Space'){e.preventDefault();if(p.paused())p.play();else p.pause();}}
   document.addEventListener('keydown',keyboard);
  });
