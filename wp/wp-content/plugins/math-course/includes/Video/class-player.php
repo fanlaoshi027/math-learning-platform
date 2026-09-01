@@ -16,9 +16,7 @@ class Player {
 
     public function assets() {
         wp_enqueue_style( 'mathcourse-course-player-large', MATHCOURSE_URL . 'assets/course-player-large.css', array(), MATHCOURSE_VERSION );
-        wp_enqueue_style( 'mathcourse-reference-player-ui', MATHCOURSE_URL . 'assets/reference-player-ui.css', array( 'mathcourse-course-player-large' ), MATHCOURSE_VERSION );
-        wp_enqueue_style( 'mathcourse-player-ui-v2', MATHCOURSE_URL . 'assets/player-ui-v2.css', array( 'mathcourse-reference-player-ui' ), MATHCOURSE_VERSION );
-        wp_enqueue_style( 'mathcourse-artplayer-ui', MATHCOURSE_URL . 'assets/artplayer-ui.css', array( 'mathcourse-player-ui-v2' ), MATHCOURSE_VERSION . '-artplayer-local' );
+        wp_enqueue_style( 'mathcourse-artplayer-ui', MATHCOURSE_URL . 'assets/artplayer-ui.css', array( 'mathcourse-course-player-large' ), MATHCOURSE_VERSION . '-artplayer-local' );
 
         wp_enqueue_script( 'hls-js', 'https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js', array(), '1.6.2', true );
         wp_enqueue_script( 'artplayer', MATHCOURSE_URL . 'assets/artplayer/artplayer.js', array( 'hls-js' ), '5.4.1-local', true );
