@@ -6,7 +6,6 @@ defined( 'ABSPATH' ) || exit;
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <?php wp_head(); ?>
-    <link rel="stylesheet" href="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/css/ui-v2.css' ); ?>">
 </head>
 <body <?php body_class( 'mathcourse-site' ); ?>>
 <?php wp_body_open(); ?>
