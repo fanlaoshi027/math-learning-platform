@@ -3,31 +3,52 @@ namespace MathCourse\Learning;
 
 defined('ABSPATH') || exit;
 
+use MathCourse\Access\Access_Service;
 use MathCourse\Progress\Progress_Service;
 
 /**
  * 课时状态展示层。
- * 完成状态统一读取 MathCourse Progress Service，避免与 Tutor LMS 使用不同数据源。
+ * 完成状态统一读取 Progress Service，访问状态统一读取 Access Service。
  */
 class Lesson_Status {
     public static function get($lesson_id, $user_id = 0) {
         $lesson_id = absint($lesson_id);
         $user_id   = absint($user_id);
 
-        if ($lesson_id && $user_id) {
-            $progress = new Progress_Service();
-            if ($progress->is_completed($user_id, $lesson_id)) {
-                return array(
-                    'type'  => 'completed',
-                    'label' => '已完成',
-                    'icon'  => '✅',
-                    'allow' => true,
-                );
-            }
+        if (!$lesson_id) {
+            return array(
+                'type'  => 'normal',
+                'label' => '开始学习',
+                'icon'  => '▶',
+                'allow' => false,
+            );
         }
 
-        $trial = get_post_meta($lesson_id, '_mathcourse_video_trial', true);
-        if ($trial) {
+        $progress = new Progress_Service();
+        $course_id = $progress->get_lesson_course_id($lesson_id);
+        if (!$course_id) {
+            return array(
+                'type'  => 'normal',
+                'label' => '开始学习',
+                'icon'  => '▶',
+                'allow' => false,
+            );
+        }
+
+        if ($user_id && $progress->is_completed($user_id, $lesson_id)) {
+            return array(
+                'type'  => 'completed',
+                'label' => '已完成',
+                'icon'  => '✅',
+                'allow' => true,
+            );
+        }
+
+        $access = new Access_Service();
+        $is_preview = $access->can_preview($course_id, $lesson_id);
+        $can_watch = $user_id ? $access->can_watch_lesson($user_id, $course_id, $lesson_id) : false;
+
+        if ($is_preview) {
             return array(
                 'type'  => 'trial',
                 'label' => '免费试听',
@@ -36,11 +57,20 @@ class Lesson_Status {
             );
         }
 
+        if ($can_watch) {
+            return array(
+                'type'  => 'normal',
+                'label' => '开始学习',
+                'icon'  => '▶',
+                'allow' => true,
+            );
+        }
+
         return array(
-            'type'  => 'normal',
-            'label' => '开始学习',
-            'icon'  => '▶',
-            'allow' => true,
+            'type'  => 'locked',
+            'label' => '需要授权',
+            'icon'  => '🔒',
+            'allow' => false,
         );
     }
 }
