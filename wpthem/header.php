@@ -12,9 +12,11 @@
 <?php
 $is_logged_in = is_user_logged_in();
 $current_user = $is_logged_in ? wp_get_current_user() : null;
+$learning_center_url = home_url('/learning-center/');
+$course_center_url = home_url('/courses/');
 ?>
 
-<!-- 顶部导航栏 (遵行规范 7. Header: 游客不显示学习中心，登录学员显示) -->
+<!-- 顶部导航：游客只有首页/课程中心/学员登录；登录学员才显示学习中心 -->
 <header class="bg-white/95 text-slate-800 sticky top-0 z-40 shadow-xs border-b border-slate-200/90 backdrop-blur-md" role="banner">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
     
@@ -40,12 +42,12 @@ $current_user = $is_logged_in ? wp_get_current_user() : null;
       <a href="<?php echo esc_url(home_url('/')); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold text-blue-600 bg-blue-50/90 border border-blue-200/70 shadow-2xs">
         首页
       </a>
-      <a href="<?php echo esc_url(home_url('/courses/')); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">
+      <a href="<?php echo esc_url($course_center_url); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">
         课程中心
       </a>
       <?php if ($is_logged_in) : ?>
-        <a href="<?php echo esc_url(home_url('/dashboard/')); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-md shadow-orange-500/25 border border-amber-400/40 transition-all flex items-center gap-1.5">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+        <a href="<?php echo esc_url($learning_center_url); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-md shadow-orange-500/25 border border-amber-400/40 transition-all flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
           <span>学习中心</span>
         </a>
       <?php endif; ?>
@@ -53,7 +55,7 @@ $current_user = $is_logged_in ? wp_get_current_user() : null;
 
     <!-- 右侧：搜索与登录态 -->
     <div class="flex items-center gap-3">
-      <form role="search" method="get" action="<?php echo esc_url(home_url('/courses/')); ?>" class="relative hidden sm:block">
+      <form role="search" method="get" action="<?php echo esc_url($course_center_url); ?>" class="relative hidden sm:block">
         <input type="text" name="s" placeholder="搜索课程或专题" value="<?php echo get_search_query(); ?>" class="w-36 lg:w-48 bg-slate-100/90 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-full py-1.5 pl-3.5 pr-8 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all" />
         <button type="submit" aria-label="搜索" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -62,7 +64,7 @@ $current_user = $is_logged_in ? wp_get_current_user() : null;
 
       <?php if ($is_logged_in) : ?>
         <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 pr-2.5 shadow-2xs">
-          <a href="<?php echo esc_url(home_url('/dashboard/')); ?>" class="flex items-center gap-1.5 text-xs text-slate-800 font-bold hover:text-blue-600">
+          <a href="<?php echo esc_url($learning_center_url); ?>" class="flex items-center gap-1.5 text-xs text-slate-800 font-bold hover:text-blue-600">
             <div class="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-2xs">
               <?php echo esc_html(mb_substr($current_user->display_name, 0, 1)); ?>
             </div>
@@ -88,9 +90,9 @@ $current_user = $is_logged_in ? wp_get_current_user() : null;
   <!-- 移动端下拉抽屉导航 -->
   <div id="mc-mobile-menu" class="hidden md:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-2 text-xs">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="block py-1.5 text-blue-600 font-bold">首页</a>
-    <a href="<?php echo esc_url(home_url('/courses/')); ?>" class="block py-1.5 text-slate-700 hover:text-blue-600 font-medium">课程中心</a>
+    <a href="<?php echo esc_url($course_center_url); ?>" class="block py-1.5 text-slate-700 hover:text-blue-600 font-medium">课程中心</a>
     <?php if ($is_logged_in) : ?>
-      <a href="<?php echo esc_url(home_url('/dashboard/')); ?>" class="block py-1.5 text-amber-700 font-bold">学习中心 (已激活课程)</a>
+      <a href="<?php echo esc_url($learning_center_url); ?>" class="block py-1.5 text-amber-700 font-bold">学习中心</a>
     <?php endif; ?>
   </div>
 </header>
