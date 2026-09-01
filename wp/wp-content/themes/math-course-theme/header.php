@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
         </nav>
         <form class="mc-header-search" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>"><input type="search" name="s" value="<?php echo esc_attr( get_search_query() ); ?>" placeholder="搜索数学知识点" aria-label="搜索数学知识点"><button type="submit">搜索</button></form>
         <div class="mc-header-actions">
-            <?php if ( is_user_logged_in() ) : ?><a class="mc-user-pill" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">我的学习 <span class="mc-user-pill__arrow" aria-hidden="true">→</span></a><?php else : ?><a class="mc-header-login" href="<?php echo esc_url( wp_login_url( home_url( '/learning-center/' ) ); ?>">登录</a><?php endif; ?>
+            <?php if ( is_user_logged_in() ) : ?><a class="mc-user-pill" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">我的学习 <span class="mc-user-pill__arrow" aria-hidden="true">→</span></a><?php else : ?><a class="mc-header-login" href="<?php echo esc_url( wp_login_url( home_url( '/learning-center/' ) ) ); ?>">登录</a><?php endif; ?>
         </div>
     </div>
 </header>
