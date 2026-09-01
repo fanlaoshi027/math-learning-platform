@@ -6,10 +6,29 @@ document.addEventListener('DOMContentLoaded',function(){
   var isMobile=function(){return mobileQuery?mobileQuery.matches:window.innerWidth<=767;};
   var speeds=[0.5,0.75,1,1.25,1.5,1.75,2];
   var hideTimer=null;
+  var feedbackTimer=null;
+
+  function getFeedbackContainer(){
+   var wrap=el.parentElement;if(!wrap)return null;
+   var existing=wrap.querySelector('.mc-player-feedback-layer');
+   if(existing)return existing;
+   var layer=document.createElement('div');layer.className='mc-player-feedback-layer';layer.setAttribute('aria-hidden','true');
+   var back=document.createElement('div');back.className='mc-player-feedback mc-player-feedback--back';back.innerHTML='<span class="mc-player-feedback-icon">↶</span><span>10秒</span>';
+   var forward=document.createElement('div');forward.className='mc-player-feedback mc-player-feedback--forward';forward.innerHTML='<span class="mc-player-feedback-icon">↷</span><span>10秒</span>';
+   layer.appendChild(back);layer.appendChild(forward);wrap.appendChild(layer);return layer;
+  }
+  function showSeekFeedback(delta){
+   if(!isMobile())return;
+   var layer=getFeedbackContainer();if(!layer)return;
+   var item=layer.querySelector(delta<0?'.mc-player-feedback--back':'.mc-player-feedback--forward');if(!item)return;
+   item.classList.remove('is-visible');void item.offsetWidth;item.classList.add('is-visible');
+   if(feedbackTimer)window.clearTimeout(feedbackTimer);
+   feedbackTimer=window.setTimeout(function(){item.classList.remove('is-visible');},700);
+  }
 
   function addSkipButton(parent,label,title,delta){
    var b=document.createElement('button');b.type='button';b.className='mc-player-skip-button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
-   b.onclick=function(e){e.preventDefault();e.stopPropagation();var t=Number(p.currentTime()||0),d=Number(p.duration()||0);p.currentTime(Math.max(0,Math.min(d||Infinity,t+delta)));showControls();};
+   b.onclick=function(e){e.preventDefault();e.stopPropagation();var t=Number(p.currentTime()||0),d=Number(p.duration()||0);p.currentTime(Math.max(0,Math.min(d||Infinity,t+delta)));showSeekFeedback(delta);showControls();};
    parent.appendChild(b);
   }
 
