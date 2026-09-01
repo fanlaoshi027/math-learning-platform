@@ -15,9 +15,8 @@ defined( 'ABSPATH' ) || exit;
 get_header();
 
 $course_id = isset( $_GET['course_id'] ) ? absint( $_GET['course_id'] ) : 0;
-
 ?>
-<main class="mc-learning-page" id="main-content">
+<section class="mc-learning-page" id="main-content">
 	<?php
 	if ( shortcode_exists( 'mathcourse_course_player' ) ) {
 		echo do_shortcode(
@@ -35,7 +34,6 @@ $course_id = isset( $_GET['course_id'] ) ? absint( $_GET['course_id'] ) : 0;
 		<?php
 	}
 	?>
-</main>
+</section>
 <?php
-
 get_footer();
