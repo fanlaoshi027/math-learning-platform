@@ -64,6 +64,23 @@ function mathcourse_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'mathcourse_enqueue_scripts');
 
+/**
+ * 学习中心不是开放页面：未登录用户不得直接访问学习中心 URL。
+ * 账号由老师创建并按课程授权，不提供前台开放注册。
+ */
+function mathcourse_protect_learning_center() {
+    if (is_admin() || is_user_logged_in()) {
+        return;
+    }
+
+    if (is_page('learning-center')) {
+        $login_url = wp_login_url(home_url('/learning-center/'));
+        wp_safe_redirect($login_url);
+        exit;
+    }
+}
+add_action('template_redirect', 'mathcourse_protect_learning_center', 1);
+
 function mathcourse_get_service() {
     if (class_exists('\\MathCourse\\Course\\Course_Service')) {
         return new \\MathCourse\\Course\\Course_Service();
