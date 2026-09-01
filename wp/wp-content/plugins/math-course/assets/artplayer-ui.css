@@ -6,15 +6,9 @@
 .mathcourse-artplayer .art-progress .art-control-progress-inner{border-radius:999px!important}
 .mathcourse-artplayer .art-control{color:#eef5ff!important}
 .mathcourse-artplayer .art-control:hover{color:#fff!important}
-.mathcourse-artplayer .mc-art-skip{display:flex;align-items:center;justify-content:center;gap:3px;min-width:58px;height:34px;padding:0 7px;border:0;border-radius:8px;background:rgba(13,27,43,.88);color:#eef5ff;font-size:11px;font-weight:800;cursor:pointer;transition:background .15s ease,transform .15s ease}
-.mathcourse-artplayer .mc-art-skip:hover{background:#17304d}
-.mathcourse-artplayer .mc-art-skip:active{transform:scale(.96)}
-.mathcourse-artplayer .mc-art-settings{min-width:42px!important}
-.mathcourse-artplayer .mc-art-invert{min-width:42px!important}
-.mathcourse-artplayer .mc-art-logo{width:30px;height:30px;margin-right:4px;object-fit:contain;opacity:.92}
 .mathcourse-artplayer.is-inverted .art-video-player video{filter:invert(1) hue-rotate(180deg)!important}
 .mathcourse-artplayer .art-setting-panel{border-radius:12px!important;background:rgba(5,17,30,.97)!important;border:1px solid rgba(255,255,255,.1)!important;box-shadow:0 12px 36px rgba(0,0,0,.3)!important}
 .mathcourse-artplayer .art-setting-panel-item{font-size:12px!important}
 .mathcourse-artplayer .art-setting-panel-item:hover{background:rgba(255,255,255,.08)!important}
 .mathcourse-artplayer .art-contextmenu{border-radius:10px!important;background:rgba(5,17,30,.97)!important}
-@media(max-width:640px){.mc-course-player__video .mathcourse-artplayer{border-radius:14px;min-height:0}.mathcourse-artplayer .art-bottom{padding-left:4px!important;padding-right:4px!important}.mathcourse-artplayer .mc-art-skip{min-width:48px;height:32px;font-size:10px;padding:0 5px}.mathcourse-artplayer .mc-art-logo{display:none}.mathcourse-artplayer .art-control{font-size:12px!important}.mathcourse-artplayer .art-control-volume{display:none!important}}
+@media(max-width:640px){.mc-course-player__video .mathcourse-artplayer{border-radius:14px;min-height:0}.mathcourse-artplayer .art-bottom{padding-left:4px!important;padding-right:4px!important}.mathcourse-artplayer .art-control{font-size:12px!important}.mathcourse-artplayer .art-control-volume{display:none!important}}
