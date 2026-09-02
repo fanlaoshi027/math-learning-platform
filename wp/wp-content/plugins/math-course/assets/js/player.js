@@ -178,8 +178,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 customType: {
                     m3u8: function (video, sourceUrl, instance) {
-                        if (window.Hls && Hls.isSupported()) {
-                            const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+                        if (window.Hls && typeof window.Hls.isSupported === 'function' && window.Hls.isSupported()) {
+                            const hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
                             hls.loadSource(sourceUrl);
                             hls.attachMedia(video);
                             instance._mathcourseHls = hls;
@@ -244,16 +244,8 @@ document.addEventListener('DOMContentLoaded', function () {
             container._mathcourseArt = art;
         }
 
-        if (window.Hls) {
-            createPlayer();
-        } else {
-            const wait = setInterval(function () {
-                if (window.Hls) {
-                    clearInterval(wait);
-                    createPlayer();
-                }
-            }, 50);
-            setTimeout(function () { clearInterval(wait); }, 5000);
-        }
+        // Always initialize ArtPlayer. Hls.js is used when available; the custom m3u8 handler
+        // falls back to the browser's native HLS implementation when it is not.
+        createPlayer();
     });
 });
