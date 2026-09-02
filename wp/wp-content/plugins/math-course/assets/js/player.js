@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.Artplayer) return;
+    document.body.classList.add('math-learning-page');
     const players = document.querySelectorAll('.mathcourse-artplayer[data-video-url]');
     const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -67,6 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
         function removeInvertFromFullscreenTarget() {
             if (fullscreenTarget && fullscreenTarget !== container) {
                 fullscreenTarget.classList.remove('math-video-invert');
+                fullscreenTarget.classList.remove('is-inverted');
             }
             fullscreenTarget = null;
         }
@@ -80,6 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
             if (invertEnabled && activeFullscreen && activeFullscreen !== container) {
                 activeFullscreen.classList.add('math-video-invert');
+                activeFullscreen.classList.add('is-inverted');
                 fullscreenTarget = activeFullscreen;
             }
 
@@ -205,6 +208,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             container.addEventListener('contextmenu', preventContextMenu, true);
             bindFullscreenEvents(art.video);
+
+            if (art.video && window.matchMedia && window.matchMedia('(max-width: 640px)').matches) {
+                art.video.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    try { art.toggle(); } catch (e) {}
+                }, true);
+            }
 
             art.on('fullscreen', onFullscreenChange);
             art.on('fullscreenWeb', onFullscreenChange);
