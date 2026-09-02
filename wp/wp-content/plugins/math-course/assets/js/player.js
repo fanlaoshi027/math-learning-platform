@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let lastSavedSecond = -1;
         let invertEnabled = false;
         let art = null;
-        let fullscreenTarget = null;
 
         function savedTime() {
             try {
@@ -71,60 +70,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        function clearFullscreenInvertTarget() {
-            if (!fullscreenTarget || fullscreenTarget === container || fullscreenTarget === (art && art.video)) {
-                fullscreenTarget = null;
-                return;
-            }
-            fullscreenTarget.classList.remove('math-video-invert');
-            fullscreenTarget.classList.remove('is-inverted');
-            fullscreenTarget.style.removeProperty('filter');
-            fullscreenTarget = null;
-        }
-
         function syncInvertState() {
             const video = art && art.video ? art.video : container.querySelector('video');
             const playerRoot = container.querySelector('.art-video-player');
 
-            // Never invert the ArtPlayer root: that also inverts the controls/icons.
-            // Only the actual video frame should be inverted.
+            // Never invert the player/container/root: that would also invert controls and icons.
             container.classList.remove('math-video-invert', 'is-inverted');
             if (playerRoot) playerRoot.classList.remove('math-video-invert', 'is-inverted');
 
-            clearFullscreenInvertTarget();
-
-            if (video) {
-                video.classList.toggle('math-video-invert', invertEnabled);
-                if (invertEnabled) {
-                    video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
-                } else {
-                    video.style.removeProperty('filter');
-                }
-            }
-
-            const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
-            if (!invertEnabled || !activeFullscreen) return;
-
-            // If the browser made the video itself fullscreen, keep the filter on it.
-            // If ArtPlayer made a wrapper fullscreen, the video remains the only target
-            // that receives the filter, preventing the fullscreen controls from inverting.
-            if (activeFullscreen === video) {
-                fullscreenTarget = video;
-                video.classList.add('math-video-invert');
-                video.classList.add('is-inverted');
+            // The video frame is the only element that may be inverted.
+            if (!video) return;
+            video.classList.toggle('math-video-invert', invertEnabled);
+            video.classList.toggle('is-inverted', invertEnabled);
+            if (invertEnabled) {
                 video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
-            } else if (activeFullscreen === container || activeFullscreen.contains(video)) {
-                fullscreenTarget = activeFullscreen;
-                // Do not put a filter on activeFullscreen. Its controls must remain normal.
-            } else if (activeFullscreen.contains(container)) {
-                fullscreenTarget = activeFullscreen;
-                // Same rule for a browser-created outer fullscreen wrapper.
+            } else {
+                video.style.removeProperty('filter');
             }
         }
 
         function onFullscreenChange() {
+            // ArtPlayer/browser fullscreen can replace or reposition the video synchronously.
+            // Re-read the actual video after the fullscreen transition settles.
             window.requestAnimationFrame(function () {
                 syncInvertState();
+                window.requestAnimationFrame(syncInvertState);
             });
         }
 
@@ -144,7 +114,39 @@ document.addEventListener('DOMContentLoaded', function () {
                 video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.removeEventListener('webkitendfullscreen', onFullscreenChange);
             }
-            clearFullscreenInvertTarget();
+        }
+
+        function isPlayerActiveForKeyboard() {
+            const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
+            if (activeFullscreen && (activeFullscreen === container || activeFullscreen.contains(container) || container.contains(activeFullscreen))) {
+                return true;
+            }
+            if (container.contains(document.activeElement)) return true;
+            return container.matches(':hover');
+        }
+
+        function seekBy(seconds) {
+            if (!art || !art.video) return;
+            const current = Number(art.currentTime || 0);
+            const duration = Number(art.duration || 0);
+            const target = Math.max(0, current + seconds);
+            art.currentTime = duration > 0 ? Math.min(target, duration) : target;
+        }
+
+        function onPlayerKeydown(event) {
+            if (!art || !art.video || !isPlayerActiveForKeyboard()) return;
+            const tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.isComposing) return;
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                event.stopPropagation();
+                seekBy(-10);
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                event.stopPropagation();
+                seekBy(10);
+            }
         }
 
         function createPlayer() {
@@ -242,6 +244,7 @@ document.addEventListener('DOMContentLoaded', function () {
             container.addEventListener('contextmenu', preventContextMenu, true);
             if (art.contextmenu) art.contextmenu.show = false;
             bindFullscreenEvents(art.video);
+            document.addEventListener('keydown', onPlayerKeydown, true);
 
             if (art.video && window.matchMedia && window.matchMedia('(max-width: 640px)').matches) {
                 art.video.addEventListener('click', function (event) {
@@ -285,6 +288,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             art.on('destroy', function () {
                 unbindFullscreenEvents(art.video);
+                document.removeEventListener('keydown', onPlayerKeydown, true);
                 container.removeEventListener('contextmenu', preventContextMenu, true);
                 if (art._mathcourseHls) {
                     try { art._mathcourseHls.destroy(); } catch (e) {}
