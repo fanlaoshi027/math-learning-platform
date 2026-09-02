@@ -108,11 +108,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function createPlayer() {
-            const castSupported = typeof HTMLVideoElement !== 'undefined' && 'remote' in HTMLVideoElement.prototype;
             const settings = [
                 {
                     name: 'math-speed',
-                    html: '倍速',
+                    html: '播放速度',
                     tooltip: '1×',
                     selector: speeds.map(function (speed) {
                         return { html: speed + '×', value: speed, default: speed === 1 };
@@ -123,33 +122,19 @@ document.addEventListener('DOMContentLoaded', function () {
                         return item.html;
                     },
                 },
-            ];
-
-            if (castSupported) {
-                settings.push({
-                    name: 'math-cast',
-                    html: '投屏',
-                    tooltip: '投屏',
-                    onSelect: function () {
-                        if (!art || !art.video || !art.video.remote || typeof art.video.remote.prompt !== 'function') return '不支持投屏';
-                        try { art.video.remote.prompt().catch(function () {}); } catch (e) {}
-                        return '投屏';
+                {
+                    name: 'math-invert',
+                    html: '反色播放',
+                    tooltip: '关闭',
+                    switch: false,
+                    onSwitch: function (item) {
+                        invertEnabled = !item.switch;
+                        item.tooltip = invertEnabled ? '开启' : '关闭';
+                        syncInvertState();
+                        return invertEnabled;
                     },
-                });
-            }
-
-            settings.push({
-                name: 'math-invert',
-                html: '反色',
-                tooltip: '关闭',
-                switch: false,
-                onSwitch: function (item) {
-                    invertEnabled = !item.switch;
-                    item.tooltip = invertEnabled ? '开启' : '关闭';
-                    syncInvertState();
-                    return invertEnabled;
                 },
-            });
+            ];
 
             art = new Artplayer({
                 container: container,
