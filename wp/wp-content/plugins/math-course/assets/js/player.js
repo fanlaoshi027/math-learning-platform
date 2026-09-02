@@ -109,6 +109,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        function seekBy(seconds) {
+            if (!art || !art.video) return;
+            const duration = Number(art.duration || art.video.duration || 0);
+            const current = Number(art.currentTime || art.video.currentTime || 0);
+            if (!Number.isFinite(current)) return;
+            const target = current + seconds;
+            art.currentTime = duration > 0 ? Math.max(0, Math.min(target, duration)) : Math.max(0, target);
+        }
+
         function createPlayer() {
             const settings = [
                 {
@@ -186,6 +195,37 @@ document.addEventListener('DOMContentLoaded', function () {
             container.addEventListener('contextmenu', preventContextMenu, true);
             if (art.contextmenu) art.contextmenu.show = false;
             bindFullscreenEvents(art.video);
+
+            // Keep the existing ArtPlayer menu/settings intact; add only the two requested
+            // 10-second seek buttons to the bottom control bar.
+            art.controls.add({
+                name: 'math-skip-back',
+                index: 2,
+                position: 'left',
+                html: '↶10',
+                tooltip: '后退 10 秒',
+                style: {
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    minWidth: '42px',
+                    textAlign: 'center',
+                },
+                click: function () { seekBy(-10); },
+            });
+            art.controls.add({
+                name: 'math-skip-forward',
+                index: 3,
+                position: 'left',
+                html: '10↷',
+                tooltip: '前进 10 秒',
+                style: {
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    minWidth: '42px',
+                    textAlign: 'center',
+                },
+                click: function () { seekBy(10); },
+            });
 
             art.on('fullscreen', onFullscreenChange);
             art.on('fullscreenWeb', onFullscreenChange);
