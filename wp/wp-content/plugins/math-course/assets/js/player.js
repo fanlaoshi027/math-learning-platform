@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const video = art && art.video ? art.video : container.querySelector('video');
             const playerRoot = container.querySelector('.art-video-player');
 
-            // Never invert the player/container/root: that would also invert controls and icons.
+            // Never invert the player/container/root: controls and icons must stay normal.
             container.classList.remove('math-video-invert', 'is-inverted');
             if (playerRoot) playerRoot.classList.remove('math-video-invert', 'is-inverted');
 
@@ -90,8 +90,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function onFullscreenChange() {
-            // ArtPlayer/browser fullscreen can replace or reposition the video synchronously.
-            // Re-read the actual video after the fullscreen transition settles.
             window.requestAnimationFrame(function () {
                 syncInvertState();
                 window.requestAnimationFrame(syncInvertState);
@@ -113,39 +111,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (video) {
                 video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.removeEventListener('webkitendfullscreen', onFullscreenChange);
-            }
-        }
-
-        function isPlayerActiveForKeyboard() {
-            const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
-            if (activeFullscreen && (activeFullscreen === container || activeFullscreen.contains(container) || container.contains(activeFullscreen))) {
-                return true;
-            }
-            if (container.contains(document.activeElement)) return true;
-            return container.matches(':hover');
-        }
-
-        function seekBy(seconds) {
-            if (!art || !art.video) return;
-            const current = Number(art.currentTime || 0);
-            const duration = Number(art.duration || 0);
-            const target = Math.max(0, current + seconds);
-            art.currentTime = duration > 0 ? Math.min(target, duration) : target;
-        }
-
-        function onPlayerKeydown(event) {
-            if (!art || !art.video || !isPlayerActiveForKeyboard()) return;
-            const tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : '';
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.isComposing) return;
-
-            if (event.key === 'ArrowLeft') {
-                event.preventDefault();
-                event.stopPropagation();
-                seekBy(-10);
-            } else if (event.key === 'ArrowRight') {
-                event.preventDefault();
-                event.stopPropagation();
-                seekBy(10);
             }
         }
 
@@ -198,8 +163,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 url: url,
                 type: 'm3u8',
                 lang: 'zh-cn',
-                theme: '#1769e0',
-                volume: 0.8,
                 autoplay: false,
                 muted: false,
                 pip: false,
@@ -212,8 +175,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 flip: false,
                 aspectRatio: false,
                 subtitleOffset: false,
-                lock: true,
-                backdrop: true,
                 contextmenu: [],
                 settings: settings,
                 moreVideoAttr: {
@@ -241,18 +202,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 event.stopPropagation();
             }
 
+            // Disable the browser/player right-click menu without changing ArtPlayer's visual UI.
             container.addEventListener('contextmenu', preventContextMenu, true);
             if (art.contextmenu) art.contextmenu.show = false;
             bindFullscreenEvents(art.video);
-            document.addEventListener('keydown', onPlayerKeydown, true);
-
-            if (art.video && window.matchMedia && window.matchMedia('(max-width: 640px)').matches) {
-                art.video.addEventListener('click', function (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    try { art.toggle(); } catch (e) {}
-                }, true);
-            }
 
             art.on('fullscreen', onFullscreenChange);
             art.on('fullscreenWeb', onFullscreenChange);
@@ -288,7 +241,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             art.on('destroy', function () {
                 unbindFullscreenEvents(art.video);
-                document.removeEventListener('keydown', onPlayerKeydown, true);
                 container.removeEventListener('contextmenu', preventContextMenu, true);
                 if (art._mathcourseHls) {
                     try { art._mathcourseHls.destroy(); } catch (e) {}
