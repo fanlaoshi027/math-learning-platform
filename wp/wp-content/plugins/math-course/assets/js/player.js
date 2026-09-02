@@ -72,16 +72,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function syncInvertState() {
             const video = art && art.video ? art.video : container.querySelector('video');
-            const playerRoot = container.querySelector('.art-video-player');
-
-            // Never invert the player/container/root: controls and icons must stay normal.
-            container.classList.remove('math-video-invert', 'is-inverted');
-            if (playerRoot) playerRoot.classList.remove('math-video-invert', 'is-inverted');
-
-            // The video frame is the only element that may be inverted.
             if (!video) return;
-            video.classList.toggle('math-video-invert', invertEnabled);
-            video.classList.toggle('is-inverted', invertEnabled);
+
+            // Apply invert only to the video element. ArtPlayer controls stay untouched.
             if (invertEnabled) {
                 video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
             } else {
