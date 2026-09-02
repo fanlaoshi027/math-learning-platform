@@ -27,6 +27,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const storageKey = 'mathcourse_lesson_' + lessonId + '_time';
         let completionSent = false;
         let lastSavedSecond = -1;
+        let invertEnabled = false;
+        let art = null;
+        let fullscreenTarget = null;
 
         function savedTime() {
             try {
@@ -61,10 +64,98 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        function createPlayer() {
-            let invertEnabled = false;
+        function removeInvertFromFullscreenTarget() {
+            if (fullscreenTarget && fullscreenTarget !== container) {
+                fullscreenTarget.classList.remove('math-video-invert');
+            }
+            fullscreenTarget = null;
+        }
 
-            const art = new Artplayer({
+        function syncInvertState() {
+            container.classList.toggle('math-video-invert', invertEnabled);
+            container.classList.toggle('is-inverted', invertEnabled);
+
+            removeInvertFromFullscreenTarget();
+
+            const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
+            if (invertEnabled && activeFullscreen && activeFullscreen !== container) {
+                activeFullscreen.classList.add('math-video-invert');
+                fullscreenTarget = activeFullscreen;
+            }
+
+            if (art && art.video) {
+                art.video.classList.toggle('math-video-invert', invertEnabled);
+            }
+        }
+
+        function onFullscreenChange() {
+            window.requestAnimationFrame(syncInvertState);
+        }
+
+        function bindFullscreenEvents(video) {
+            document.addEventListener('fullscreenchange', onFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+            if (video) {
+                video.addEventListener('webkitbeginfullscreen', onFullscreenChange);
+                video.addEventListener('webkitendfullscreen', onFullscreenChange);
+            }
+        }
+
+        function unbindFullscreenEvents(video) {
+            document.removeEventListener('fullscreenchange', onFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+            if (video) {
+                video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
+                video.removeEventListener('webkitendfullscreen', onFullscreenChange);
+            }
+            removeInvertFromFullscreenTarget();
+        }
+
+        function createPlayer() {
+            const castSupported = typeof HTMLVideoElement !== 'undefined' && 'remote' in HTMLVideoElement.prototype;
+            const settings = [
+                {
+                    name: 'math-speed',
+                    html: '倍速',
+                    tooltip: '1×',
+                    selector: speeds.map(function (speed) {
+                        return { html: speed + '×', value: speed, default: speed === 1 };
+                    }),
+                    onSelect: function (item) {
+                        const speed = Number(item.value);
+                        if (Number.isFinite(speed) && art) art.playbackRate = speed;
+                        return item.html;
+                    },
+                },
+            ];
+
+            if (castSupported) {
+                settings.push({
+                    name: 'math-cast',
+                    html: '投屏',
+                    tooltip: '投屏',
+                    onSelect: function () {
+                        if (!art || !art.video || !art.video.remote || typeof art.video.remote.prompt !== 'function') return '不支持投屏';
+                        try { art.video.remote.prompt().catch(function () {}); } catch (e) {}
+                        return '投屏';
+                    },
+                });
+            }
+
+            settings.push({
+                name: 'math-invert',
+                html: '反色',
+                tooltip: '关闭',
+                switch: false,
+                onSwitch: function (item) {
+                    invertEnabled = !item.switch;
+                    item.tooltip = invertEnabled ? '开启' : '关闭';
+                    syncInvertState();
+                    return invertEnabled;
+                },
+            });
+
+            art = new Artplayer({
                 container: container,
                 url: url,
                 type: 'm3u8',
@@ -85,39 +176,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 subtitleOffset: false,
                 lock: true,
                 backdrop: true,
+                contextmenu: [],
+                settings: settings,
                 moreVideoAttr: {
                     'webkit-playsinline': true,
                     playsInline: true,
                     controlsList: 'nodownload noplaybackrate',
                     disablePictureInPicture: true,
                 },
-                settings: [
-                    {
-                        name: 'math-speed',
-                        html: '播放速度',
-                        tooltip: '1×',
-                        selector: speeds.map(function (speed) {
-                            return { html: speed + '×', value: speed, default: speed === 1 };
-                        }),
-                        onSelect: function (item) {
-                            const speed = Number(item.value);
-                            if (Number.isFinite(speed)) art.playbackRate = speed;
-                            return item.html;
-                        },
-                    },
-                    {
-                        name: 'math-invert',
-                        html: '反色播放',
-                        tooltip: '关闭',
-                        switch: false,
-                        onSwitch: function (item) {
-                            invertEnabled = !item.switch;
-                            container.classList.toggle('is-inverted', invertEnabled);
-                            item.tooltip = invertEnabled ? '开启' : '关闭';
-                            return invertEnabled;
-                        },
-                    },
-                ],
                 customType: {
                     m3u8: function (video, sourceUrl, instance) {
                         if (window.Hls && Hls.isSupported()) {
@@ -132,13 +198,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
             });
 
-            function applyInvertState() {
-                container.classList.toggle('is-inverted', invertEnabled);
+            function preventContextMenu(event) {
+                event.preventDefault();
+                event.stopPropagation();
             }
 
-            art.on('fullscreen', applyInvertState);
-            art.on('fullscreenWeb', applyInvertState);
-            art.on('fullscreenError', applyInvertState);
+            container.addEventListener('contextmenu', preventContextMenu, true);
+            bindFullscreenEvents(art.video);
+
+            art.on('fullscreen', onFullscreenChange);
+            art.on('fullscreenWeb', onFullscreenChange);
+            art.on('fullscreenError', onFullscreenChange);
 
             art.on('ready', function () {
                 const saved = savedTime();
@@ -147,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else if (saved >= art.duration - 5) {
                     clearSavedTime();
                 }
-                applyInvertState();
+                syncInvertState();
             });
 
             art.on('timeupdate', function () {
@@ -168,12 +238,13 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             art.on('destroy', function () {
+                unbindFullscreenEvents(art.video);
+                container.removeEventListener('contextmenu', preventContextMenu, true);
                 if (art._mathcourseHls) {
                     try { art._mathcourseHls.destroy(); } catch (e) {}
                 }
             });
 
-            // 只有真正播放到结尾才计为完成课时，不因拖动进度条到末尾而误完成。
             art.on('ended', submitCompletion);
             container._mathcourseArt = art;
         }
