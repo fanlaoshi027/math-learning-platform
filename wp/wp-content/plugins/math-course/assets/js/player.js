@@ -10,8 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (isWeChat && isAndroid) document.body.classList.add('math-wechat-android');
     if (isWeChat && isIOS) document.body.classList.add('math-wechat-ios');
 
-    // Web fullscreen must be mounted under <body> so no parent container, grid,
-    // transform, overflow, or width constraint can prevent viewport fullscreen.
+    // Web fullscreen is mounted under <body>, so the page grid cannot constrain it.
     if ('FULLSCREEN_WEB_IN_BODY' in window.Artplayer) {
         window.Artplayer.FULLSCREEN_WEB_IN_BODY = true;
     }
@@ -82,23 +81,23 @@ document.addEventListener('DOMContentLoaded', function () {
         function syncInvertState() {
             const video = art && art.video ? art.video : container.querySelector('video');
             if (!video) return;
+            video.classList.toggle('mathcourse-invert-video', invertEnabled);
             if (invertEnabled) {
                 video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
+                video.style.setProperty('-webkit-filter', 'invert(1) hue-rotate(180deg)', 'important');
             } else {
                 video.style.removeProperty('filter');
+                video.style.removeProperty('-webkit-filter');
             }
+            container.classList.toggle('is-inverted', invertEnabled);
         }
 
-        function setWebFullscreenState(active) {
-            document.body.classList.toggle('mathcourse-web-fullscreen', !!active);
-            container.classList.toggle('is-web-fullscreen', !!active);
-            window.requestAnimationFrame(function () {
-                if (art && typeof art.resize === 'function') art.resize();
-                syncInvertState();
-            });
-        }
-
-        function onFullscreenChange() {
+        function setFullscreenState() {
+            const webActive = !!(art && art.fullscreenWeb);
+            const windowActive = !!(art && art.fullscreen);
+            document.body.classList.toggle('mathcourse-web-fullscreen', webActive);
+            container.classList.toggle('is-web-fullscreen', webActive);
+            container.classList.toggle('is-window-fullscreen', windowActive);
             window.requestAnimationFrame(function () {
                 if (art && typeof art.resize === 'function') art.resize();
                 syncInvertState();
@@ -107,6 +106,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     syncInvertState();
                 });
             });
+        }
+
+        function onFullscreenChange() {
+            setFullscreenState();
         }
 
         function bindFullscreenEvents(video) {
@@ -221,10 +224,10 @@ document.addEventListener('DOMContentLoaded', function () {
             bindFullscreenEvents(art.video);
 
             art.on('fullscreen', function () {
-                onFullscreenChange();
+                setFullscreenState();
             });
-            art.on('fullscreenWeb', function (active) {
-                setWebFullscreenState(active);
+            art.on('fullscreenWeb', function () {
+                setFullscreenState();
             });
             art.on('fullscreenError', onFullscreenChange);
 
@@ -237,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     clearSavedTime();
                 }
                 syncInvertState();
+                setFullscreenState();
                 window.setTimeout(onFullscreenChange, isWeChat ? 80 : 0);
             });
 
@@ -258,7 +262,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             art.on('destroy', function () {
-                setWebFullscreenState(false);
+                setFullscreenState();
+                document.body.classList.remove('mathcourse-web-fullscreen');
+                container.classList.remove('is-web-fullscreen', 'is-window-fullscreen', 'is-inverted');
                 unbindFullscreenEvents(art.video);
                 container.removeEventListener('contextmenu', preventContextMenu, true);
                 if (art._mathcourseHls) {
