@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let invertEnabled = false;
         let art = null;
         let fullscreenTarget = null;
+        let fullscreenInvertTargets = [];
 
         function savedTime() {
             try {
@@ -71,30 +72,53 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        function removeInvertFromFullscreenTarget() {
-            if (fullscreenTarget && fullscreenTarget !== container) {
-                fullscreenTarget.classList.remove('math-video-invert');
-                fullscreenTarget.classList.remove('is-inverted');
-                fullscreenTarget.style.filter = '';
-            }
+        function clearFullscreenInvertTargets() {
+            fullscreenInvertTargets.forEach(function (target) {
+                if (!target) return;
+                target.classList.remove('math-video-invert');
+                target.classList.remove('is-inverted');
+                target.style.filter = '';
+            });
+            fullscreenInvertTargets = [];
             fullscreenTarget = null;
+        }
+
+        function addFullscreenInvertTarget(target) {
+            if (!target || fullscreenInvertTargets.indexOf(target) !== -1) return;
+            target.classList.add('math-video-invert');
+            target.classList.add('is-inverted');
+            target.style.filter = 'invert(1) hue-rotate(180deg)';
+            fullscreenInvertTargets.push(target);
         }
 
         function syncInvertState() {
             container.classList.toggle('math-video-invert', invertEnabled);
             container.classList.toggle('is-inverted', invertEnabled);
 
-            removeInvertFromFullscreenTarget();
+            clearFullscreenInvertTargets();
 
             const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
-            if (invertEnabled && activeFullscreen && activeFullscreen !== container) {
-                activeFullscreen.classList.add('math-video-invert');
-                activeFullscreen.classList.add('is-inverted');
-                // Native video fullscreen may not match ArtPlayer's container CSS selector.
-                if (activeFullscreen === (art && art.video) || activeFullscreen.classList.contains('art-video-player')) {
-                    activeFullscreen.style.filter = 'invert(1) hue-rotate(180deg)';
-                }
+            if (invertEnabled && activeFullscreen) {
                 fullscreenTarget = activeFullscreen;
+
+                // ArtPlayer web fullscreen can expose either the root container or the
+                // internal player as the fullscreen element. Apply the native filter to
+                // the actual fullscreen element and its ArtPlayer/video child so both
+                // browser fullscreen implementations keep the video inverted.
+                if (activeFullscreen === container || container.contains(activeFullscreen)) {
+                    addFullscreenInvertTarget(activeFullscreen);
+                } else if (activeFullscreen.contains(container)) {
+                    addFullscreenInvertTarget(activeFullscreen);
+                }
+
+                const playerRoot = container.querySelector('.art-video-player');
+                const video = art && art.video ? art.video : container.querySelector('video');
+                if (playerRoot && (activeFullscreen === container || activeFullscreen.contains(playerRoot) || playerRoot === activeFullscreen)) {
+                    addFullscreenInvertTarget(playerRoot);
+                }
+                if (video && (activeFullscreen === container || activeFullscreen.contains(video) || video === activeFullscreen)) {
+                    addFullscreenInvertTarget(video);
+                }
             }
 
             if (art && art.video) {
@@ -124,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.removeEventListener('webkitendfullscreen', onFullscreenChange);
             }
-            removeInvertFromFullscreenTarget();
+            clearFullscreenInvertTargets();
         }
 
         function createPlayer() {
