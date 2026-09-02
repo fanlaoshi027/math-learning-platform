@@ -1,4 +1,4 @@
-/* Learning layout final override: full-width learning area, stable responsive stacking. */
+/* Learning layout final override: reference-style proportions and stable responsive behavior. */
 body.mathcourse-site .math-learning-page .mc-course-player{
   width:100vw !important;
   max-width:none !important;
@@ -6,16 +6,27 @@ body.mathcourse-site .math-learning-page .mc-course-player{
   margin-right:0 !important;
   transform:translateX(-50%) !important;
   box-sizing:border-box !important;
-  padding-left:24px !important;
-  padding-right:24px !important;
+  padding-left:28px !important;
+  padding-right:28px !important;
 }
 
+/* Desktop reference layout: course directory on the left, player on the right. */
 body.mathcourse-site .math-learning-page .mc-course-player__layout{
   display:grid !important;
-  grid-template-columns:minmax(0,1fr) 360px !important;
-  gap:24px !important;
+  grid-template-columns:360px minmax(0,1fr) !important;
+  grid-template-areas:"sidebar main" !important;
+  gap:28px !important;
   width:100% !important;
   min-width:0 !important;
+  align-items:start !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+  grid-area:sidebar !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__main{
+  grid-area:main !important;
 }
 
 body.mathcourse-site .math-learning-page .mc-course-player__main,
@@ -24,27 +35,30 @@ body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
   box-sizing:border-box !important;
 }
 
-/* Below laptop width, stack instead of letting the two columns suddenly collide. */
-@media (max-width:1099px){
-  body.mathcourse-site .math-learning-page .mc-course-player__layout{
-    display:block !important;
-  }
-  body.mathcourse-site .math-learning-page .mc-course-player__main,
-  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
-    width:100% !important;
-    min-width:0 !important;
-  }
-  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
-    margin-top:18px !important;
-  }
-}
-
-/* The player itself always gets the full available row. */
+/* Keep the player as the dominant visual block. */
 body.mathcourse-site .math-learning-page .mc-course-player__video,
 body.mathcourse-site .math-learning-page .mathcourse-artplayer{
   width:100% !important;
   max-width:none !important;
   min-width:0 !important;
+}
+
+/* Below laptop width, stack smoothly: player first, directory second. */
+@media (max-width:1099px){
+  body.mathcourse-site .math-learning-page .mc-course-player__layout{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:18px !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__main{
+    order:1 !important;
+    width:100% !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+    order:2 !important;
+    width:100% !important;
+    margin-top:0 !important;
+  }
 }
 
 @media (max-width:700px){
@@ -53,6 +67,11 @@ body.mathcourse-site .math-learning-page .mathcourse-artplayer{
     padding-right:0 !important;
     margin-top:0 !important;
   }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__layout{
+    gap:14px !important;
+  }
+
   body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
     width:calc(100% - 24px) !important;
     margin-left:12px !important;
