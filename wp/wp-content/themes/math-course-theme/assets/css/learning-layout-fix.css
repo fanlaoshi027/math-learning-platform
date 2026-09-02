@@ -21,13 +21,8 @@ body.mathcourse-site .math-learning-page .mc-course-player__layout{
   align-items:start !important;
 }
 
-body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
-  grid-area:sidebar !important;
-}
-
-body.mathcourse-site .math-learning-page .mc-course-player__main{
-  grid-area:main !important;
-}
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar{grid-area:sidebar !important}
+body.mathcourse-site .math-learning-page .mc-course-player__main{grid-area:main !important}
 
 body.mathcourse-site .math-learning-page .mc-course-player__main,
 body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
@@ -35,7 +30,6 @@ body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
   box-sizing:border-box !important;
 }
 
-/* Keep the player as the dominant visual block. */
 body.mathcourse-site .math-learning-page .mc-course-player__video,
 body.mathcourse-site .math-learning-page .mathcourse-artplayer{
   width:100% !important;
@@ -61,20 +55,60 @@ body.mathcourse-site .math-learning-page .mathcourse-artplayer{
   }
 }
 
+/* Phone portrait: edge-to-edge player with a compact directory card. */
 @media (max-width:700px){
   body.mathcourse-site .math-learning-page .mc-course-player{
     padding-left:0 !important;
     padding-right:0 !important;
     margin-top:0 !important;
   }
-
-  body.mathcourse-site .math-learning-page .mc-course-player__layout{
-    gap:14px !important;
-  }
-
+  body.mathcourse-site .math-learning-page .mc-course-player__layout{gap:14px !important}
   body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
     width:calc(100% - 24px) !important;
     margin-left:12px !important;
     margin-right:12px !important;
+  }
+}
+
+/* Phone landscape: use the full horizontal canvas without forcing desktop columns.
+ * The video stays 16:9, while the directory remains below it and remains touch-friendly.
+ */
+@media (min-width:701px) and (max-width:900px) and (orientation:landscape){
+  body.mathcourse-site .math-learning-page .mc-course-player{
+    padding-left:0 !important;
+    padding-right:0 !important;
+    margin-top:0 !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__layout{
+    width:100% !important;
+    gap:16px !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__main{
+    width:100% !important;
+  }
+  body.mathcourse-site .math-learning-page .mathcourse-artplayer{
+    width:100% !important;
+    aspect-ratio:16 / 9 !important;
+    min-height:0 !important;
+    height:auto !important;
+  }
+  body.mathcourse-site .math-learning-page .mathcourse-artplayer .art-video-player{
+    width:100% !important;
+    height:100% !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+    width:100% !important;
+    margin:0 !important;
+  }
+}
+
+/* Very short landscape phones: keep the player from being clipped by viewport height. */
+@media (orientation:landscape) and (max-height:500px){
+  body.mathcourse-site .math-learning-page .mc-course-player__video,
+  body.mathcourse-site .math-learning-page .mathcourse-artplayer{
+    min-height:0 !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__lesson-head{
+    padding-top:10px !important;
   }
 }
