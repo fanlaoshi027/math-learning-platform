@@ -37,7 +37,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let invertEnabled = false;
         let art = null;
         let fullscreenTarget = null;
-        let fullscreenInvertTargets = [];
 
         function savedTime() {
             try {
@@ -72,57 +71,54 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        function clearFullscreenInvertTargets() {
-            fullscreenInvertTargets.forEach(function (target) {
-                if (!target) return;
-                target.classList.remove('math-video-invert');
-                target.classList.remove('is-inverted');
-                target.style.filter = '';
-            });
-            fullscreenInvertTargets = [];
+        function clearFullscreenInvertTarget() {
+            if (!fullscreenTarget || fullscreenTarget === container || fullscreenTarget === (art && art.video)) {
+                fullscreenTarget = null;
+                return;
+            }
+            fullscreenTarget.classList.remove('math-video-invert');
+            fullscreenTarget.classList.remove('is-inverted');
+            fullscreenTarget.style.removeProperty('filter');
             fullscreenTarget = null;
         }
 
-        function addFullscreenInvertTarget(target) {
-            if (!target || fullscreenInvertTargets.indexOf(target) !== -1) return;
-            target.classList.add('math-video-invert');
-            target.classList.add('is-inverted');
-            target.style.filter = 'invert(1) hue-rotate(180deg)';
-            fullscreenInvertTargets.push(target);
-        }
-
         function syncInvertState() {
-            container.classList.toggle('math-video-invert', invertEnabled);
-            container.classList.toggle('is-inverted', invertEnabled);
+            const video = art && art.video ? art.video : container.querySelector('video');
+            const playerRoot = container.querySelector('.art-video-player');
 
-            clearFullscreenInvertTargets();
+            // Never invert the ArtPlayer root: that also inverts the controls/icons.
+            // Only the actual video frame should be inverted.
+            container.classList.remove('math-video-invert', 'is-inverted');
+            if (playerRoot) playerRoot.classList.remove('math-video-invert', 'is-inverted');
 
-            const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
-            if (invertEnabled && activeFullscreen) {
-                fullscreenTarget = activeFullscreen;
+            clearFullscreenInvertTarget();
 
-                // ArtPlayer web fullscreen can expose either the root container or the
-                // internal player as the fullscreen element. Apply the native filter to
-                // the actual fullscreen element and its ArtPlayer/video child so both
-                // browser fullscreen implementations keep the video inverted.
-                if (activeFullscreen === container || container.contains(activeFullscreen)) {
-                    addFullscreenInvertTarget(activeFullscreen);
-                } else if (activeFullscreen.contains(container)) {
-                    addFullscreenInvertTarget(activeFullscreen);
-                }
-
-                const playerRoot = container.querySelector('.art-video-player');
-                const video = art && art.video ? art.video : container.querySelector('video');
-                if (playerRoot && (activeFullscreen === container || activeFullscreen.contains(playerRoot) || playerRoot === activeFullscreen)) {
-                    addFullscreenInvertTarget(playerRoot);
-                }
-                if (video && (activeFullscreen === container || activeFullscreen.contains(video) || video === activeFullscreen)) {
-                    addFullscreenInvertTarget(video);
+            if (video) {
+                video.classList.toggle('math-video-invert', invertEnabled);
+                if (invertEnabled) {
+                    video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
+                } else {
+                    video.style.removeProperty('filter');
                 }
             }
 
-            if (art && art.video) {
-                art.video.classList.toggle('math-video-invert', invertEnabled);
+            const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement || null;
+            if (!invertEnabled || !activeFullscreen) return;
+
+            // If the browser made the video itself fullscreen, keep the filter on it.
+            // If ArtPlayer made a wrapper fullscreen, the video remains the only target
+            // that receives the filter, preventing the fullscreen controls from inverting.
+            if (activeFullscreen === video) {
+                fullscreenTarget = video;
+                video.classList.add('math-video-invert');
+                video.classList.add('is-inverted');
+                video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
+            } else if (activeFullscreen === container || activeFullscreen.contains(video)) {
+                fullscreenTarget = activeFullscreen;
+                // Do not put a filter on activeFullscreen. Its controls must remain normal.
+            } else if (activeFullscreen.contains(container)) {
+                fullscreenTarget = activeFullscreen;
+                // Same rule for a browser-created outer fullscreen wrapper.
             }
         }
 
@@ -148,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.removeEventListener('webkitendfullscreen', onFullscreenChange);
             }
-            clearFullscreenInvertTargets();
+            clearFullscreenInvertTarget();
         }
 
         function createPlayer() {
