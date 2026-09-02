@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (isWeChat && isIOS) document.body.classList.add('math-wechat-ios');
 
     // Web fullscreen must be mounted under <body> so no parent container, grid,
-    // transform, overflow, or width constraint can prevent true viewport fullscreen.
+    // transform, overflow, or width constraint can prevent viewport fullscreen.
     if ('FULLSCREEN_WEB_IN_BODY' in window.Artplayer) {
         window.Artplayer.FULLSCREEN_WEB_IN_BODY = true;
     }
@@ -21,10 +21,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateProgressUI(progress) {
         if (!progress) return;
-        document.querySelectorAll('.mc-course-player__progress span').forEach(el => el.textContent = '学习进度 ' + Number(progress.percent || 0) + '%');
-        document.querySelectorAll('.mc-course-player__progress strong').forEach(el => el.textContent = Number(progress.completed || 0) + ' / ' + Number(progress.total || 0) + ' 课时');
-        document.querySelectorAll('.mc-course-player__progress i').forEach(el => el.style.width = Number(progress.percent || 0) + '%');
-        document.querySelectorAll('.mc-course-player__sidebar-head span').forEach(el => el.textContent = Number(progress.completed || 0) + '/' + Number(progress.total || 0));
+        document.querySelectorAll('.mc-course-player__progress span').forEach(el => el.textContent = '学习进度');
+        document.querySelectorAll('.mc-course-player__progress strong').forEach(el => el.textContent = Number(progress.percent || 0) + '%');
+        document.querySelectorAll('.mc-course-player__progress b').forEach(el => el.style.width = Number(progress.percent || 0) + '%');
+        document.querySelectorAll('.mc-course-player__sidebar-head strong').forEach(el => el.textContent = Number(progress.completed || 0) + ' / ' + Number(progress.total || 0) + ' 课时');
     }
 
     function showCompletionPanel() {
@@ -87,6 +87,15 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 video.style.removeProperty('filter');
             }
+        }
+
+        function setWebFullscreenState(active) {
+            document.body.classList.toggle('mathcourse-web-fullscreen', !!active);
+            container.classList.toggle('is-web-fullscreen', !!active);
+            window.requestAnimationFrame(function () {
+                if (art && typeof art.resize === 'function') art.resize();
+                syncInvertState();
+            });
         }
 
         function onFullscreenChange() {
@@ -179,8 +188,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 contextmenu: [],
                 settings: settings,
                 moreVideoAttr: {
-                    // Keep the attributes on the video element from creation time.
-                    // This is important for iOS WebKit and Android WeChat/X5.
                     'webkit-playsinline': 'true',
                     playsinline: 'true',
                     'x5-playsinline': 'true',
@@ -213,8 +220,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (art.contextmenu) art.contextmenu.show = false;
             bindFullscreenEvents(art.video);
 
-            art.on('fullscreen', onFullscreenChange);
-            art.on('fullscreenWeb', onFullscreenChange);
+            art.on('fullscreen', function () {
+                onFullscreenChange();
+            });
+            art.on('fullscreenWeb', function (active) {
+                setWebFullscreenState(active);
+            });
             art.on('fullscreenError', onFullscreenChange);
 
             art.on('ready', function () {
@@ -247,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             art.on('destroy', function () {
+                setWebFullscreenState(false);
                 unbindFullscreenEvents(art.video);
                 container.removeEventListener('contextmenu', preventContextMenu, true);
                 if (art._mathcourseHls) {
