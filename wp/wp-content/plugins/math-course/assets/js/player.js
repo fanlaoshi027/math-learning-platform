@@ -207,6 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             container.addEventListener('contextmenu', preventContextMenu, true);
+            if (art.contextmenu) art.contextmenu.show = false;
             bindFullscreenEvents(art.video);
 
             if (art.video && window.matchMedia && window.matchMedia('(max-width: 640px)').matches) {
@@ -222,6 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
             art.on('fullscreenError', onFullscreenChange);
 
             art.on('ready', function () {
+                if (art.contextmenu) art.contextmenu.show = false;
                 const saved = savedTime();
                 if (saved > 0 && art.duration > 0 && saved < art.duration - 5) {
                     try { art.currentTime = Math.min(saved, art.duration - 1); } catch (e) {}
