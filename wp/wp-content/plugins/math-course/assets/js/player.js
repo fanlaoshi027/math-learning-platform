@@ -74,8 +74,6 @@ document.addEventListener('DOMContentLoaded', function () {
         function syncInvertState() {
             const video = art && art.video ? art.video : container.querySelector('video');
             if (!video) return;
-
-            // Apply invert only to the video element. ArtPlayer controls stay untouched.
             if (invertEnabled) {
                 video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
             } else {
@@ -84,15 +82,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function onFullscreenChange() {
+            // Re-measure ArtPlayer after browser orientation/viewport changes.
             window.requestAnimationFrame(function () {
+                if (art && typeof art.resize === 'function') art.resize();
                 syncInvertState();
-                window.requestAnimationFrame(syncInvertState);
+                window.requestAnimationFrame(function () {
+                    if (art && typeof art.resize === 'function') art.resize();
+                    syncInvertState();
+                });
             });
         }
 
         function bindFullscreenEvents(video) {
             document.addEventListener('fullscreenchange', onFullscreenChange);
             document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+            window.addEventListener('orientationchange', onFullscreenChange, { passive: true });
+            window.addEventListener('resize', onFullscreenChange, { passive: true });
             if (video) {
                 video.addEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.addEventListener('webkitendfullscreen', onFullscreenChange);
@@ -102,6 +107,8 @@ document.addEventListener('DOMContentLoaded', function () {
         function unbindFullscreenEvents(video) {
             document.removeEventListener('fullscreenchange', onFullscreenChange);
             document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+            window.removeEventListener('orientationchange', onFullscreenChange);
+            window.removeEventListener('resize', onFullscreenChange);
             if (video) {
                 video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.removeEventListener('webkitendfullscreen', onFullscreenChange);
@@ -181,7 +188,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 event.stopPropagation();
             }
 
-            // Disable the browser/player right-click menu without changing ArtPlayer's visual UI.
             container.addEventListener('contextmenu', preventContextMenu, true);
             if (art.contextmenu) art.contextmenu.show = false;
             bindFullscreenEvents(art.video);
@@ -230,8 +236,6 @@ document.addEventListener('DOMContentLoaded', function () {
             container._mathcourseArt = art;
         }
 
-        // Always initialize ArtPlayer. Hls.js is used when available; the custom m3u8 handler
-        // falls back to the browser's native HLS implementation when it is not.
         createPlayer();
     });
 });
