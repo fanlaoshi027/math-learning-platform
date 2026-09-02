@@ -1,0 +1,61 @@
+/* Learning layout final override: full-width learning area, stable responsive stacking. */
+body.mathcourse-site .math-learning-page .mc-course-player{
+  width:100vw !important;
+  max-width:none !important;
+  margin-left:50% !important;
+  margin-right:0 !important;
+  transform:translateX(-50%) !important;
+  box-sizing:border-box !important;
+  padding-left:24px !important;
+  padding-right:24px !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__layout{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 360px !important;
+  gap:24px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__main,
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+  min-width:0 !important;
+  box-sizing:border-box !important;
+}
+
+/* Below laptop width, stack instead of letting the two columns suddenly collide. */
+@media (max-width:1099px){
+  body.mathcourse-site .math-learning-page .mc-course-player__layout{
+    display:block !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__main,
+  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+    width:100% !important;
+    min-width:0 !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+    margin-top:18px !important;
+  }
+}
+
+/* The player itself always gets the full available row. */
+body.mathcourse-site .math-learning-page .mc-course-player__video,
+body.mathcourse-site .math-learning-page .mathcourse-artplayer{
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+}
+
+@media (max-width:700px){
+  body.mathcourse-site .math-learning-page .mc-course-player{
+    padding-left:0 !important;
+    padding-right:0 !important;
+    margin-top:0 !important;
+  }
+  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+    width:calc(100% - 24px) !important;
+    margin-left:12px !important;
+    margin-right:12px !important;
+  }
+}
