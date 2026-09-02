@@ -2,9 +2,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!window.Artplayer) return;
     document.body.classList.add('math-learning-page');
 
-    // Keep web fullscreen inside the player container so the invert state and UI stay together.
+    // Web fullscreen must be mounted under <body> so no parent container, grid,
+    // transform, overflow, or width constraint can prevent true viewport fullscreen.
+    // ArtPlayer's default is true; keep it explicit for reliable Edge/Chrome behavior.
     if ('FULLSCREEN_WEB_IN_BODY' in window.Artplayer) {
-        window.Artplayer.FULLSCREEN_WEB_IN_BODY = false;
+        window.Artplayer.FULLSCREEN_WEB_IN_BODY = true;
     }
 
     const players = document.querySelectorAll('.mathcourse-artplayer[data-video-url]');
