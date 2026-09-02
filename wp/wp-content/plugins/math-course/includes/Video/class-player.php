@@ -3,7 +3,6 @@ namespace MathCourse\Video;
 
 defined( 'ABSPATH' ) || exit;
 
-use MathCourse\Course\Course_Service;
 use MathCourse\Tutor\Adapter;
 
 class Player {
@@ -15,8 +14,7 @@ class Player {
     }
 
     public function assets() {
-        wp_enqueue_style( 'mathcourse-course-player-large', MATHCOURSE_URL . 'assets/course-player-large.css', array(), MATHCOURSE_VERSION );
-        wp_enqueue_style( 'mathcourse-artplayer-ui', MATHCOURSE_URL . 'assets/artplayer-ui.css', array( 'mathcourse-course-player-large' ), MATHCOURSE_VERSION . '-artplayer-local' );
+        wp_enqueue_style( 'mathcourse-artplayer-ui', MATHCOURSE_URL . 'assets/artplayer-ui.css', array( 'mathcourse-course-player' ), MATHCOURSE_VERSION . '-artplayer-local' );
 
         wp_enqueue_script( 'hls-js', 'https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js', array(), '1.6.2', true );
         wp_enqueue_script( 'artplayer', MATHCOURSE_URL . 'assets/artplayer/artplayer.js', array( 'hls-js' ), '5.4.1-local', true );
@@ -41,7 +39,7 @@ class Player {
             return '<div class="mc-video-missing">未指定课时。</div>';
         }
 
-        $service = new Course_Service();
+        $service = new \MathCourse\Course\Course_Service();
         $video   = $service->get_lesson_video( $lesson_id, $user_id );
 
         if ( empty( $video['id'] ) || empty( $video['accessible'] ) ) {
