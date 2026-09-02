@@ -13,19 +13,26 @@ class Course_Player {
         wp_enqueue_script('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/js/course-outline-accordion.js', array(), MATHCOURSE_VERSION, true);
         wp_enqueue_script('mathcourse-course-directory-lock-modal', MATHCOURSE_URL . 'assets/course-directory.js', array(), MATHCOURSE_VERSION, true);
     }
+    private function learning_url($course_id, $lesson_id = 0) {
+        $page = get_page_by_path('learning');
+        $base = $page ? get_permalink($page) : home_url('/learning/');
+        $args = array('course_id' => absint($course_id));
+        if ($lesson_id) $args['lesson_id'] = absint($lesson_id);
+        return add_query_arg($args, $base);
+    }
     public function render($atts=array()) {
-        $atts=shortcode_atts(array('course_id'=>0),$atts,'mathcourse_course_player');
+        $atts=shortcode_atts(array('course_id'=>0,'lesson_id'=>0),$atts,'mathcourse_course_player');
         $course_id=absint($atts['course_id']); if(!$course_id && isset($_GET['course_id'])) $course_id=absint($_GET['course_id']);
         if(!$course_id) return '<p>课程不存在。</p>';
         $data=$this->service->get_course_directory($course_id,get_current_user_id()); if(!$data) return '<p>课程不存在或课程系统暂不可用。</p>';
-        $selected=isset($_GET['lesson_id'])?absint($_GET['lesson_id']):0; $current=$this->find_lesson($data,$selected); if(!$current) $current=$this->first_accessible($data);
+        $selected=absint($atts['lesson_id']); if(!$selected && isset($_GET['lesson_id'])) $selected=absint($_GET['lesson_id']);
+        $current=$this->find_lesson($data,$selected); if(!$current) $current=$this->first_accessible($data);
         $progress=isset($data['progress'])?$data['progress']:array('completed'=>0,'total'=>0,'percent'=>0);
-        $page=get_page_by_path('course-center'); $base=$page?get_permalink($page):home_url('/course-center/');
         $navigation=$this->lesson_navigation($data,$current,$course_id); $this->assets();
         ob_start(); ?>
         <main class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
             <header class="mc-learning-header">
-                <a class="mc-learning-back" href="<?php echo esc_url($base); ?>" aria-label="返回课程中心"><span aria-hidden="true">‹</span><span>课程中心</span></a>
+                <a class="mc-learning-back" href="<?php echo esc_url(home_url('/course-center/')); ?>" aria-label="返回课程中心"><span aria-hidden="true">‹</span><span>课程中心</span></a>
                 <div class="mc-learning-course-title"><span>正在学习</span><strong><?php echo esc_html($data['title']); ?></strong></div>
                 <div class="mc-learning-progress"><span>学习进度</span><strong><?php echo esc_html($progress['percent']); ?>%</strong><i><b style="width:<?php echo esc_attr($progress['percent']); ?>%"></b></i></div>
             </header>
@@ -55,7 +62,7 @@ class Course_Player {
                         <div class="mc-course-player__topic<?php echo $topic_open?' is-open':''; ?>">
                             <h3 class="mc-course-player__topic-toggle" tabindex="0" role="button" aria-expanded="<?php echo $topic_open?'true':'false'; ?>"><span class="mc-course-player__topic-number"><?php echo esc_html(str_pad((string)($index+1),2,'0',STR_PAD_LEFT)); ?></span><span><?php echo esc_html($topic['title']); ?></span></h3>
                             <div class="mc-course-player__lessons"<?php echo $topic_open?'':' hidden'; ?>>
-                            <?php foreach($topic['lessons'] as $lesson): $active=$current&&(int)$current['id']===(int)$lesson['id']; $url=add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base); ?>
+                            <?php foreach($topic['lessons'] as $lesson): $active=$current&&(int)$current['id']===(int)$lesson['id']; $url=$this->learning_url($course_id,$lesson['id']); ?>
                                 <?php if($lesson['accessible']): ?><a class="mc-course-player__item <?php echo $active?'is-active ':''; echo $lesson['completed']?'is-complete':''; ?>" href="<?php echo esc_url($url); ?>"><span class="mc-course-player__check"><?php echo $lesson['completed']?'✓':($active?'●':'○'); ?></span><span><?php echo esc_html($lesson['title']); ?></span><?php if($lesson['preview']): ?><small>试看</small><?php endif; ?></a><?php else: ?><div class="mc-course-player__item is-locked" data-mathcourse-lock="1" role="button" tabindex="0"><span class="mc-course-player__check">🔒</span><span><?php echo esc_html($lesson['title']); ?></span><small>需授权</small></div><?php endif; ?>
                             <?php endforeach; ?>
                             </div>
@@ -76,9 +83,8 @@ class Course_Player {
         $lessons=array(); foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)$lessons[]=$lesson;
         $current_index=null; foreach($lessons as $index=>$lesson)if((int)$lesson['id']===(int)$current['id']){$current_index=$index;break;}
         if(null===$current_index)return $result;
-        $page=get_page_by_path('course-center'); $base=$page?get_permalink($page):home_url('/course-center/'); $course_id=absint($course_id);
-        if($current_index>0){$lesson=$lessons[$current_index-1];$result['previous']=array('id'=>$lesson['id'],'title'=>$lesson['title'],'accessible'=>!empty($lesson['accessible']),'url'=>add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base));}
-        if($current_index<count($lessons)-1){$lesson=$lessons[$current_index+1];$result['next']=array('id'=>$lesson['id'],'title'=>$lesson['title'],'accessible'=>!empty($lesson['accessible']),'url'=>add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base));}
+        if($current_index>0){$lesson=$lessons[$current_index-1];$result['previous']=array('id'=>$lesson['id'],'title'=>$lesson['title'],'accessible'=>!empty($lesson['accessible']),'url'=>$this->learning_url($course_id,$lesson['id']));}
+        if($current_index<count($lessons)-1){$lesson=$lessons[$current_index+1];$result['next']=array('id'=>$lesson['id'],'title'=>$lesson['title'],'accessible'=>!empty($lesson['accessible']),'url'=>$this->learning_url($course_id,$lesson['id']));}
         return $result;
     }
 }
