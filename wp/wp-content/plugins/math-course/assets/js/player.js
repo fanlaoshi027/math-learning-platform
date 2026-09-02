@@ -1,6 +1,12 @@
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.Artplayer) return;
     document.body.classList.add('math-learning-page');
+
+    // Keep web fullscreen inside the player container so the invert state and UI stay together.
+    if ('FULLSCREEN_WEB_IN_BODY' in window.Artplayer) {
+        window.Artplayer.FULLSCREEN_WEB_IN_BODY = false;
+    }
+
     const players = document.querySelectorAll('.mathcourse-artplayer[data-video-url]');
     const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -69,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fullscreenTarget && fullscreenTarget !== container) {
                 fullscreenTarget.classList.remove('math-video-invert');
                 fullscreenTarget.classList.remove('is-inverted');
+                fullscreenTarget.style.filter = '';
             }
             fullscreenTarget = null;
         }
@@ -83,6 +90,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (invertEnabled && activeFullscreen && activeFullscreen !== container) {
                 activeFullscreen.classList.add('math-video-invert');
                 activeFullscreen.classList.add('is-inverted');
+                // Native video fullscreen may not match ArtPlayer's container CSS selector.
+                if (activeFullscreen === (art && art.video) || activeFullscreen.classList.contains('art-video-player')) {
+                    activeFullscreen.style.filter = 'invert(1) hue-rotate(180deg)';
+                }
                 fullscreenTarget = activeFullscreen;
             }
 
@@ -92,7 +103,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function onFullscreenChange() {
-            window.requestAnimationFrame(syncInvertState);
+            window.requestAnimationFrame(function () {
+                syncInvertState();
+            });
         }
 
         function bindFullscreenEvents(video) {
