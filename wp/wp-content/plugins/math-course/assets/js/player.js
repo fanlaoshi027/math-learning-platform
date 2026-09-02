@@ -1,6 +1,10 @@
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.Artplayer) return;
+
+    const userAgent = navigator.userAgent || '';
+    const isWeChat = /MicroMessenger/i.test(userAgent);
     document.body.classList.add('math-learning-page');
+    if (isWeChat) document.body.classList.add('math-wechat');
 
     // Web fullscreen must be mounted under <body> so no parent container, grid,
     // transform, overflow, or width constraint can prevent true viewport fullscreen.
@@ -82,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function onFullscreenChange() {
-            // Re-measure ArtPlayer after browser orientation/viewport changes.
+            // Re-measure ArtPlayer after browser/WeChat viewport or orientation changes.
             window.requestAnimationFrame(function () {
                 if (art && typeof art.resize === 'function') art.resize();
                 syncInvertState();
@@ -98,6 +102,8 @@ document.addEventListener('DOMContentLoaded', function () {
             document.addEventListener('webkitfullscreenchange', onFullscreenChange);
             window.addEventListener('orientationchange', onFullscreenChange, { passive: true });
             window.addEventListener('resize', onFullscreenChange, { passive: true });
+            window.addEventListener('pageshow', onFullscreenChange, { passive: true });
+            document.addEventListener('visibilitychange', onFullscreenChange, { passive: true });
             if (video) {
                 video.addEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.addEventListener('webkitendfullscreen', onFullscreenChange);
@@ -109,6 +115,8 @@ document.addEventListener('DOMContentLoaded', function () {
             document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
             window.removeEventListener('orientationchange', onFullscreenChange);
             window.removeEventListener('resize', onFullscreenChange);
+            window.removeEventListener('pageshow', onFullscreenChange);
+            document.removeEventListener('visibilitychange', onFullscreenChange);
             if (video) {
                 video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
                 video.removeEventListener('webkitendfullscreen', onFullscreenChange);
@@ -165,7 +173,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 settings: settings,
                 moreVideoAttr: {
                     'webkit-playsinline': true,
+                    'playsinline': true,
                     playsInline: true,
+                    // Keep Android WeChat/X5 in HTML5 mode instead of handing the
+                    // video to the embedded native player when these attributes are supported.
+                    'x5-video-player-type': 'h5',
+                    'x5-video-player-fullscreen': 'true',
                     controlsList: 'nodownload noplaybackrate',
                     disablePictureInPicture: true,
                 },
@@ -205,6 +218,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     clearSavedTime();
                 }
                 syncInvertState();
+                // WeChat can settle its viewport after the media element becomes ready.
+                window.setTimeout(onFullscreenChange, isWeChat ? 80 : 0);
             });
 
             art.on('timeupdate', function () {
