@@ -1,5 +1,6 @@
-/* Learning Page V3: final theme-level reset. Keep the learning workspace independent
- * from the normal WordPress content container and avoid legacy layout overrides. */
+/* Learning Page V3 — final visual/layout layer.
+ * Keep ArtPlayer's own controls/menu intact; this file only styles the outer learning shell.
+ */
 body.mathcourse-site .math-learning-page .mc-course-player{
   width:100% !important;
   max-width:none !important;
@@ -12,31 +13,181 @@ body.mathcourse-site .math-learning-page .mc-learning-workspace{
   width:100% !important;
   max-width:1500px !important;
   min-width:0 !important;
-  margin-left:auto !important;
-  margin-right:auto !important;
+  margin:0 auto !important;
+  padding:0 24px !important;
   box-sizing:border-box !important;
+  display:grid !important;
+  grid-template-columns:360px minmax(0,1fr) !important;
+  grid-template-areas:"sidebar main" !important;
+  gap:20px !important;
+  align-items:start !important;
 }
 
-body.mathcourse-site .math-learning-page .mc-course-player__main,
-body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+body.mathcourse-site .math-learning-page .mc-course-player__main{
+  grid-area:main !important;
   min-width:0 !important;
+  background:#fff !important;
+  border:1px solid #e7ebf0 !important;
+  border-radius:18px !important;
+  overflow:hidden !important;
   box-sizing:border-box !important;
+  box-shadow:0 8px 28px rgba(15,23,42,.06) !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+  grid-area:sidebar !important;
+  min-width:0 !important;
+  background:#fff !important;
+  border:1px solid #e7ebf0 !important;
+  border-radius:18px !important;
+  overflow:hidden !important;
+  position:sticky !important;
+  top:20px !important;
+  max-height:calc(100vh - 40px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  box-sizing:border-box !important;
+  box-shadow:0 8px 28px rgba(15,23,42,.05) !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__lesson-head{
+  min-width:0 !important;
+  padding:18px 20px !important;
+  box-sizing:border-box !important;
+  background:#fff !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__lesson-head h1{
+  margin:4px 0 0 !important;
+  font-size:21px !important;
+  line-height:1.45 !important;
+  color:#172033 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__eyebrow{
+  font-size:12px !important;
+  color:#8a94a3 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__progress{
+  min-width:190px !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__progress span{
+  font-size:12px !important;
+  color:#8a94a3 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__progress strong{
+  font-size:14px !important;
+  color:#263244 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__progress i{
+  display:block !important;
+  height:6px !important;
+  background:#eef1f5 !important;
+  border-radius:99px !important;
+  overflow:hidden !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__progress i b{
+  display:block !important;
+  height:100% !important;
+  background:#f59e0b !important;
+  border-radius:99px !important;
 }
 
 body.mathcourse-site .math-learning-page .mc-course-player__video,
 body.mathcourse-site .math-learning-page .mathcourse-artplayer,
 body.mathcourse-site .math-learning-page .mathcourse-artplayer .art-video-player{
+  width:100% !important;
   max-width:none !important;
   min-width:0 !important;
 }
 
-/* ArtPlayer web fullscreen gets an explicit viewport-level surface. */
+body.mathcourse-site .math-learning-page .mathcourse-artplayer{
+  aspect-ratio:16/9 !important;
+  background:#000 !important;
+}
+
+body.mathcourse-site .math-learning-page .mathcourse-artplayer .art-video-player{
+  height:100% !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar-head{
+  flex:none !important;
+  min-height:58px !important;
+  padding:16px 18px !important;
+  box-sizing:border-box !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:10px !important;
+  border-bottom:1px solid #edf0f3 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar-head span{
+  font-size:14px !important;
+  font-weight:600 !important;
+  color:#202b3c !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__sidebar-head strong{
+  font-size:12px !important;
+  font-weight:500 !important;
+  color:#8a94a3 !important;
+  white-space:nowrap !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__topics{
+  min-height:0 !important;
+  overflow:auto !important;
+  overscroll-behavior:contain !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__topic h3{
+  margin:0 !important;
+  padding:14px 16px 8px !important;
+  font-size:13px !important;
+  line-height:1.4 !important;
+  font-weight:600 !important;
+  color:#5d6878 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__item{
+  min-height:44px !important;
+  padding:9px 14px !important;
+  border-left:3px solid transparent !important;
+  border-radius:0 8px 8px 0 !important;
+  box-sizing:border-box !important;
+  color:#354052 !important;
+  font-size:13px !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__item:hover{
+  background:#f7f9fb !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__item.is-active{
+  background:#eef6ff !important;
+  border-left-color:#2271b1 !important;
+  color:#145b92 !important;
+  font-weight:600 !important;
+}
+
+body.mathcourse-site .math-learning-page .mc-course-player__item.is-complete .mc-course-player__check{
+  color:#16a34a !important;
+}
+
+/* ArtPlayer web fullscreen: use the real viewport and remove page chrome. */
 body.mathcourse-web-fullscreen .mathcourse-artplayer.is-web-fullscreen{
   position:fixed !important;
   inset:0 !important;
   z-index:2147483000 !important;
   width:100vw !important;
   height:100vh !important;
+  height:100dvh !important;
   max-width:none !important;
   max-height:none !important;
   margin:0 !important;
@@ -54,20 +205,77 @@ body.mathcourse-web-fullscreen{
   overflow:hidden !important;
 }
 
-@media(max-width:850px){
-  body.mathcourse-site .math-learning-page .mc-course-player{
-    padding-left:0 !important;
-    padding-right:0 !important;
+@media(max-width:1050px){
+  body.mathcourse-site .math-learning-page .mc-learning-workspace{
+    padding:0 16px !important;
+    grid-template-columns:300px minmax(0,1fr) !important;
+    gap:16px !important;
+  }
+}
+
+@media(max-width:900px){
+  body.mathcourse-site .math-learning-page .mc-learning-workspace{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:14px !important;
+    padding:0 !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__main{
+    order:1 !important;
+    width:100% !important;
+    border-radius:14px !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
+    order:2 !important;
+    position:static !important;
+    width:100% !important;
+    max-height:none !important;
+    border-radius:14px !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__topics{
+    max-height:420px !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__lesson-head{
+    align-items:flex-start !important;
+    flex-direction:column !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__progress{
+    width:100% !important;
+    min-width:0 !important;
   }
 }
 
 @media(max-width:600px){
-  body.mathcourse-site .math-learning-page .mc-learning-workspace{
-    gap:14px !important;
+  body.mathcourse-site .math-learning-page .mc-course-player__main{
+    border-radius:0 !important;
+    border-left:0 !important;
+    border-right:0 !important;
+    box-shadow:none !important;
   }
+
   body.mathcourse-site .math-learning-page .mc-course-player__sidebar{
     width:calc(100% - 24px) !important;
-    margin-left:12px !important;
-    margin-right:12px !important;
+    margin:0 12px !important;
+    border-radius:12px !important;
+    box-shadow:none !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__lesson-head{
+    padding:13px 14px !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__lesson-head h1{
+    font-size:18px !important;
+  }
+
+  body.mathcourse-site .math-learning-page .mc-course-player__item{
+    min-height:43px !important;
+    padding:9px 11px !important;
+    font-size:13px !important;
   }
 }
