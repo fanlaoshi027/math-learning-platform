@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', function () {
             heading.setAttribute('role', 'button');
             heading.setAttribute('tabindex', '0');
             heading.setAttribute('aria-controls', id);
-
             heading.addEventListener('click', toggle);
             heading.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -57,5 +56,16 @@ document.addEventListener('DOMContentLoaded', function () {
             heading.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
             lessons.hidden = !shouldOpen;
         });
+
+        var player = topics.closest('.mc-course-player');
+        var toggleButton = player ? player.querySelector('.mc-learning-directory-toggle') : null;
+        if (toggleButton) {
+            toggleButton.addEventListener('click', function () {
+                var collapsed = topics.hasAttribute('hidden');
+                topics.hidden = !collapsed;
+                toggleButton.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
+                toggleButton.textContent = collapsed ? '目录' : '收起';
+            });
+        }
     });
 });
