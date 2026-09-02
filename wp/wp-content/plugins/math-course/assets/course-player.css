@@ -16,19 +16,20 @@ body.mathcourse-web-fullscreen{overflow:hidden!important}.mathcourse-artplayer.i
 /* V8 directory refinement: calmer hierarchy, clearer states, less visual noise. */
 .mc-course-player__sidebar-head{background:#fff}.mc-course-player__sidebar-head>div{gap:7px}.mc-course-player__sidebar-head span{letter-spacing:-.01em}.mc-course-player__topic h3{padding:11px 14px 7px}.mc-course-player__topic-number{display:inline-grid;place-items:center;width:22px;height:20px;border-radius:6px;background:#f5f7fa}.mc-course-player__topic.is-open .mc-course-player__topic-number{background:#edf5ff}.mc-course-player__lessons{padding:0 8px 8px}.mc-course-player__item{min-height:40px;margin:2px 0;padding:6px 9px}.mc-course-player__check{width:19px;flex-basis:19px}.mc-course-player__item.is-active{box-shadow:inset 3px 0 0 var(--mc-blue)}.mc-course-player__item.is-complete .mc-course-player__check{font-size:11px}.mc-course-player__item.is-locked{opacity:.82}.mc-course-player__item.is-locked:hover{opacity:1}.mc-course-player__item small{padding:3px 6px}.mc-course-player__topic h3+ .mc-course-player__lessons{border-top:1px solid #f6f8fa}
 /* V9: unify outer proportions, reduce visual weight, and keep touch targets stable. */
-.mc-learning-header{border-bottom:1px solid transparent}
-.mc-learning-back{flex:0 0 104px}
-.mc-learning-course-title{padding:0 12px}
-.mc-learning-progress{flex:0 0 214px;justify-content:flex-end}
-.mc-course-player__video{box-shadow:0 8px 28px rgba(16,38,61,.09)}
-.mc-learning-lesson-bar{margin-top:14px;padding-left:1px;padding-right:1px}
-.mc-learning-lesson-copy h1{font-size:20px}
-.mc-course-player__navigation{margin-top:10px;gap:10px}
-.mc-course-player__nav-button{min-height:54px;border-color:#e1e8ef}
-.mc-course-player__sidebar{box-shadow:0 5px 20px rgba(16,38,61,.045)}
-.mc-course-player__sidebar-head{padding:14px 14px 12px}
-.mc-course-player__topics{scrollbar-width:thin}
+.mc-learning-header{border-bottom:1px solid transparent}.mc-learning-back{flex:0 0 104px}.mc-learning-course-title{padding:0 12px}.mc-learning-progress{flex:0 0 214px;justify-content:flex-end}.mc-course-player__video{box-shadow:0 8px 28px rgba(16,38,61,.09)}.mc-learning-lesson-bar{margin-top:14px;padding-left:1px;padding-right:1px}.mc-learning-lesson-copy h1{font-size:20px}.mc-course-player__navigation{margin-top:10px;gap:10px}.mc-course-player__nav-button{min-height:54px;border-color:#e1e8ef}.mc-course-player__sidebar{box-shadow:0 5px 20px rgba(16,38,61,.045)}.mc-course-player__sidebar-head{padding:14px 14px 12px}.mc-course-player__topics{scrollbar-width:thin}
 @media(max-width:1100px){.mc-learning-header{padding-left:0;padding-right:0}.mc-learning-back{flex-basis:94px}.mc-learning-progress{flex-basis:190px}.mc-learning-course-title{padding:0 8px}.mc-course-player__video{box-shadow:0 7px 24px rgba(16,38,61,.075)}}
 @media(max-width:850px){.mc-learning-header{padding:0 14px;border-bottom:1px solid #edf1f5}.mc-learning-back{flex:0 0 auto}.mc-learning-course-title{display:none}.mc-learning-progress{flex:0 0 auto}.mc-course-player__video{box-shadow:none}.mc-learning-lesson-bar{margin-top:0;padding-top:14px}.mc-learning-lesson-copy h1{font-size:18px}.mc-course-player__navigation{margin-top:9px}}
 @media(max-width:600px){.mc-learning-progress{flex:0 0 auto}.mc-learning-lesson-bar{padding-top:13px}.mc-learning-lesson-copy h1{font-size:16px}.mc-course-player__navigation{gap:7px}.mc-course-player__nav-button{min-height:48px}}
 @media(hover:none){.mc-course-player__nav-button:hover{transform:none;box-shadow:none}.mc-course-player__item:hover{background:transparent;color:inherit}.mc-course-player__item.is-active:hover{background:var(--mc-blue-soft);color:#15579b}}
+/* V10: tighter composition at desktop, clearer separation around the video, and safer mobile edges. */
+.mc-learning-header{width:min(1400px,100%)}
+.mc-learning-workspace{width:min(1400px,100%);grid-template-columns:minmax(0,1fr) 318px;gap:22px}
+.mc-course-player__video{border-radius:12px;box-shadow:0 7px 24px rgba(16,38,61,.075)}
+.mc-learning-lesson-bar{margin-top:16px;padding-bottom:13px}
+.mc-learning-lesson-copy span{margin-bottom:4px}
+.mc-learning-lesson-copy h1{font-size:21px}
+.mc-course-player__sidebar{top:10px;border-radius:12px}
+.mc-course-player__sidebar-head{min-height:51px;box-sizing:border-box}
+@media(max-width:1100px){.mc-learning-header{width:100%}.mc-learning-workspace{width:100%;grid-template-columns:minmax(0,1fr) 292px;gap:18px}.mc-course-player__video{border-radius:11px}}
+@media(max-width:850px){.mc-learning-workspace{width:100%;gap:0}.mc-course-player__video{border-radius:0}.mc-learning-lesson-bar{padding-left:14px;padding-right:14px}.mc-course-player__sidebar{width:calc(100% - 24px);margin-left:12px;margin-right:12px;border-radius:11px}}
+@media(max-width:600px){.mc-learning-lesson-bar{padding-left:13px;padding-right:13px}.mc-learning-lesson-copy h1{font-size:16px}.mc-learning-progress i{width:60px}}
