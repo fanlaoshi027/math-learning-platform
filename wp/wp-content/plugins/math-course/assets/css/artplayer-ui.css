@@ -1,0 +1,37 @@
+.mathcourse-artplayer {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 240px;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.mathcourse-artplayer .art-video-player {
+    width: 100%;
+    height: 100%;
+}
+
+.mathcourse-artplayer .art-bottom {
+    padding-bottom: 6px;
+}
+
+.mathcourse-artplayer .art-progress {
+    height: 4px;
+}
+
+.mathcourse-artplayer .art-control-bar {
+    min-height: 46px;
+}
+
+@media (max-width: 767px) {
+    .mathcourse-artplayer {
+        min-height: 0;
+        border-radius: 8px;
+    }
+
+    .mathcourse-artplayer .art-control-bar {
+        min-height: 42px;
+    }
+}
