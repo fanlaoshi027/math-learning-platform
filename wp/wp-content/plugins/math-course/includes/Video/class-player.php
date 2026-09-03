@@ -9,7 +9,8 @@ class Player {
     public function __construct() { $this->tutor = new Adapter(); add_shortcode( 'mathcourse_video', array( $this, 'render' ) ); }
     public function assets() {
         // ArtPlayer 官方 UI：播放器本体使用项目内固定版本，不依赖 CDN。
-        wp_enqueue_script( 'mathcourse-hls', 'https://cdn.jsdelivr.net/npm/hls.js@1.7.0/dist/hls.min.js', array(), '1.7.0', true );
+        // HLS.js 仅作为浏览器端 HLS 解码器；MP4 与 HLS 均由同一个 ArtPlayer 外壳承载。
+        wp_enqueue_script( 'mathcourse-hls', 'https://cdn.jsdelivr.net/npm/hls.js@1.7.1/dist/hls.min.js', array(), '1.7.1', true );
         wp_enqueue_script( 'mathcourse-artplayer', MATHCOURSE_URL . 'assets/js/artplayer.js', array(), '5.4.1', true );
         wp_enqueue_style( 'mathcourse-artplayer-ui', MATHCOURSE_URL . 'assets/css/artplayer-ui.css', array(), MATHCOURSE_VERSION );
         wp_enqueue_script( 'mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array( 'mathcourse-hls', 'mathcourse-artplayer' ), MATHCOURSE_VERSION, true );
