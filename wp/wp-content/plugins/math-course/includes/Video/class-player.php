@@ -20,7 +20,7 @@ class Player {
         wp_enqueue_style( 'mathcourse-course-player-responsive-fix', MATHCOURSE_URL . 'assets/course-player-responsive-fix.css', array( 'mathcourse-lock-modal-ui', 'mathcourse-course-outline-accordion' ), MATHCOURSE_VERSION );
         wp_enqueue_script( 'hls-js', 'https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js', array(), '1.6.2', true );
         wp_enqueue_script( 'artplayer', MATHCOURSE_URL . 'assets/artplayer/artplayer.js', array( 'hls-js' ), '5.4.1-local', true );
-        wp_enqueue_script( 'mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array( 'artplayer', 'hls-js' ), MATHCOURSE_VERSION . '-artplayer-local', true );
+        wp_enqueue_script( 'mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array( 'artplayer', 'hls-js' ), MATHCOURSE_VERSION . '-artplayer-local-v2', true );
         wp_localize_script( 'mathcourse-player', 'mathcoursePlayer', array(
             'ajax_url' => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'mathcourse_progress_nonce' ),
@@ -60,7 +60,6 @@ class Player {
                 id="<?php echo esc_attr( $player_id ); ?>"
                 class="artplayer-app mathcourse-artplayer"
                 data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>"
-                data-course-id="<?php echo esc_attr( $course_id ); ?>"
                 data-video-url="<?php echo esc_url( $video['hls_url'] ); ?>"
                 aria-label="课程视频播放器"
             ></div>
