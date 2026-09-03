@@ -35,15 +35,10 @@ body.mathcourse-site .mc-home-courses .mathcourse-center__grid{grid-template-col
 
 /* Learning player: Tutor-native-inspired dark learning workspace. */
 body.mathcourse-site:has(.mc-course-player){background:#11161c;color:#e7edf4}
-body.mathcourse-site:has(.mc-course-player) .mc-site-header{background:#151b22;border-color:#252d37}
-body.mathcourse-site:has(.mc-course-player) .mc-brand{color:#f3f6fa!important}
-body.mathcourse-site:has(.mc-course-player) .mc-brand__text small{color:#7fb5ff}
-body.mathcourse-site:has(.mc-course-player) .mc-site-nav a{color:#aeb9c7!important}
-body.mathcourse-site:has(.mc-course-player) .mc-site-nav a:hover,body.mathcourse-site:has(.mc-course-player) .mc-site-nav a.is-active{background:#202a35;color:#fff!important}
-body.mathcourse-site:has(.mc-course-player) .mc-header-search{background:#1b222b;border-color:#303946}
-body.mathcourse-site:has(.mc-course-player) .mc-header-search input{color:#e7edf4}
-body.mathcourse-site:has(.mc-course-player) .mc-header-login{background:#2463e8;border-color:#2463e8}
-body.mathcourse-site:has(.mc-course-player) .mc-user-pill{background:#1b222b;border-color:#303946;color:#e7edf4!important}
+body.mathcourse-site:has(.mc-course-player) .mc-site-header,
+body.mathcourse-site:has(.mc-course-player) .mc-site-footer{display:none}
+body.mathcourse-site:has(.mc-course-player) .mc-learning-page{margin:0!important;padding:0!important;background:#11161c;min-height:100vh}
+body.mathcourse-site:has(.mc-course-player) .mc-learning-container{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
 
 /* Native Tutor-like top bar: back arrow + course title. */
 body.mathcourse-site .mc-course-player{width:100%;max-width:none;margin:0;padding:0 0 48px}
