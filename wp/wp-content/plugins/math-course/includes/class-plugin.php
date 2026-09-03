@@ -22,6 +22,7 @@ class Plugin {
         if (class_exists('MathCourse\\Learning\\Course_Learning')) new Learning\Course_Learning();
         if (class_exists('MathCourse\\Video\\Player')) new Video\Player();
         if (class_exists('MathCourse\\Video\\Video_Router')) new Video\Video_Router();
+        if (class_exists('MathCourse\\Video\\Hls_Accelerator')) new Video\Hls_Accelerator();
         if (class_exists('MathCourse\\Frontend\\Course_Directory')) new Frontend\Course_Directory();
         if (class_exists('MathCourse\\Frontend\\Course_Player')) new Frontend\Course_Player();
         if (class_exists('MathCourse\\Frontend\\Course_Directory_Assets')) new Frontend\Course_Directory_Assets();
