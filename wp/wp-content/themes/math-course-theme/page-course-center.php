@@ -13,20 +13,18 @@ defined( 'ABSPATH' ) || exit;
 get_header();
 ?>
 
-<main class="mc-course-page min-h-screen">
+<section class="mc-course-page min-h-screen" aria-label="课程中心">
     <div class="mc-course-page__container">
-        <section aria-label="课程列表">
-            <?php
-            if ( shortcode_exists( 'mathcourse_course_center' ) ) {
-                echo do_shortcode( '[mathcourse_course_center]' );
-            } elseif ( shortcode_exists( 'mathcourse_course_directory' ) ) {
-                echo do_shortcode( '[mathcourse_course_directory]' );
-            } else {
-                echo '<div class="mathcourse-directory__empty"><strong>课程中心正在加载</strong><span>请确认 MathCourse 插件已启用。</span></div>';
-            }
-            ?>
-        </section>
+        <?php
+        if ( shortcode_exists( 'mathcourse_course_center' ) ) {
+            echo do_shortcode( '[mathcourse_course_center]' );
+        } elseif ( shortcode_exists( 'mathcourse_course_directory' ) ) {
+            echo do_shortcode( '[mathcourse_course_directory]' );
+        } else {
+            echo '<div class="mathcourse-directory__empty"><strong>课程中心正在加载</strong><span>请确认 MathCourse 插件已启用。</span></div>';
+        }
+        ?>
     </div>
-</main>
+</section>
 
 <?php get_footer(); ?>
