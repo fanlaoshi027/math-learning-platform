@@ -1,13 +1,12 @@
-<?php
-defined( 'ABSPATH' ) || exit;
-?><!doctype html>
+<!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
-    <meta charset="<?php bloginfo( 'charset' ); ?>">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <?php wp_head(); ?>
 </head>
-<body <?php body_class( 'mathcourse-site bg-[#f8fafc] text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between' ); ?>>
+<body <?php body_class('mathcourse-site bg-[#f8fafc] text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between'); ?>>
 <?php wp_body_open(); ?>
 
 <?php
@@ -17,6 +16,7 @@ $learning_center_url = home_url('/learning-center/');
 $course_center_url = home_url('/course-center/');
 ?>
 
+<!-- 顶部导航：游客只有首页/课程中心/学员登录；登录学员才显示学习中心 -->
 <header class="bg-white/95 text-slate-800 sticky top-0 z-40 shadow-xs border-b border-slate-200/90 backdrop-blur-md" role="banner">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="flex items-center gap-2.5 select-none shrink-0" title="<?php bloginfo('name'); ?>">
@@ -30,29 +30,34 @@ $course_center_url = home_url('/course-center/');
     </a>
 
     <nav class="hidden md:flex items-center gap-1.5 lg:gap-2" role="navigation" aria-label="主导航">
-      <a href="<?php echo esc_url(home_url('/')); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold <?php echo is_front_page() ? 'text-blue-600 bg-blue-50/90 border border-blue-200/70 shadow-2xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'; ?> transition-all">首页</a>
-      <a href="<?php echo esc_url($course_center_url); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold <?php echo is_page('course-center') ? 'text-blue-600 bg-blue-50/90 border border-blue-200/70 shadow-2xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'; ?> transition-all">课程中心</a>
+      <a href="<?php echo esc_url(home_url('/')); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold text-blue-600 bg-blue-50/90 border border-blue-200/70 shadow-2xs">首页</a>
+      <a href="<?php echo esc_url($course_center_url); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">课程中心</a>
       <?php if ($is_logged_in) : ?>
-        <a href="<?php echo esc_url($learning_center_url); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold <?php echo is_page('learning-center') ? 'text-white bg-gradient-to-r from-amber-500 to-orange-500' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'; ?> transition-all flex items-center gap-1.5">学习中心</a>
+        <a href="<?php echo esc_url($learning_center_url); ?>" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-md shadow-orange-500/25 border border-amber-400/40 transition-all flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg><span>学习中心</span>
+        </a>
       <?php endif; ?>
     </nav>
 
     <div class="flex items-center gap-3">
       <form role="search" method="get" action="<?php echo esc_url($course_center_url); ?>" class="relative hidden sm:block">
         <input type="text" name="s" placeholder="搜索课程或专题" value="<?php echo esc_attr(get_search_query()); ?>" class="w-36 lg:w-48 bg-slate-100/90 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-full py-1.5 pl-3.5 pr-8 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all" />
-        <button type="submit" aria-label="搜索" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600">⌕</button>
+        <button type="submit" aria-label="搜索" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></button>
       </form>
+
       <?php if ($is_logged_in) : ?>
         <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 pr-2.5 shadow-2xs">
           <a href="<?php echo esc_url($learning_center_url); ?>" class="flex items-center gap-1.5 text-xs text-slate-800 font-bold hover:text-blue-600"><div class="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-2xs"><?php echo esc_html(mb_substr($current_user->display_name, 0, 1)); ?></div><span class="max-w-[70px] truncate"><?php echo esc_html($current_user->display_name); ?></span></a>
           <span class="text-slate-300">|</span><a href="<?php echo esc_url(wp_logout_url(home_url('/'))); ?>" class="text-[11px] text-slate-500 hover:text-rose-600">退出</a>
         </div>
       <?php else : ?>
-        <a href="<?php echo esc_url(wp_login_url(home_url('/learning-center/'))); ?>" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-xs font-bold text-white shadow-md shadow-blue-600/25 border border-blue-400/30 transition-all shrink-0">学员登录</a>
+        <a href="<?php echo esc_url(wp_login_url()); ?>" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-xs font-bold text-white shadow-md shadow-blue-600/25 border border-blue-400/30 transition-all shrink-0">学员登录</a>
       <?php endif; ?>
+
       <button id="mc-mobile-menu-btn" class="md:hidden p-1.5 text-slate-600 hover:text-slate-900 focus:outline-none" aria-label="切换菜单"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
     </div>
   </div>
+
   <div id="mc-mobile-menu" class="hidden md:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-2 text-xs">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="block py-1.5 text-blue-600 font-bold">首页</a>
     <a href="<?php echo esc_url($course_center_url); ?>" class="block py-1.5 text-slate-700 hover:text-blue-600 font-medium">课程中心</a>
