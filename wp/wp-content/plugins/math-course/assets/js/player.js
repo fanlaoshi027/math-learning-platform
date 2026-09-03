@@ -3,11 +3,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.Artplayer.CONTEXTMENU = false;
 
+    // 护眼反色：先轻微压低亮度，再反色并旋转色相，避免彩色内容出现传统反色的刺眼互补色。
+    // 白色经过 brightness(.9) -> invert(1) 后约为 10% 亮度，即约 #1a1a1a。
+    var INVERT_FILTER = 'brightness(0.9) invert(1) hue-rotate(180deg)';
+
     function installInvertStyle() {
         if (document.getElementById('mathcourse-invert-style')) return;
         var s = document.createElement('style');
         s.id = 'mathcourse-invert-style';
-        s.textContent = '.mathcourse-artplayer.mathcourse-inverted video{filter:invert(1)!important;}';
+        s.textContent = '.mathcourse-artplayer.mathcourse-inverted video{filter:' + INVERT_FILTER + '!important;}';
         document.head.appendChild(s);
     }
 
@@ -15,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var video = container.querySelector('video');
         container.classList.toggle('mathcourse-inverted', !!on);
         if (video) {
-            if (on) video.style.setProperty('filter', 'invert(1)', 'important');
+            if (on) video.style.setProperty('filter', INVERT_FILTER, 'important');
             else video.style.removeProperty('filter');
         }
     }
