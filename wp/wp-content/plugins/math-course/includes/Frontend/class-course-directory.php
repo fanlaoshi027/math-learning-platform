@@ -22,17 +22,11 @@ class Course_Directory {
         $atts = shortcode_atts(array('course_id' => 0, 'show_filters' => 1), $atts, 'mathcourse_course_directory');
         $course_id = absint($atts['course_id']);
         if (!$course_id && isset($_GET['course_id'])) $course_id = absint($_GET['course_id']);
-        if ($course_id) {
-            wp_safe_redirect($this->learning_player_url($course_id));
-            exit;
-        }
+        if ($course_id) { wp_safe_redirect($this->learning_player_url($course_id)); exit; }
         return $this->render_course_center((bool) absint($atts['show_filters']));
     }
 
-    private function course_center_url() {
-        $page = get_page_by_path('course-center');
-        return $page ? get_permalink($page) : home_url('/course-center/');
-    }
+    private function course_center_url() { $page = get_page_by_path('course-center'); return $page ? get_permalink($page) : home_url('/course-center/'); }
 
     private function learning_player_url($course_id, $lesson_id = 0) {
         $page = get_page_by_path('learning');
@@ -43,15 +37,11 @@ class Course_Directory {
         return add_query_arg($args, $base);
     }
 
-    private function course_detail_url($course_id) {
-        return $this->learning_player_url($course_id);
-    }
+    private function course_detail_url($course_id) { return $this->learning_player_url($course_id); }
 
     private function render_course_cover($data) {
         $cover = !empty($data['cover']) ? $data['cover'] : '';
-        if ($cover) {
-            return '<img src="' . esc_url($cover) . '" alt="' . esc_attr($data['title']) . '" loading="lazy">';
-        }
+        if ($cover) return '<img src="' . esc_url($cover) . '" alt="' . esc_attr($data['title']) . '" loading="lazy">';
         $style = !empty($data['cover_style']) ? sanitize_html_class($data['cover_style']) : 'solid';
         $color = !empty($data['cover_color']) ? sanitize_hex_color($data['cover_color']) : '#1769e0';
         if (!$color) $color = '#1769e0';
@@ -68,7 +58,6 @@ class Course_Directory {
         if (!in_array($type_filter, array('', 'topic', 'supplementary'), true)) $type_filter = '';
         if (!in_array($grade_filter, array('', '7', '8', '9'), true)) $grade_filter = '';
         $filter_base = $this->course_center_url();
-
         ob_start(); ?>
         <div class="mathcourse-center">
             <?php if ($show_filters) : ?>
@@ -77,13 +66,7 @@ class Course_Directory {
                 <a class="<?php echo 'topic' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','topic',remove_query_arg(array('course_id','course_grade'),$filter_base))); ?>">专题课程</a>
                 <a class="<?php echo 'supplementary' === $type_filter ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('course_type','supplementary',remove_query_arg(array('course_id','course_grade'),$filter_base))); ?>">教辅配套</a>
             </div>
-            <div class="mc-course-grade-filter" aria-label="年级筛选">
-                <span>年级</span>
-                <?php foreach (array(''=>'全部','7'=>'七年级','8'=>'八年级','9'=>'九年级') as $grade=>$label) : ?>
-                    <?php $url_args=array(); if($type_filter)$url_args['course_type']=$type_filter; if($grade)$url_args['course_grade']=$grade; ?>
-                    <a class="<?php echo (string)$grade_filter === (string)$grade ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg($url_args,remove_query_arg(array('course_id','course_type','course_grade'),$filter_base))); ?>"><?php echo esc_html($label); ?></a>
-                <?php endforeach; ?>
-            </div>
+            <div class="mc-course-grade-filter" aria-label="年级筛选"><span>年级</span><?php foreach (array(''=>'全部','7'=>'七年级','8'=>'八年级','9'=>'九年级') as $grade=>$label) : ?><?php $url_args=array(); if($type_filter)$url_args['course_type']=$type_filter; if($grade)$url_args['course_grade']=$grade; ?><a class="<?php echo (string)$grade_filter === (string)$grade ? 'is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg($url_args,remove_query_arg(array('course_id','course_type','course_grade'),$filter_base))); ?>"><?php echo esc_html($label); ?></a><?php endforeach; ?></div>
             <?php endif; ?>
             <div class="mathcourse-center__grid">
                 <?php $visible=0; foreach($courses as $course) : $data=$this->service->get_course_directory($course->ID,get_current_user_id()); if(!$data)continue; $data_type=(string)($data['type']??'topic'); $data_grade=(string)($data['grade']??''); if($type_filter&&$type_filter!==$data_type)continue; if($grade_filter&&$grade_filter!==$data_grade)continue; $visible++; $detail_url=$this->course_detail_url($data['id']); ?>
@@ -104,18 +87,29 @@ class Course_Directory {
         $courses=$this->tutor->get_courses(false);
         $cards=array();
         foreach($courses as $course){$data=$this->service->get_course_directory($course->ID,$user_id);if(!$data||empty($data['access']))continue;$progress=$data['progress']??array('completed'=>0,'total'=>0,'percent'=>0);$continue=$this->find_continue_lesson($data);$cards[]=array('data'=>$data,'progress'=>$progress,'continue'=>$continue);}
+        $active_count=count($cards); $completed_total=0; $lesson_total=0; $study_hours=0;
+        foreach($cards as $card){$completed_total+=(int)($card['progress']['completed']??0);$lesson_total+=(int)($card['progress']['total']??0);}
+        $continue_card=!empty($cards)?$cards[0]:null;
+        foreach($cards as $card){if(!empty($card['continue'])){$continue_card=$card;break;}}
         ob_start(); ?>
-        <div class="mathcourse-learning-center"><div class="mathcourse-learning-center__heading"><h1>我的课程</h1><p>已授权课程与学习进度</p></div>
-        <?php if(empty($cards)): ?><div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div><?php else: ?><div class="mathcourse-learning-center__grid"><?php foreach($cards as $card):$data=$card['data'];$progress=$card['progress'];$continue=$card['continue'];?><article class="mathcourse-learning-center__card"><div class="mathcourse-learning-center__cover"><?php echo $this->render_course_cover($data); ?></div><div class="mathcourse-learning-center__body"><h2><?php echo esc_html($data['title']); ?></h2><div class="mathcourse-learning-center__progress-row"><span>学习进度</span><strong><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?></strong><em><?php echo esc_html($progress['percent']); ?>%</em></div><div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div><a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->learning_player_url($data['id'])); ?>"><?php echo !empty($progress['completed'])?'继续学习':'开始学习'; ?><span>→</span></a></div></article><?php endforeach;?></div><?php endif;?></div>
+        <div class="mathcourse-learning-center">
+          <section class="mc-learning-hero">
+            <div class="mc-learning-hero__identity"><div class="mc-learning-hero__avatar">樊</div><div><h1>樊同学 的学习中心</h1><p>年级：初二（八年级） · 专属学习计划进行中</p></div></div>
+            <div class="mc-learning-hero__stats"><span><b><?php echo esc_html($active_count); ?></b><small>已激活课程</small></span><span><b><?php echo esc_html($completed_total); ?></b><small>已学完课时</small></span><span><b><?php echo esc_html(number_format($completed_total * 1.5,1)); ?></b><small>累计学时</small></span></div>
+          </section>
+          <?php if($continue_card): $data=$continue_card['data'];$progress=$continue_card['progress'];$continue=$continue_card['continue']; ?>
+          <section class="mc-learning-continue"><div class="mc-learning-continue__icon">♨</div><div><em>上次学习进度</em><h2><?php echo esc_html($data['title']); ?></h2><p>已学至：第 <?php echo esc_html((int)$progress['completed']+1); ?> 讲 · <?php echo !empty($continue['title'])?esc_html($continue['title']):'继续完成下一讲'; ?></p></div><a href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->learning_player_url($data['id'])); ?>">▶ 继续观看下一节</a></section>
+          <?php endif; ?>
+          <div class="mc-learning-list-title"><h2>▣ 我的已激活课程 (<?php echo esc_html($active_count); ?>)</h2><a href="<?php echo esc_url($this->course_center_url()); ?>">浏览更多课程 ›</a></div>
+          <?php if(empty($cards)): ?><div class="mathcourse-learning-center__empty"><strong>还没有已授权课程</strong><span>获得课程授权后，会显示在这里。</span></div><?php else: ?><div class="mathcourse-learning-center__grid"><?php foreach($cards as $card):$data=$card['data'];$progress=$card['progress'];$continue=$card['continue'];?><article class="mathcourse-learning-center__card"><div class="mathcourse-learning-center__body"><div class="mc-learning-card__badges"><span>系统专题课</span><?php if(!empty($data['grade'])):?><i><?php echo esc_html($this->grade_label($data['grade'])); ?></i><?php endif;?><b>已激活 · 授学</b></div><h2><?php echo esc_html($data['title']); ?></h2><p><?php echo esc_html(!empty($data['description'])?$data['description']:'系统梳理重点知识，配合视频讲解逐步掌握。'); ?></p><div class="mathcourse-learning-center__progress-row"><span>学习进度：<?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?> 讲</span><em><?php echo esc_html($progress['percent']); ?>%</em></div><div class="mathcourse-learning-center__progress-track"><span style="width:<?php echo esc_attr($progress['percent']); ?>%"></span></div><div class="mc-learning-card__bottom"><small>Tutor LMS 同步记录</small><a class="mathcourse-learning-center__button" href="<?php echo esc_url($continue&&!empty($continue['url'])?$continue['url']:$this->learning_player_url($data['id'])); ?>">▶ 进入学习</a></div></div></article><?php endforeach;?></div><?php endif; ?>
+          <div class="mc-learning-contact"><span>✧</span><p>需要开通更多初中数学模块或中考冲刺专题？可随时微信联系樊老师进行课程续费或加订。</p><b>微信：fanmath_vip</b></div>
+        </div>
         <?php return ob_get_clean();
     }
 
     private function find_continue_lesson($data) {
         if(empty($data['topics']))return null;
-        if(empty($data['access'])){
-            foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson;
-            return null;
-        }
+        if(empty($data['access'])){foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson;return null;}
         $last_completed_index=-1;$last_completed=null;$index=0;
         foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson){if(!empty($lesson['completed'])){$last_completed_index=$index;$last_completed=$lesson;}$index++;}
         if($last_completed_index<0)foreach($data['topics'] as $topic)foreach($topic['lessons'] as $lesson)if(!empty($lesson['accessible']))return $lesson;
@@ -123,7 +117,5 @@ class Course_Directory {
         return $last_completed;
     }
 
-    private function grade_label($grade) {
-        $labels=array('7'=>'七年级','8'=>'八年级','9'=>'九年级');return $labels[(string)$grade]??$grade;
-    }
+    private function grade_label($grade) { $labels=array('7'=>'七年级','8'=>'八年级','9'=>'九年级');return $labels[(string)$grade]??$grade; }
 }
