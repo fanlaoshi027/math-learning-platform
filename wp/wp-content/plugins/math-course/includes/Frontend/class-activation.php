@@ -1,62 +1,23 @@
 <?php
 namespace MathCourse\Frontend;
 defined('ABSPATH') || exit;
-
 use MathCourse\Access\Activation_Service;
-
 class Activation {
-    public function __construct() { add_shortcode('math_student_register', array($this,'register_shortcode')); }
-
-    public function register_shortcode() {
-        if (is_user_logged_in()) return '<div class="mathcourse-activation-card"><h2>你已经登录</h2><p>当前账号无需重复注册。</p></div>';
-        $error=''; $success='';
-        if ('POST'===strtoupper($_SERVER['REQUEST_METHOD']??'') && isset($_POST['mathcourse_register_nonce'])) {
-            if (!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['mathcourse_register_nonce'])),'mathcourse_register')) $error='页面已过期，请刷新后重试。';
-            else {
-                $code=sanitize_text_field(wp_unslash($_POST['activation_code']??''));
-                $username=sanitize_user(wp_unslash($_POST['username']??''));
-                $password=(string)wp_unslash($_POST['password']??'');
-                $confirm=(string)wp_unslash($_POST['password_confirm']??'');
-                if (!$code||!$username||!$password) $error='请完整填写激活码、账号和密码。';
-                elseif (strlen($password)<8) $error='密码至少需要 8 位。';
-                elseif ($password!==$confirm) $error='两次输入的密码不一致。';
-                elseif (username_exists($username)) $error='该账号已存在，请换一个账号。';
-                else {
-                    global $wpdb;
-                    $table=$wpdb->prefix.'mathcourse_activation_codes';
-                    $hash=hash_hmac('sha256',strtoupper(preg_replace('/[^A-Z0-9]/i','',$code)),wp_salt('auth'));
-                    $row=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE code_hash=%s LIMIT 1",$hash));
-                    if (!$row) $error='激活码无效。';
-                    elseif ('unused'!==$row->status) $error='激活码已使用。';
-                    elseif (!empty($row->expires_at)&&strtotime($row->expires_at)<=current_time('timestamp')) $error='激活码已过期。';
-                    if (!$error) {
-                        $user_id=wp_insert_user(array('user_login'=>$username,'user_pass'=>$password,'role'=>'subscriber'));
-                        if (is_wp_error($user_id)) $error=$user_id->get_error_message();
-                        else {
-                            $result=(new Activation_Service())->redeem($code,$user_id);
-                            if (is_wp_error($result)) { require_once ABSPATH.'wp-admin/includes/user.php'; wp_delete_user($user_id); $error=$result->get_error_message(); }
-                            else { wp_set_auth_cookie($user_id,true); $success='注册成功，课程已自动激活。'; }
-                        }
-                    }
-                }
-            }
-        }
-        ob_start(); ?>
-        <div class="mathcourse-activation-card">
-            <h2>课程激活注册</h2>
-            <p class="mathcourse-activation-tip">请输入老师提供的课程激活码。注册成功后，对应课程会自动加入你的账号。</p>
-            <?php if($error): ?><div class="mathcourse-activation-error"><?php echo esc_html($error); ?></div><?php endif; ?>
-            <?php if($success): ?><div class="mathcourse-activation-success"><?php echo esc_html($success); ?></div><p><a class="button" href="<?php echo esc_url(home_url('/')); ?>">进入课程</a></p><?php else: ?>
-            <form method="post">
-                <?php wp_nonce_field('mathcourse_register','mathcourse_register_nonce'); ?>
-                <p><label>课程激活码</label><input name="activation_code" autocomplete="one-time-code" placeholder="例如 8S7K-4P2M-X9QD" required></p>
-                <p><label>登录账号</label><input name="username" autocomplete="username" required></p>
-                <p><label>设置密码</label><input type="password" name="password" autocomplete="new-password" minlength="8" required></p>
-                <p><label>确认密码</label><input type="password" name="password_confirm" autocomplete="new-password" minlength="8" required></p>
-                <button type="submit">注册并激活课程</button>
-            </form>
-            <?php endif; ?>
-        </div>
-        <?php return ob_get_clean();
+ public function __construct(){add_shortcode('math_student_register',array($this,'register_shortcode'));add_filter('option_users_can_register',array($this,'disable_open_registration'));}
+ public function disable_open_registration($value){return false;}
+ public function register_shortcode(){
+  if(is_user_logged_in())return '<div class="mathcourse-activation-card"><h2>你已经登录</h2><p>当前账号无需重复注册。</p></div>';
+  $error='';$success='';
+  if('POST'===strtoupper($_SERVER['REQUEST_METHOD']??'')&&isset($_POST['mathcourse_register_nonce'])){
+   if(!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['mathcourse_register_nonce'])),'mathcourse_register'))$error='页面已过期，请刷新后重试。';else{
+    $code=sanitize_text_field(wp_unslash($_POST['activation_code']??''));$username=sanitize_user(wp_unslash($_POST['username']??''));$password=(string)wp_unslash($_POST['password']??'');$confirm=(string)wp_unslash($_POST['password_confirm']??'');
+    if(!$code||!$username||!$password)$error='请完整填写激活码、账号和密码。';elseif(strlen($password)<8)$error='密码至少需要 8 位。';elseif($password!==$confirm)$error='两次输入的密码不一致。';elseif(username_exists($username))$error='该账号已存在，请换一个账号。';else{
+     global $wpdb;$table=$wpdb->prefix.'mathcourse_activation_codes';$hash=hash_hmac('sha256',strtoupper(preg_replace('/[^A-Z0-9]/i','',$code)),wp_salt('auth'));$row=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE code_hash=%s LIMIT 1",$hash));
+     if(!$row)$error='激活码无效。';elseif('unused'!==$row->status)$error='激活码已使用。';elseif(!empty($row->expires_at)&&strtotime($row->expires_at)<=current_time('timestamp'))$error='激活码已过期。';
+     if(!$error){$user_id=wp_insert_user(array('user_login'=>$username,'user_pass'=>$password,'role'=>'subscriber'));if(is_wp_error($user_id))$error=$user_id->get_error_message();else{$result=(new Activation_Service())->redeem($code,$user_id);if(is_wp_error($result)){require_once ABSPATH.'wp-admin/includes/user.php';wp_delete_user($user_id);$error=$result->get_error_message();}else{wp_set_auth_cookie($user_id,true);$success='注册成功，课程已自动激活。';}}}
     }
+   }
+  }
+  ob_start();?><div class="mathcourse-activation-card"><h2>课程激活注册</h2><p class="mathcourse-activation-tip">请输入老师提供的课程激活码。注册成功后，对应课程会自动加入你的账号。</p><?php if($error):?><div class="mathcourse-activation-error"><?php echo esc_html($error);?></div><?php endif;?><?php if($success):?><div class="mathcourse-activation-success"><?php echo esc_html($success);?></div><p><a class="button" href="<?php echo esc_url(home_url('/'));?>">进入课程</a></p><?php else:?><form method="post"><?php wp_nonce_field('mathcourse_register','mathcourse_register_nonce');?><p><label>课程激活码</label><input name="activation_code" autocomplete="one-time-code" placeholder="例如 8S7K-4P2M-X9QD" required></p><p><label>登录账号</label><input name="username" autocomplete="username" required></p><p><label>设置密码</label><input type="password" name="password" autocomplete="new-password" minlength="8" required></p><p><label>确认密码</label><input type="password" name="password_confirm" autocomplete="new-password" minlength="8" required></p><button type="submit">注册并激活课程</button></form><?php endif;?></div><?php return ob_get_clean();
+ }
 }
