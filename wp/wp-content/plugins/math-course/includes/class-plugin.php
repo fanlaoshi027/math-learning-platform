@@ -37,6 +37,7 @@ class Plugin {
     private function load_admin_assets() {
         add_action('admin_enqueue_scripts', function() {
             wp_enqueue_style('mathcourse-admin', MATHCOURSE_URL.'assets/css/admin.css', array(), MATHCOURSE_VERSION);
+            wp_enqueue_style('mathcourse-admin-redesign', MATHCOURSE_URL.'assets/css/admin-redesign.css', array('mathcourse-admin'), MATHCOURSE_VERSION);
             wp_enqueue_script('mathcourse-admin-course-editor', MATHCOURSE_URL.'assets/js/admin-course-editor.js', array(), MATHCOURSE_VERSION, true);
         });
     }
