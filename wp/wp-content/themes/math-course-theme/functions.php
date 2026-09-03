@@ -36,6 +36,7 @@ function mc_theme_assets() {
 	$final_ui_path=get_stylesheet_directory().'/assets/css/final-ui-pass.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
 	$cover_path=get_stylesheet_directory().'/assets/css/course-cover.css';
+	$desktop_fix_path=get_stylesheet_directory().'/assets/css/learning-desktop-fix.css';
 	$version=file_exists($style_path)?(string)filemtime($style_path):'0.2.0';
 	$ui_version=file_exists($ui_path)?(string)filemtime($ui_path):'0.3.0';
 	$scale_version=file_exists($scale_path)?(string)filemtime($scale_path):'1.0.0';
@@ -51,6 +52,7 @@ function mc_theme_assets() {
 	$final_ui_version=file_exists($final_ui_path)?(string)filemtime($final_ui_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
 	$cover_version=file_exists($cover_path)?(string)filemtime($cover_path):'1.0.0';
+	$desktop_fix_version=file_exists($desktop_fix_path)?(string)filemtime($desktop_fix_path):'1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
 	$queried_content=get_post_field('post_content',get_queried_object_id());
 	$load_course_ui=is_front_page()||is_page(array('course-center','xueyuan-denglu','learning','learning-center'));
@@ -79,6 +81,9 @@ function mc_theme_assets() {
 	}
 	wp_enqueue_style('mc-ui-reference-override',get_stylesheet_directory_uri().'/assets/css/ui-reference-override.css',array('mc-course-ui-polish'),$reference_override_version);
 	wp_enqueue_style('mc-final-ui-pass',get_stylesheet_directory_uri().'/assets/css/final-ui-pass.css',array('mc-ui-reference-override'),$final_ui_version);
+	if(is_page('learning')||is_page_template('page-learning.php')){
+		wp_enqueue_style('mc-learning-desktop-fix',get_stylesheet_directory_uri().'/assets/css/learning-desktop-fix.css',array('mc-final-ui-pass'),$desktop_fix_version);
+	}
 }
 add_action('wp_enqueue_scripts','mc_theme_assets');
 
