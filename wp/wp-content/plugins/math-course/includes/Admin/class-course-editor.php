@@ -94,17 +94,48 @@ class Course_Editor {
 		check_admin_referer( 'mathcourse_edit_course_' . $course_id );
 		$action = sanitize_key( wp_unslash( $_POST['mathcourse_action'] ) );
 		if ( 'save_course' === $action ) {
-			$title = isset( $_POST['course_title'] ) ? sanitize_text_field( wp_unslash( $_POST['course_title'] ) ) : '新课程'; $description = isset( $_POST['course_description'] ) ? wp_kses_post( wp_unslash( $_POST['course_description'] ) ) : ''; $type = isset( $_POST['course_type'] ) ? sanitize_key( wp_unslash( $_POST['course_type'] ) ) : 'topic'; $grade = isset( $_POST['course_grade'] ) ? sanitize_key( wp_unslash( $_POST['course_grade'] ) ) : ''; $cover = isset( $_POST['course_cover'] ) ? esc_url_raw( wp_unslash( $_POST['course_cover'] ) ) : ''; $status = isset( $_POST['course_status'] ) ? sanitize_key( wp_unslash( $_POST['course_status'] ) ) : 'draft'; if ( ! in_array( $type, array( 'topic', 'supplementary' ), true ) ) $type='topic'; if ( ! in_array( $status, array( 'draft', 'publish', 'private' ), true ) ) $status='draft'; wp_update_post( array( 'ID'=>$course_id, 'post_title'=>$title, 'post_content'=>$description, 'post_status'=>$status ) ); update_post_meta( $course_id, '_mathcourse_type', $type ); update_post_meta( $course_id, '_mathcourse_grade', $grade ); update_post_meta( $course_id, '_mathcourse_cover', $cover ); $message='课程已保存。';
+			$title = isset( $_POST['course_title'] ) ? sanitize_text_field( wp_unslash( $_POST['course_title'] ) ) : '新课程';
+			$description = isset( $_POST['course_description'] ) ? wp_kses_post( wp_unslash( $_POST['course_description'] ) ) : '';
+			$type = isset( $_POST['course_type'] ) ? sanitize_key( wp_unslash( $_POST['course_type'] ) ) : 'topic';
+			$grade = isset( $_POST['course_grade'] ) ? sanitize_key( wp_unslash( $_POST['course_grade'] ) ) : '';
+			$cover = isset( $_POST['course_cover'] ) ? esc_url_raw( wp_unslash( $_POST['course_cover'] ) ) : '';
+			$status = isset( $_POST['course_status'] ) ? sanitize_key( wp_unslash( $_POST['course_status'] ) ) : 'draft';
+			if ( ! in_array( $type, array( 'topic', 'supplementary' ), true ) ) { $type = 'topic'; }
+			if ( ! in_array( $status, array( 'draft', 'publish', 'private' ), true ) ) { $status = 'draft'; }
+			$result = wp_update_post( array( 'ID' => $course_id, 'post_title' => $title, 'post_content' => $description, 'post_status' => $status ), true );
+			if ( is_wp_error( $result ) ) { $message = '课程保存失败：' . $result->get_error_message(); $message_type = 'error'; return; }
+			update_post_meta( $course_id, '_mathcourse_type', $type );
+			update_post_meta( $course_id, '_mathcourse_grade', $grade );
+			update_post_meta( $course_id, '_mathcourse_cover', $cover );
+			$message='课程已保存。';
 		} elseif ( 'add_topic' === $action ) {
-			$title = isset( $_POST['topic_title'] ) ? sanitize_text_field( wp_unslash( $_POST['topic_title'] ) ) : ''; if ( ! $title ) { $message='请输入专题名称。'; $message_type='warning'; return; } $topic_id = $this->tutor->create_topic( $course_id, $title ); $message = $topic_id ? '专题已添加。' : '专题添加失败。'; $message_type = $topic_id ? 'success' : 'error';
+			$title = isset( $_POST['topic_title'] ) ? sanitize_text_field( wp_unslash( $_POST['topic_title'] ) ) : '';
+			if ( ! $title ) { $message='请输入专题名称。'; $message_type='warning'; return; }
+			$topic_id = $this->tutor->create_topic( $course_id, $title );
+			$message = $topic_id ? '专题已添加。' : '专题添加失败。';
+			$message_type = $topic_id ? 'success' : 'error';
 		} elseif ( 0 === strpos( $action, 'add_lesson_' ) ) {
-			$topic_id = absint( substr( $action, 11 ) ); $field = 'lesson_title_' . $topic_id; $title = isset( $_POST[$field] ) ? sanitize_text_field( wp_unslash( $_POST[$field] ) ) : ''; if ( ! $title ) { $message='请输入课时名称。'; $message_type='warning'; return; } $lesson_id=$this->tutor->create_lesson($topic_id,$title); $message=$lesson_id?'课时已添加。':'课时添加失败。'; $message_type=$lesson_id?'success':'error';
+			$topic_id = absint( substr( $action, 11 ) );
+			if ( ! $topic_id || (int) get_post_field( 'post_parent', $topic_id ) !== (int) $course_id || get_post_type( $topic_id ) !== $this->tutor->get_topic_post_type() ) { $message='专题不存在或不属于当前课程。'; $message_type='error'; return; }
+			$field = 'lesson_title_' . $topic_id;
+			$title = isset( $_POST[$field] ) ? sanitize_text_field( wp_unslash( $_POST[$field] ) ) : '';
+			if ( ! $title ) { $message='请输入课时名称。'; $message_type='warning'; return; }
+			$lesson_id = wp_insert_post( array( 'post_title' => $title, 'post_type' => $this->tutor->get_lesson_post_type(), 'post_status' => 'publish', 'post_author' => get_current_user_id(), 'post_parent' => $topic_id, 'menu_order' => count( $this->tutor->get_lessons( $topic_id, true ) ), 'post_content' => '' ), true );
+			if ( is_wp_error( $lesson_id ) ) { $message='课时添加失败：' . $lesson_id->get_error_message(); $message_type='error'; return; }
+			$lesson_id = absint( $lesson_id );
+			update_post_meta( $lesson_id, '_mathcourse_preview', 'no' );
+			update_post_meta( $lesson_id, '_is_preview', 'no' );
+			update_post_meta( $lesson_id, '_mathcourse_page_number', '' );
+			update_post_meta( $lesson_id, '_mathcourse_video_id', '' );
+			update_post_meta( $lesson_id, '_mathcourse_permission_mode', 'authorization' );
+			$message = $lesson_id ? '课时已添加。' : '课时添加失败。';
+			$message_type = $lesson_id ? 'success' : 'error';
 		} elseif ( 'save_lesson' === $action ) {
-			$lesson_id=isset($_POST['editing_lesson_id'])?absint($_POST['editing_lesson_id']):0; $lesson=$lesson_id?$this->tutor->get_lesson($lesson_id):null; if(!$lesson || $course_id!==$this->tutor->get_lesson_course_id($lesson_id)){ $message='课时不存在。'; $message_type='error'; return; } $title=isset($_POST['lesson_title_edit'])?sanitize_text_field(wp_unslash($_POST['lesson_title_edit'])):''; $description=isset($_POST['lesson_description_edit'])?wp_kses_post(wp_unslash($_POST['lesson_description_edit'])):''; $preview=!empty($_POST['lesson_preview_edit'])?'yes':'no'; $status=isset($_POST['lesson_status_edit'])?sanitize_key(wp_unslash($_POST['lesson_status_edit'])):'draft'; $page=isset($_POST['lesson_page_edit'])?sanitize_text_field(wp_unslash($_POST['lesson_page_edit'])):''; $video=isset($_POST['lesson_video_edit'])?sanitize_text_field(wp_unslash($_POST['lesson_video_edit'])):''; if(!in_array($status,array('draft','publish','private'),true))$status='draft'; wp_update_post(array('ID'=>$lesson_id,'post_title'=>$title,'post_content'=>$description,'post_status'=>$status)); update_post_meta($lesson_id,'_mathcourse_preview',$preview); update_post_meta($lesson_id,'_mathcourse_page_number',$page); update_post_meta($lesson_id,'_mathcourse_video_id',$video); if ( isset( $_POST['lesson_hls_edit'] ) && '' !== trim( (string) wp_unslash( $_POST['lesson_hls_edit'] ) ) ) { update_post_meta( $lesson_id, '_mathcourse_hls_url', esc_url_raw( wp_unslash( $_POST['lesson_hls_edit'] ) ) ); } $message='课时已保存。';
+			$lesson_id=isset($_POST['editing_lesson_id'])?absint($_POST['editing_lesson_id']):0; $lesson=$lesson_id?$this->tutor->get_lesson($lesson_id):null; if(!$lesson || $course_id!==$this->tutor->get_lesson_course_id($lesson_id)){ $message='课时不存在。'; $message_type='error'; return; } $title=isset($_POST['lesson_title_edit'])?sanitize_text_field(wp_unslash($_POST['lesson_title_edit'])):''; $description=isset($_POST['lesson_description_edit'])?wp_kses_post(wp_unslash($_POST['lesson_description_edit'])):''; $preview=!empty($_POST['lesson_preview_edit'])?'yes':'no'; $status=isset($_POST['lesson_status_edit'])?sanitize_key(wp_unslash($_POST['lesson_status_edit'])):'draft'; $page=isset($_POST['lesson_page_edit'])?sanitize_text_field(wp_unslash($_POST['lesson_page_edit'])):''; $video=isset($_POST['lesson_video_edit'])?sanitize_text_field(wp_unslash($_POST['lesson_video_edit'])):''; if(!in_array($status,array('draft','publish','private'),true))$status='draft'; $updated=wp_update_post(array('ID'=>$lesson_id,'post_title'=>$title,'post_content'=>$description,'post_status'=>$status),true); if(is_wp_error($updated)){ $message='课时保存失败：'.$updated->get_error_message(); $message_type='error'; return; } update_post_meta($lesson_id,'_mathcourse_preview',$preview); update_post_meta($lesson_id,'_is_preview',$preview); update_post_meta($lesson_id,'_mathcourse_page_number',$page); update_post_meta($lesson_id,'_mathcourse_video_id',$video); if ( isset( $_POST['lesson_hls_edit'] ) && '' !== trim( (string) wp_unslash( $_POST['lesson_hls_edit'] ) ) ) { update_post_meta( $lesson_id, '_mathcourse_hls_url', esc_url_raw( wp_unslash( $_POST['lesson_hls_edit'] ) ) ); } $message='课时已保存。';
 		} elseif ( 0 === strpos( $action, 'delete_topic_' ) ) {
-			$topic_id=absint(substr($action,13)); if($topic_id){$lessons=$this->tutor->get_lessons($topic_id,true);foreach($lessons as $lesson)$this->tutor->delete_lesson($lesson->ID);$deleted=$this->tutor->delete_topic($topic_id);$message=$deleted?'专题已删除。':'专题删除失败。';$message_type=$deleted?'success':'error';}
+			$topic_id=absint(substr($action,13)); if(!$topic_id || get_post_type($topic_id)!==$this->tutor->get_topic_post_type() || (int)get_post_field('post_parent',$topic_id)!==(int)$course_id){ $message='专题不存在或不属于当前课程。'; $message_type='error'; return; } foreach($this->tutor->get_lessons($topic_id,true) as $lesson){ wp_delete_post($lesson->ID,true); } $deleted=wp_delete_post($topic_id,true); $message=$deleted?'专题已删除。':'专题删除失败。'; $message_type=$deleted?'success':'error';
 		} elseif ( 0 === strpos( $action, 'delete_lesson_' ) ) {
-			$lesson_id=absint(substr($action,14)); $lesson=$lesson_id?$this->tutor->get_lesson($lesson_id):null; if($lesson && $course_id===$this->tutor->get_lesson_course_id($lesson_id)){$deleted=$this->tutor->delete_lesson($lesson_id);$message=$deleted?'课时已删除。':'课时删除失败。';$message_type=$deleted?'success':'error';}
+			$lesson_id=absint(substr($action,14)); $lesson=$lesson_id?$this->tutor->get_lesson($lesson_id):null; if(!$lesson || $course_id!==$this->tutor->get_lesson_course_id($lesson_id)){ $message='课时不存在。'; $message_type='error'; return; } $deleted=wp_delete_post($lesson_id,true); $message=$deleted?'课时已删除。':'课时删除失败。'; $message_type=$deleted?'success':'error';
 		}
 	}
 
