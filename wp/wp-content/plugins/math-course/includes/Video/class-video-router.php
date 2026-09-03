@@ -5,7 +5,7 @@ use MathCourse\Access\Access_Service;
 use MathCourse\Tutor\Adapter;
 
 class Video_Router {
-    private $access; private $adapter; private $token_ttl=600;
+    private $access; private $adapter; private $token_ttl=7200;
     public function __construct($register_hooks=true){$this->access=new Access_Service();$this->adapter=new Adapter();if($register_hooks){add_action('init',array($this,'register_route'));add_action('template_redirect',array($this,'handle'));}}
     public function register_route(){add_rewrite_rule('^math-video/([0-9]+)/([0-9]+)/([A-Za-z0-9_-]+)/?$','index.php?math_video=$matches[1]&math_video_exp=$matches[2]&math_video_sig=$matches[3]','top');add_rewrite_tag('%math_video%','([0-9]+)');add_rewrite_tag('%math_video_exp%','([0-9]+)');add_rewrite_tag('%math_video_sig%','([A-Za-z0-9_-]+)');}
     public function get_media_type($source_url){$path=(string)wp_parse_url((string)$source_url,PHP_URL_PATH);$ext=strtolower(pathinfo($path,PATHINFO_EXTENSION));return $ext==='m3u8'?'m3u8':($ext==='mp4'?'mp4':'');}
