@@ -33,11 +33,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return Promise.resolve(true);
         }
 
-        // Chrome/Edge/Android need hls.js for m3u8. Keep a second public CDN
-        // fallback so a transient jsDelivr failure does not leave a blank player.
+        // The plugin normally enqueues hls.js first. These fallbacks cover
+        // environments where the primary CDN is blocked or temporarily fails.
         return loadScript('https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js')
             .catch(function () {
                 return loadScript('https://unpkg.com/hls.js@1.6.2/dist/hls.min.js');
+            })
+            .catch(function () {
+                return loadScript('https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.6.2/hls.min.js');
             })
             .then(function () {
                 return !!(window.Hls && typeof window.Hls.isSupported === 'function');
@@ -234,12 +237,29 @@ document.addEventListener('DOMContentLoaded', function () {
                     customType: {
                         m3u8: function (video, sourceUrl, instance) {
                             if (window.Hls && typeof window.Hls.isSupported === 'function' && window.Hls.isSupported()) {
-                                const hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+                                const hls = new window.Hls({
+                                    enableWorker: true,
+                                    lowLatencyMode: false,
+                                    backBufferLength: 30,
+                                    maxBufferLength: 30,
+                                    maxMaxBufferLength: 60,
+                                });
+                                instance._mathcourseHls = hls;
+                                hls.on(window.Hls.Events.ERROR, function (_event, data) {
+                                    if (!data || !data.fatal) return;
+                                    console.warn('MathCourse HLS error:', data.type, data.details);
+                                    if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+                                        try { hls.startLoad(); } catch (e) {}
+                                    } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                                        try { hls.recoverMediaError(); } catch (e) {}
+                                    }
+                                });
                                 hls.loadSource(sourceUrl);
                                 hls.attachMedia(video);
-                                instance._mathcourseHls = hls;
                             } else {
+                                // Safari/iOS can play HLS natively without hls.js.
                                 video.src = sourceUrl;
+                                video.load();
                             }
                         },
                     },
