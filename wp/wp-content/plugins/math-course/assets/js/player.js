@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', function () {
     window.Artplayer.CONTEXTMENU = false;
 
     // 护眼反色：先轻微压低亮度，再反色并旋转色相，避免彩色内容出现传统反色的刺眼互补色。
-    // 白色经过 brightness(.9) -> invert(1) 后约为 10% 亮度，即约 #1a1a1a。
     var INVERT_FILTER = 'brightness(0.9) invert(1) hue-rotate(180deg)';
 
     function installInvertStyle() {
@@ -188,9 +187,13 @@ document.addEventListener('DOMContentLoaded', function () {
             autoPlayback: false,
             fullscreen: true,
             fullscreenWeb: true,
-            setting: false,
-            playbackRate: false,
+            // 使用 ArtPlayer 官方设置面板。播放速度由官方菜单提供，避免自定义控制在手机端随控制栏隐藏而消失。
+            setting: true,
+            playbackRate: true,
             flip: false,
+            aspectRatio: false,
+            screenshot: false,
+            pip: false,
             fastForward: true,
             autoOrientation: true,
             mutex: true,
@@ -252,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
         art.on('ready', function () {
             restorePosition(art);
 
+            // 反色保留为课程播放器专用按钮；倍速使用 ArtPlayer 官方设置面板。
             art.controls.add({
                 name: 'mathcourse-invert',
                 position: 'right',
@@ -260,27 +264,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 click: function () {
                     invertEnabled = !invertEnabled;
                     applyInvert(container, invertEnabled);
-                }
-            });
-
-            art.controls.add({
-                name: 'mathcourse-speed',
-                position: 'right',
-                html: '倍速',
-                selector: [
-                    { default: true, html: '1倍', value: 1 },
-                    { html: '1.25倍', value: 1.25 },
-                    { html: '1.5倍', value: 1.5 },
-                    { html: '2倍', value: 2 },
-                    { html: '0.75倍', value: 0.75 },
-                    { html: '0.5倍', value: 0.5 }
-                ],
-                onSelect: function (item) {
-                    var rate = Number(item.value);
-                    if (Number.isFinite(rate) && rate > 0) {
-                        art.playbackRate = rate;
-                    }
-                    return '倍速';
                 }
             });
 
