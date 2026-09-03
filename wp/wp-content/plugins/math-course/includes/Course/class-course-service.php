@@ -46,14 +46,31 @@ class Course_Service {
         );
     }
 
+    /**
+     * 获取统一的视频地址。
+     * _mathcourse_hls_url 是历史字段名，但实际允许保存 HLS 或 MP4；前端统一走受保护网关。
+     */
     public function get_lesson_video($lesson_id, $user_id=0) {
         $lesson_id=absint($lesson_id); $user_id=absint($user_id); $lesson=$this->tutor->get_lesson($lesson_id);
         if(!$lesson)return null;
         $course_id=$this->tutor->get_lesson_course_id($lesson_id); if(!$course_id)return null;
         $watch_access=$this->access->can_watch_lesson($user_id,$course_id,$lesson_id);
         $preview=$this->access->can_preview($course_id,$lesson_id); $accessible=$watch_access||$preview;
-        $video_id=$this->tutor->get_lesson_video_id($lesson_id); $has_hls=(bool)$this->tutor->get_lesson_hls_url($lesson_id);
-        return array('id'=>$lesson_id,'course_id'=>$course_id,'video_id'=>$video_id,'hls_url'=>($accessible&&$has_hls)?$this->video->get_protected_url($lesson_id):'','preview'=>$preview,'accessible'=>$accessible);
+        $video_id=$this->tutor->get_lesson_video_id($lesson_id);
+        $source_url=trim((string)$this->tutor->get_lesson_hls_url($lesson_id));
+        $has_source=(bool)$source_url;
+        $media_type=$this->video->get_media_type($source_url);
+        $protected_url=($accessible&&$has_source)?$this->video->get_protected_url($lesson_id):'';
+        return array(
+            'id'=>$lesson_id,
+            'course_id'=>$course_id,
+            'video_id'=>$video_id,
+            'hls_url'=>($media_type==='m3u8')?$protected_url:'',
+            'media_url'=>$protected_url,
+            'media_type'=>$media_type,
+            'preview'=>$preview,
+            'accessible'=>$accessible
+        );
     }
 
     private function lesson_learning_url($course_id,$lesson_id) {
@@ -69,8 +86,12 @@ class Course_Service {
             foreach($this->tutor->get_lessons($topic->ID,false) as $lesson) {
                 $lesson_id=(int)$lesson->ID;
                 $completed_lesson=$user_id?$this->progress->is_completed($user_id,$lesson_id):false;
-                $preview=$this->access->can_preview($course->ID,$lesson_id); $watch_access=$this->access->can_watch_lesson($user_id,$course->ID,$lesson_id); $accessible=$watch_access||$preview; $has_hls=(bool)$this->tutor->get_lesson_hls_url($lesson_id);
-                $lessons[]=array('id'=>$lesson_id,'title'=>get_the_title($lesson),'page_number'=>$this->tutor->get_lesson_page_number($lesson_id),'video_id'=>$this->tutor->get_lesson_video_id($lesson_id),'hls_url'=>($accessible&&$has_hls)?$this->video->get_protected_url($lesson_id):'','url'=>$accessible?$this->lesson_learning_url($course->ID,$lesson_id):'','completed'=>$completed_lesson,'preview'=>$preview,'accessible'=>$accessible);
+                $preview=$this->access->can_preview($course->ID,$lesson_id); $watch_access=$this->access->can_watch_lesson($user_id,$course->ID,$lesson_id); $accessible=$watch_access||$preview;
+                $source_url=trim((string)$this->tutor->get_lesson_hls_url($lesson_id));
+                $media_type=$this->video->get_media_type($source_url);
+                $has_source=(bool)$source_url;
+                $protected_url=($accessible&&$has_source)?$this->video->get_protected_url($lesson_id):'';
+                $lessons[]=array('id'=>$lesson_id,'title'=>get_the_title($lesson),'page_number'=>$this->tutor->get_lesson_page_number($lesson_id),'video_id'=>$this->tutor->get_lesson_video_id($lesson_id),'hls_url'=>($media_type==='m3u8')?$protected_url:'','media_url'=>$protected_url,'media_type'=>$media_type,'url'=>$accessible?$this->lesson_learning_url($course->ID,$lesson_id):'','completed'=>$completed_lesson,'preview'=>$preview,'accessible'=>$accessible);
             }
             $topics[]=array('id'=>(int)$topic->ID,'title'=>get_the_title($topic),'lessons'=>$lessons);
         }
