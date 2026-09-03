@@ -30,7 +30,7 @@ class Course_Player {
         $progress=isset($data['progress'])?$data['progress']:array('completed'=>0,'total'=>0,'percent'=>0);
         $navigation=$this->lesson_navigation($data,$current,$course_id); $this->assets();
         ob_start(); ?>
-        <div class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
+        <div class="mc-course-player">
             <header class="mc-learning-header">
                 <a class="mc-learning-back" href="<?php echo esc_url(home_url('/course-center/')); ?>" aria-label="返回课程中心"><span aria-hidden="true">‹</span><span>课程中心</span></a>
                 <div class="mc-learning-course-title"><span>正在学习</span><strong><?php echo esc_html($data['title']); ?></strong></div>
