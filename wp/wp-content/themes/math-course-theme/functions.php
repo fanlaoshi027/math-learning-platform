@@ -33,6 +33,7 @@ function mc_theme_assets() {
 	$learning_center_v2_path=get_stylesheet_directory().'/assets/css/learning-center-ui-v2.css';
 	$home_path=get_stylesheet_directory().'/assets/css/home-ui-v2.css';
 	$reference_override_path=get_stylesheet_directory().'/assets/css/ui-reference-override.css';
+	$final_ui_path=get_stylesheet_directory().'/assets/css/final-ui-pass.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
 	$cover_path=get_stylesheet_directory().'/assets/css/course-cover.css';
 	$version=file_exists($style_path)?(string)filemtime($style_path):'0.2.0';
@@ -47,6 +48,7 @@ function mc_theme_assets() {
 	$learning_center_v2_version=file_exists($learning_center_v2_path)?(string)filemtime($learning_center_v2_path):'1.0.0';
 	$home_version=file_exists($home_path)?(string)filemtime($home_path):'1.0.0';
 	$reference_override_version=file_exists($reference_override_path)?(string)filemtime($reference_override_path):'1.0.0';
+	$final_ui_version=file_exists($final_ui_path)?(string)filemtime($final_ui_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
 	$cover_version=file_exists($cover_path)?(string)filemtime($cover_path):'1.0.0';
 	wp_enqueue_style('mc-theme-style',get_stylesheet_uri(),array(),$version);
@@ -76,6 +78,7 @@ function mc_theme_assets() {
 		wp_enqueue_style('mc-learning-ui-polish',get_stylesheet_directory_uri().'/assets/css/learning-ui-polish.css',array('mc-learning-nav'),$learning_polish_version);
 	}
 	wp_enqueue_style('mc-ui-reference-override',get_stylesheet_directory_uri().'/assets/css/ui-reference-override.css',array('mc-course-ui-polish'),$reference_override_version);
+	wp_enqueue_style('mc-final-ui-pass',get_stylesheet_directory_uri().'/assets/css/final-ui-pass.css',array('mc-ui-reference-override'),$final_ui_version);
 }
 add_action('wp_enqueue_scripts','mc_theme_assets');
 
