@@ -42,21 +42,19 @@ function mc_theme_assets() {
         'style'           => 'style.css',
         'design'          => 'assets/css/design-system-v2.css',
         'ui'              => 'assets/css/reference-ui.css',
-        'scale'           => 'assets/css/ui-scale.css',
-        'detail'          => 'assets/css/course-detail.css',
-        'learning'       => 'assets/css/learning.css',
+        'scale'            => 'assets/css/ui-scale.css',
+        'detail'           => 'assets/css/course-detail.css',
+        'learning'        => 'assets/css/learning.css',
         'states'          => 'assets/css/learning-states.css',
         'nav'             => 'assets/css/learning-nav.css',
         'polish'          => 'assets/css/course-ui-polish.css',
         'learning_polish' => 'assets/css/learning-ui-polish.css',
         'learning_center' => 'assets/css/learning-center-ui-v1.css',
         'override'        => 'assets/css/ui-reference-override.css',
-        'header_polish'   => 'assets/css/header-ui-polish.css',
         'cover'           => 'assets/css/course-cover.css',
         'learning_v2'     => 'assets/css/learning-v2.css',
         'learning_layout' => 'assets/css/learning-layout-fix.css',
         'course_card'     => 'assets/css/course-card-v2.css',
-        'header_v2'       => 'assets/css/header-v2.css',
         'solid'           => 'assets/css/solid-color-overrides-v2.css',
         'course_center'   => 'assets/css/course-center.css',
     );
@@ -90,7 +88,6 @@ function mc_theme_assets() {
         wp_enqueue_style( 'mc-course-card-v2', $uri . '/assets/css/course-card-v2.css', array( 'mc-ui-reference-override' ), $version['course_card'] );
     }
 
-    wp_enqueue_style( 'mc-header-ui-polish', $uri . '/assets/css/header-ui-polish.css', array( 'mc-design-system-v2' ), $version['header_polish'] );
     wp_enqueue_style( 'mc-ui-reference-override', $uri . '/assets/css/ui-reference-override.css', array( 'mc-course-ui-polish' ), $version['override'] );
 
     if ( is_page( 'learning-center' ) ) {
@@ -130,8 +127,7 @@ function mc_theme_assets() {
         wp_enqueue_style( 'mc-learning-layout-fix', $uri . '/assets/css/learning-layout-fix.css', array( 'mc-learning-v2' ), $version['learning_layout'] );
     }
 
-    wp_enqueue_style( 'mc-header-v2', $uri . '/assets/css/header-v2.css', array( 'mc-ui-reference-override' ), $version['header_v2'] );
-    wp_enqueue_style( 'mc-solid-color-v2', $uri . '/assets/css/solid-color-overrides-v2.css', array( 'mc-header-v2', 'mc-learning-v2' ), $version['solid'] );
+    wp_enqueue_style( 'mc-solid-color-v2', $uri . '/assets/css/solid-color-overrides-v2.css', array( 'mc-ui-reference-override', 'mc-learning-v2' ), $version['solid'] );
 }
 add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
 
