@@ -14,6 +14,7 @@ class Course_Player {
         wp_enqueue_style('mathcourse-learning-mobile-directory', MATHCOURSE_URL . 'assets/css/learning-mobile-directory.css', array('mathcourse-learning-layout-v3'), MATHCOURSE_VERSION);
         wp_enqueue_script('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/js/course-outline-accordion.js', array(), MATHCOURSE_VERSION, true);
         wp_enqueue_script('mathcourse-course-directory-lock-modal', MATHCOURSE_URL . 'assets/course-directory.js', array(), MATHCOURSE_VERSION, true);
+        wp_enqueue_script('mathcourse-learning-mobile-directory', MATHCOURSE_URL . 'assets/js/learning-mobile-directory.js', array(), MATHCOURSE_VERSION, true);
     }
     public function render($atts=array()) {
         $atts=shortcode_atts(array('course_id'=>0),$atts,'mathcourse_course_player');
