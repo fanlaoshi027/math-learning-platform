@@ -3,9 +3,24 @@ namespace MathCourse\Frontend;
 defined('ABSPATH') || exit;
 use MathCourse\Access\Activation_Service;
 class Activation {
- public function __construct(){add_shortcode('math_student_register',array($this,'register_shortcode'));add_filter('option_users_can_register',array($this,'disable_open_registration'));add_filter('registration_errors',array($this,'block_open_registration'),10,3);}
+ public function __construct(){add_shortcode('math_student_register',array($this,'register_shortcode'));add_filter('option_users_can_register',array($this,'disable_open_registration'));add_filter('registration_errors',array($this,'block_open_registration'),10,3);add_filter('register_url',array($this,'replace_register_url'),10,1);add_filter('login_url',array($this,'replace_login_url'),10,3);}
  public function disable_open_registration($value){return false;}
  public function block_open_registration($errors,$sanitized_user_login,$user_email){$errors->add('mathcourse_activation_required','请使用课程激活注册页面，并输入老师提供的课程激活码。');return $errors;}
+ public function replace_register_url($url){$page=$this->get_register_page();return $page?$page:$url;}
+ public function replace_login_url($login_url,$redirect='',$force_reauth=false){return $login_url;}
+ private function get_register_page(){
+  $pages=get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'suppress_filters'=>false,'meta_query'=>array(array('key'=>'_mathcourse_activation_register','value'=>'yes'))));
+  if($pages)return get_permalink($pages[0]->ID);
+  return '';
+ }
+ public static function ensure_register_page(){
+  $existing=get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_activation_register','meta_value'=>'yes'));
+  if($existing)return (int)$existing[0]->ID;
+  $page_id=wp_insert_post(array('post_title'=>'学员注册','post_name'=>'student-register','post_content'=>'[math_student_register]','post_status'=>'publish','post_type'=>'page'),true);
+  if(is_wp_error($page_id))return 0;
+  update_post_meta($page_id,'_mathcourse_activation_register','yes');
+  return (int)$page_id;
+ }
  private function rate_key(){ $ip=sanitize_text_field($_SERVER['REMOTE_ADDR']??'unknown'); return 'mathcourse_activation_rate_'.hash_hmac('sha256',$ip,wp_salt('auth')); }
  private function rate_limited(){ $key=$this->rate_key();$data=get_transient($key);return is_array($data)&&!empty($data['blocked']); }
  private function record_failure(){ $key=$this->rate_key();$data=get_transient($key);if(!is_array($data))$data=array('count'=>0,'blocked'=>false);$data['count']=(int)$data['count']+1;if($data['count']>=10)$data['blocked']=true;set_transient($key,$data,10*MINUTE_IN_SECONDS); }
