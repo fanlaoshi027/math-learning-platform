@@ -3,7 +3,7 @@
 Plugin Name: MathCourse
 Plugin URI:
 Description: 数学课程管理系统
-Version: 1.0.4
+Version: 1.0.5
 Author:
 Author URI:
 Text Domain: mathcourse
@@ -11,7 +11,7 @@ Text Domain: mathcourse
 
 defined('ABSPATH') || exit;
 
-define('MATHCOURSE_VERSION', '1.0.4');
+define('MATHCOURSE_VERSION', '1.0.5');
 define('MATHCOURSE_PATH', plugin_dir_path(__FILE__));
 define('MATHCOURSE_URL', plugin_dir_url(__FILE__));
 
