@@ -17,40 +17,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const players = document.querySelectorAll('.mathcourse-artplayer[data-video-url]');
     const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
-    function loadScript(src) {
-        return new Promise(function (resolve, reject) {
-            const script = document.createElement('script');
-            script.src = src;
-            script.async = true;
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
-
-    function ensureHls() {
-        if (window.Hls && typeof window.Hls.isSupported === 'function') {
-            return Promise.resolve(true);
-        }
-
-        // The plugin normally enqueues hls.js first. These fallbacks cover
-        // environments where the primary CDN is blocked or temporarily fails.
-        return loadScript('https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js')
-            .catch(function () {
-                return loadScript('https://unpkg.com/hls.js@1.6.2/dist/hls.min.js');
-            })
-            .catch(function () {
-                return loadScript('https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.6.2/hls.min.js');
-            })
-            .then(function () {
-                return !!(window.Hls && typeof window.Hls.isSupported === 'function');
-            })
-            .catch(function () {
-                console.warn('MathCourse: HLS library could not be loaded.');
-                return false;
-            });
-    }
-
     function updateProgressUI(progress) {
         if (!progress) return;
         document.querySelectorAll('.mc-course-player__progress span').forEach(el => el.textContent = '学习进度');
@@ -257,7 +223,6 @@ document.addEventListener('DOMContentLoaded', function () {
                                 hls.loadSource(sourceUrl);
                                 hls.attachMedia(video);
                             } else {
-                                // Safari/iOS can play HLS natively without hls.js.
                                 video.src = sourceUrl;
                                 video.load();
                             }
@@ -331,5 +296,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    ensureHls().finally(initializePlayers);
+    // hls.js is enqueued locally by MathCourse\Video\Player before this script.
+    // Do not load video assets from CDN: course media is served by the user's own server.
+    initializePlayers();
 });
