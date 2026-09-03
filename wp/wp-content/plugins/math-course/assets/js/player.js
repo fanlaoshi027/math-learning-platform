@@ -11,9 +11,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.head.appendChild(style);
     }
 
-    function applyInvert(container, enabled) {
-        var video = container.querySelector('video');
-        container.classList.toggle('mathcourse-inverted', !!enabled);
+    function applyInvert(art, enabled) {
+        var container = art && art.container ? art.container : null;
+        var video = art && art.video ? art.video : (container ? container.querySelector('video') : null);
+        if (container) container.classList.toggle('mathcourse-inverted', !!enabled);
         if (video) {
             if (enabled) video.style.setProperty('filter', 'invert(1)', 'important');
             else video.style.removeProperty('filter');
@@ -154,6 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
             autoPlayback: false,
             fullscreen: true,
             fullscreenWeb: true,
+            // 保留官方设置组件作为基础能力，但不显示官方齿轮控制按钮。
             setting: true,
             playbackRate: true,
             flip: false,
@@ -219,8 +221,10 @@ document.addEventListener('DOMContentLoaded', function () {
         art.on('ready', function () {
             restorePosition(art);
 
-            // 隐藏官方齿轮按钮，但保留官方设置面板本身，倍速按钮直接打开它。
-            try { art.controls.remove('setting'); } catch (e) {}
+            // 不删除 setting 组件，否则官方设置面板也会被一起销毁，导致倍速无法打开。
+            // 仅隐藏官方齿轮控制按钮，倍速改用官方 selector 控制器实现。
+            var settingControl = container.querySelector('.art-control-setting');
+            if (settingControl) settingControl.style.display = 'none';
 
             art.controls.add({
                 name: 'mathcourse-invert',
@@ -229,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 tooltip: '反色播放',
                 click: function () {
                     invertEnabled = !invertEnabled;
-                    applyInvert(container, invertEnabled);
+                    applyInvert(art, invertEnabled);
                 }
             });
 
@@ -238,32 +242,41 @@ document.addEventListener('DOMContentLoaded', function () {
                 position: 'right',
                 html: '倍速',
                 tooltip: '播放速度',
-                click: function () {
-                    // ArtPlayer 官方设置组件提供 toggle API，比直接写 show 更稳健。
-                    try {
-                        art.setting.toggle();
-                    } catch (e) {
-                        art.setting.show = !art.setting.show;
-                    }
+                selector: [
+                    { html: '0.5x', value: 0.5 },
+                    { html: '0.75x', value: 0.75 },
+                    { html: '正常', value: 1 },
+                    { html: '1.25x', value: 1.25 },
+                    { html: '1.5x', value: 1.5 },
+                    { html: '2x', value: 2 }
+                ],
+                onSelect: function (item) {
+                    var rate = Number(item.value);
+                    if (Number.isFinite(rate) && rate > 0) art.playbackRate = rate;
                 }
             });
 
-            applyInvert(container, invertEnabled);
+            applyInvert(art, invertEnabled);
         });
 
-        // ArtPlayer 的窗口全屏会改变播放器尺寸/状态；重新把反色直接写回 video，避免全屏样式覆盖 filter。
+        // 窗口全屏 / 网页全屏都会改变播放器容器或 DOM 挂载位置，统一重新应用反色。
         art.on('fullscreen', function () {
             if (!invertEnabled) return;
-            setTimeout(function () { applyInvert(container, true); }, 0);
-            setTimeout(function () { applyInvert(container, true); }, 120);
+            setTimeout(function () { applyInvert(art, true); }, 0);
+            setTimeout(function () { applyInvert(art, true); }, 120);
+        });
+        art.on('fullscreenWeb', function () {
+            if (!invertEnabled) return;
+            setTimeout(function () { applyInvert(art, true); }, 0);
+            setTimeout(function () { applyInvert(art, true); }, 120);
         });
         art.on('resize', function () {
             if (!invertEnabled) return;
-            applyInvert(container, true);
+            applyInvert(art, true);
         });
         art.on('video:loadedmetadata', function () {
             restorePosition(art);
-            if (invertEnabled) applyInvert(container, true);
+            if (invertEnabled) applyInvert(art, true);
         });
         art.on('video:durationchange', function () { restorePosition(art); });
         art.on('video:timeupdate', function () { savePosition(art, false); maybeCompleteAtEnd(art); });
