@@ -37,6 +37,20 @@
     min-height: 48px;
 }
 
+/* 倍速使用 ArtPlayer 官方 selector 控件：保持中文、不显示额外英文提示。 */
+.mathcourse-artplayer .art-control-mathcourse-speed {
+    white-space: nowrap;
+}
+
+.mathcourse-artplayer .art-control-mathcourse-speed .art-selector,
+.mathcourse-artplayer .art-control-mathcourse-speed [class*="selector"] {
+    z-index: 10000 !important;
+}
+
+.mathcourse-artplayer .art-control-mathcourse-speed [class*="selector-item"] {
+    white-space: nowrap;
+}
+
 /* Desktop: keep the official ArtPlayer UI in a true 16:9 desktop canvas. */
 @media (min-width: 1051px) {
     .mathcourse-artplayer {
