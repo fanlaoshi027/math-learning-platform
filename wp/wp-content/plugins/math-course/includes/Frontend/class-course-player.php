@@ -22,9 +22,14 @@ class Course_Player {
         $selected=isset($_GET['lesson_id'])?absint($_GET['lesson_id']):0; $current=$this->find_lesson($data,$selected); if(!$current) $current=$this->first_accessible($data);
         $progress=isset($data['progress'])?$data['progress']:array('completed'=>0,'total'=>0,'percent'=>0);
         $page=get_page_by_path('course-center'); $base=$page?get_permalink($page):home_url('/course-center/');
+        $course_title=get_the_title($course_id); if(!$course_title) $course_title='课程学习';
         $navigation=$this->lesson_navigation($data,$current,$course_id); $this->assets();
         ob_start(); ?>
         <div class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
+            <header class="mc-course-player__topbar">
+                <a class="mc-course-player__back" href="<?php echo esc_url($base); ?>" aria-label="返回课程中心">‹</a>
+                <div class="mc-course-player__course-title"><?php echo esc_html($course_title); ?></div>
+            </header>
             <div class="mc-course-player__workspace">
                 <aside class="mc-course-player__sidebar">
                     <div class="mc-course-player__progress-line" aria-label="学习进度">
