@@ -10,13 +10,43 @@ document.addEventListener('DOMContentLoaded', function () {
     if (isWeChat && isAndroid) document.body.classList.add('math-wechat-android');
     if (isWeChat && isIOS) document.body.classList.add('math-wechat-ios');
 
-    // Web fullscreen is mounted under <body>, so the page grid cannot constrain it.
     if ('FULLSCREEN_WEB_IN_BODY' in window.Artplayer) {
         window.Artplayer.FULLSCREEN_WEB_IN_BODY = true;
     }
 
     const players = document.querySelectorAll('.mathcourse-artplayer[data-video-url]');
     const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+    function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    function ensureHls() {
+        if (window.Hls && typeof window.Hls.isSupported === 'function') {
+            return Promise.resolve(true);
+        }
+
+        // Chrome/Edge/Android need hls.js for m3u8. Keep a second public CDN
+        // fallback so a transient jsDelivr failure does not leave a blank player.
+        return loadScript('https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js')
+            .catch(function () {
+                return loadScript('https://unpkg.com/hls.js@1.6.2/dist/hls.min.js');
+            })
+            .then(function () {
+                return !!(window.Hls && typeof window.Hls.isSupported === 'function');
+            })
+            .catch(function () {
+                console.warn('MathCourse: HLS library could not be loaded.');
+                return false;
+            });
+    }
 
     function updateProgressUI(progress) {
         if (!progress) return;
@@ -34,248 +64,252 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    players.forEach(function (container) {
-        const lessonId = parseInt(container.dataset.lessonId || '0', 10);
-        const url = container.dataset.videoUrl || '';
-        if (!lessonId || !url) return;
+    function initializePlayers() {
+        players.forEach(function (container) {
+            const lessonId = parseInt(container.dataset.lessonId || '0', 10);
+            const url = container.dataset.videoUrl || '';
+            if (!lessonId || !url) return;
 
-        const storageKey = 'mathcourse_lesson_' + lessonId + '_time';
-        let completionSent = false;
-        let lastSavedSecond = -1;
-        let invertEnabled = false;
-        let art = null;
+            const storageKey = 'mathcourse_lesson_' + lessonId + '_time';
+            let completionSent = false;
+            let lastSavedSecond = -1;
+            let invertEnabled = false;
+            let art = null;
 
-        function savedTime() {
-            try {
-                const value = parseFloat(localStorage.getItem(storageKey) || '0');
-                return Number.isFinite(value) && value > 0 ? value : 0;
-            } catch (e) { return 0; }
-        }
-
-        function clearSavedTime() {
-            try { localStorage.removeItem(storageKey); } catch (e) {}
-        }
-
-        function submitCompletion() {
-            if (completionSent || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
-            completionSent = true;
-            const fd = new FormData();
-            fd.append('action', 'mathcourse_complete_lesson');
-            fd.append('nonce', mathcoursePlayer.nonce);
-            fd.append('lesson_id', String(lessonId));
-            fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: fd, keepalive: true })
-                .then(r => r.json())
-                .then(result => {
-                    if (!result || !result.success) throw new Error('progress rejected');
-                    clearSavedTime();
-                    const data = result.data || {};
-                    updateProgressUI(data.progress || null);
-                    showCompletionPanel();
-                })
-                .catch(error => {
-                    completionSent = false;
-                    console.warn('MathCourse: unable to save lesson completion.', error);
-                });
-        }
-
-        function syncInvertState() {
-            const video = art && art.video ? art.video : container.querySelector('video');
-            if (!video) return;
-            video.classList.toggle('mathcourse-invert-video', invertEnabled);
-            if (invertEnabled) {
-                video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
-                video.style.setProperty('-webkit-filter', 'invert(1) hue-rotate(180deg)', 'important');
-            } else {
-                video.style.removeProperty('filter');
-                video.style.removeProperty('-webkit-filter');
+            function savedTime() {
+                try {
+                    const value = parseFloat(localStorage.getItem(storageKey) || '0');
+                    return Number.isFinite(value) && value > 0 ? value : 0;
+                } catch (e) { return 0; }
             }
-            container.classList.toggle('is-inverted', invertEnabled);
-        }
 
-        function setFullscreenState() {
-            const webActive = !!(art && art.fullscreenWeb);
-            const windowActive = !!(art && art.fullscreen);
-            document.body.classList.toggle('mathcourse-web-fullscreen', webActive);
-            container.classList.toggle('is-web-fullscreen', webActive);
-            container.classList.toggle('is-window-fullscreen', windowActive);
-            window.requestAnimationFrame(function () {
-                if (art && typeof art.resize === 'function') art.resize();
-                syncInvertState();
+            function clearSavedTime() {
+                try { localStorage.removeItem(storageKey); } catch (e) {}
+            }
+
+            function submitCompletion() {
+                if (completionSent || !window.mathcoursePlayer || !mathcoursePlayer.ajax_url || !mathcoursePlayer.nonce) return;
+                completionSent = true;
+                const fd = new FormData();
+                fd.append('action', 'mathcourse_complete_lesson');
+                fd.append('nonce', mathcoursePlayer.nonce);
+                fd.append('lesson_id', String(lessonId));
+                fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: fd, keepalive: true })
+                    .then(r => r.json())
+                    .then(result => {
+                        if (!result || !result.success) throw new Error('progress rejected');
+                        clearSavedTime();
+                        const data = result.data || {};
+                        updateProgressUI(data.progress || null);
+                        showCompletionPanel();
+                    })
+                    .catch(error => {
+                        completionSent = false;
+                        console.warn('MathCourse: unable to save lesson completion.', error);
+                    });
+            }
+
+            function syncInvertState() {
+                const video = art && art.video ? art.video : container.querySelector('video');
+                if (!video) return;
+                video.classList.toggle('mathcourse-invert-video', invertEnabled);
+                if (invertEnabled) {
+                    video.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
+                    video.style.setProperty('-webkit-filter', 'invert(1) hue-rotate(180deg)', 'important');
+                } else {
+                    video.style.removeProperty('filter');
+                    video.style.removeProperty('-webkit-filter');
+                }
+                container.classList.toggle('is-inverted', invertEnabled);
+            }
+
+            function setFullscreenState() {
+                const webActive = !!(art && art.fullscreenWeb);
+                const windowActive = !!(art && art.fullscreen);
+                document.body.classList.toggle('mathcourse-web-fullscreen', webActive);
+                container.classList.toggle('is-web-fullscreen', webActive);
+                container.classList.toggle('is-window-fullscreen', windowActive);
                 window.requestAnimationFrame(function () {
                     if (art && typeof art.resize === 'function') art.resize();
                     syncInvertState();
-                });
-            });
-        }
-
-        function onFullscreenChange() {
-            setFullscreenState();
-        }
-
-        function bindFullscreenEvents(video) {
-            document.addEventListener('fullscreenchange', onFullscreenChange);
-            document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-            window.addEventListener('orientationchange', onFullscreenChange, { passive: true });
-            window.addEventListener('resize', onFullscreenChange, { passive: true });
-            window.addEventListener('pageshow', onFullscreenChange, { passive: true });
-            document.addEventListener('visibilitychange', onFullscreenChange, { passive: true });
-            if (video) {
-                video.addEventListener('webkitbeginfullscreen', onFullscreenChange);
-                video.addEventListener('webkitendfullscreen', onFullscreenChange);
-                video.addEventListener('x5videoenterfullscreen', onFullscreenChange);
-                video.addEventListener('x5videoexitfullscreen', onFullscreenChange);
-            }
-        }
-
-        function unbindFullscreenEvents(video) {
-            document.removeEventListener('fullscreenchange', onFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-            window.removeEventListener('orientationchange', onFullscreenChange);
-            window.removeEventListener('resize', onFullscreenChange);
-            window.removeEventListener('pageshow', onFullscreenChange);
-            document.removeEventListener('visibilitychange', onFullscreenChange);
-            if (video) {
-                video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
-                video.removeEventListener('webkitendfullscreen', onFullscreenChange);
-                video.removeEventListener('x5videoenterfullscreen', onFullscreenChange);
-                video.removeEventListener('x5videoexitfullscreen', onFullscreenChange);
-            }
-        }
-
-        function createPlayer() {
-            const settings = [
-                {
-                    name: 'math-speed',
-                    html: '播放速度',
-                    tooltip: '1×',
-                    selector: speeds.map(function (speed) {
-                        return { html: speed + '×', value: speed, default: speed === 1 };
-                    }),
-                    onSelect: function (item) {
-                        const speed = Number(item.value);
-                        if (Number.isFinite(speed) && art) art.playbackRate = speed;
-                        return item.html;
-                    },
-                },
-                {
-                    name: 'math-invert',
-                    html: '反色播放',
-                    tooltip: '关闭',
-                    switch: false,
-                    onSwitch: function (item) {
-                        invertEnabled = !item.switch;
-                        item.tooltip = invertEnabled ? '开启' : '关闭';
+                    window.requestAnimationFrame(function () {
+                        if (art && typeof art.resize === 'function') art.resize();
                         syncInvertState();
-                        return invertEnabled;
-                    },
-                },
-            ];
-
-            art = new Artplayer({
-                container: container,
-                url: url,
-                type: 'm3u8',
-                lang: 'zh-cn',
-                autoplay: false,
-                muted: false,
-                pip: false,
-                fullscreen: true,
-                fullscreenWeb: true,
-                playsInline: true,
-                autoOrientation: true,
-                setting: true,
-                playbackRate: false,
-                flip: false,
-                aspectRatio: false,
-                subtitleOffset: false,
-                contextmenu: [],
-                settings: settings,
-                moreVideoAttr: {
-                    'webkit-playsinline': 'true',
-                    playsinline: 'true',
-                    'x5-playsinline': 'true',
-                    'x5-video-player-type': isWeChat && isAndroid ? 'h5' : '',
-                    'x5-video-player-fullscreen': isWeChat && isAndroid ? 'true' : '',
-                    'x-webkit-airplay': 'allow',
-                    controlsList: 'nodownload noplaybackrate',
-                    disablePictureInPicture: true,
-                },
-                customType: {
-                    m3u8: function (video, sourceUrl, instance) {
-                        if (window.Hls && typeof window.Hls.isSupported === 'function' && window.Hls.isSupported()) {
-                            const hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
-                            hls.loadSource(sourceUrl);
-                            hls.attachMedia(video);
-                            instance._mathcourseHls = hls;
-                        } else {
-                            video.src = sourceUrl;
-                        }
-                    },
-                },
-            });
-
-            function preventContextMenu(event) {
-                event.preventDefault();
-                event.stopPropagation();
+                    });
+                });
             }
 
-            container.addEventListener('contextmenu', preventContextMenu, true);
-            if (art.contextmenu) art.contextmenu.show = false;
-            bindFullscreenEvents(art.video);
-
-            art.on('fullscreen', function () {
+            function onFullscreenChange() {
                 setFullscreenState();
-            });
-            art.on('fullscreenWeb', function () {
-                setFullscreenState();
-            });
-            art.on('fullscreenError', onFullscreenChange);
+            }
 
-            art.on('ready', function () {
+            function bindFullscreenEvents(video) {
+                document.addEventListener('fullscreenchange', onFullscreenChange);
+                document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+                window.addEventListener('orientationchange', onFullscreenChange, { passive: true });
+                window.addEventListener('resize', onFullscreenChange, { passive: true });
+                window.addEventListener('pageshow', onFullscreenChange, { passive: true });
+                document.addEventListener('visibilitychange', onFullscreenChange, { passive: true });
+                if (video) {
+                    video.addEventListener('webkitbeginfullscreen', onFullscreenChange);
+                    video.addEventListener('webkitendfullscreen', onFullscreenChange);
+                    video.addEventListener('x5videoenterfullscreen', onFullscreenChange);
+                    video.addEventListener('x5videoexitfullscreen', onFullscreenChange);
+                }
+            }
+
+            function unbindFullscreenEvents(video) {
+                document.removeEventListener('fullscreenchange', onFullscreenChange);
+                document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+                window.removeEventListener('orientationchange', onFullscreenChange);
+                window.removeEventListener('resize', onFullscreenChange);
+                window.removeEventListener('pageshow', onFullscreenChange);
+                document.removeEventListener('visibilitychange', onFullscreenChange);
+                if (video) {
+                    video.removeEventListener('webkitbeginfullscreen', onFullscreenChange);
+                    video.removeEventListener('webkitendfullscreen', onFullscreenChange);
+                    video.removeEventListener('x5videoenterfullscreen', onFullscreenChange);
+                    video.removeEventListener('x5videoexitfullscreen', onFullscreenChange);
+                }
+            }
+
+            function createPlayer() {
+                const settings = [
+                    {
+                        name: 'math-speed',
+                        html: '播放速度',
+                        tooltip: '1×',
+                        selector: speeds.map(function (speed) {
+                            return { html: speed + '×', value: speed, default: speed === 1 };
+                        }),
+                        onSelect: function (item) {
+                            const speed = Number(item.value);
+                            if (Number.isFinite(speed) && art) art.playbackRate = speed;
+                            return item.html;
+                        },
+                    },
+                    {
+                        name: 'math-invert',
+                        html: '反色播放',
+                        tooltip: '关闭',
+                        switch: false,
+                        onSwitch: function (item) {
+                            invertEnabled = !item.switch;
+                            item.tooltip = invertEnabled ? '开启' : '关闭';
+                            syncInvertState();
+                            return invertEnabled;
+                        },
+                    },
+                ];
+
+                art = new Artplayer({
+                    container: container,
+                    url: url,
+                    type: 'm3u8',
+                    lang: 'zh-cn',
+                    autoplay: false,
+                    muted: false,
+                    pip: false,
+                    fullscreen: true,
+                    fullscreenWeb: true,
+                    playsInline: true,
+                    autoOrientation: true,
+                    setting: true,
+                    playbackRate: false,
+                    flip: false,
+                    aspectRatio: false,
+                    subtitleOffset: false,
+                    contextmenu: [],
+                    settings: settings,
+                    moreVideoAttr: {
+                        'webkit-playsinline': 'true',
+                        playsinline: 'true',
+                        'x5-playsinline': 'true',
+                        'x5-video-player-type': isWeChat && isAndroid ? 'h5' : '',
+                        'x5-video-player-fullscreen': isWeChat && isAndroid ? 'true' : '',
+                        'x-webkit-airplay': 'allow',
+                        controlsList: 'nodownload noplaybackrate',
+                        disablePictureInPicture: true,
+                    },
+                    customType: {
+                        m3u8: function (video, sourceUrl, instance) {
+                            if (window.Hls && typeof window.Hls.isSupported === 'function' && window.Hls.isSupported()) {
+                                const hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+                                hls.loadSource(sourceUrl);
+                                hls.attachMedia(video);
+                                instance._mathcourseHls = hls;
+                            } else {
+                                video.src = sourceUrl;
+                            }
+                        },
+                    },
+                });
+
+                function preventContextMenu(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+
+                container.addEventListener('contextmenu', preventContextMenu, true);
                 if (art.contextmenu) art.contextmenu.show = false;
-                const saved = savedTime();
-                if (saved > 0 && art.duration > 0 && saved < art.duration - 5) {
-                    try { art.currentTime = Math.min(saved, art.duration - 1); } catch (e) {}
-                } else if (saved >= art.duration - 5) {
-                    clearSavedTime();
-                }
-                syncInvertState();
-                setFullscreenState();
-                window.setTimeout(onFullscreenChange, isWeChat ? 80 : 0);
-            });
+                bindFullscreenEvents(art.video);
 
-            art.on('timeupdate', function () {
-                const time = Number(art.currentTime || 0);
-                const duration = Number(art.duration || 0);
-                if (!Number.isFinite(time) || time <= 0 || (duration > 0 && time >= duration - 0.5)) return;
-                const value = Math.floor(time * 10) / 10;
-                if (Math.floor(value) === lastSavedSecond) return;
-                lastSavedSecond = Math.floor(value);
-                try { localStorage.setItem(storageKey, String(value)); } catch (e) {}
-            });
+                art.on('fullscreen', function () {
+                    setFullscreenState();
+                });
+                art.on('fullscreenWeb', function () {
+                    setFullscreenState();
+                });
+                art.on('fullscreenError', onFullscreenChange);
 
-            art.on('pause', function () {
-                const time = Number(art.currentTime || 0);
-                if (Number.isFinite(time) && time > 0) {
-                    try { localStorage.setItem(storageKey, String(Math.floor(time * 10) / 10)); } catch (e) {}
-                }
-            });
+                art.on('ready', function () {
+                    if (art.contextmenu) art.contextmenu.show = false;
+                    const saved = savedTime();
+                    if (saved > 0 && art.duration > 0 && saved < art.duration - 5) {
+                        try { art.currentTime = Math.min(saved, art.duration - 1); } catch (e) {}
+                    } else if (saved >= art.duration - 5) {
+                        clearSavedTime();
+                    }
+                    syncInvertState();
+                    setFullscreenState();
+                    window.setTimeout(onFullscreenChange, isWeChat ? 80 : 0);
+                });
 
-            art.on('destroy', function () {
-                setFullscreenState();
-                document.body.classList.remove('mathcourse-web-fullscreen');
-                container.classList.remove('is-web-fullscreen', 'is-window-fullscreen', 'is-inverted');
-                unbindFullscreenEvents(art.video);
-                container.removeEventListener('contextmenu', preventContextMenu, true);
-                if (art._mathcourseHls) {
-                    try { art._mathcourseHls.destroy(); } catch (e) {}
-                }
-            });
+                art.on('timeupdate', function () {
+                    const time = Number(art.currentTime || 0);
+                    const duration = Number(art.duration || 0);
+                    if (!Number.isFinite(time) || time <= 0 || (duration > 0 && time >= duration - 0.5)) return;
+                    const value = Math.floor(time * 10) / 10;
+                    if (Math.floor(value) === lastSavedSecond) return;
+                    lastSavedSecond = Math.floor(value);
+                    try { localStorage.setItem(storageKey, String(value)); } catch (e) {}
+                });
 
-            art.on('ended', submitCompletion);
-            container._mathcourseArt = art;
-        }
+                art.on('pause', function () {
+                    const time = Number(art.currentTime || 0);
+                    if (Number.isFinite(time) && time > 0) {
+                        try { localStorage.setItem(storageKey, String(Math.floor(time * 10) / 10)); } catch (e) {}
+                    }
+                });
 
-        createPlayer();
-    });
+                art.on('destroy', function () {
+                    setFullscreenState();
+                    document.body.classList.remove('mathcourse-web-fullscreen');
+                    container.classList.remove('is-web-fullscreen', 'is-window-fullscreen', 'is-inverted');
+                    unbindFullscreenEvents(art.video);
+                    container.removeEventListener('contextmenu', preventContextMenu, true);
+                    if (art._mathcourseHls) {
+                        try { art._mathcourseHls.destroy(); } catch (e) {}
+                    }
+                });
+
+                art.on('ended', submitCompletion);
+                container._mathcourseArt = art;
+            }
+
+            createPlayer();
+        });
+    }
+
+    ensureHls().finally(initializePlayers);
 });
