@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.Artplayer) return;
 
-    // 按需求：保留 ArtPlayer 官方播放器菜单/控制器，只关闭 ArtPlayer 自带右键菜单。
+    // 保留 ArtPlayer 官方播放器菜单/控制器，只关闭 ArtPlayer 自带右键菜单。
     window.Artplayer.CONTEXTMENU = false;
 
     function updateProgressUI(progress, lessonId) {
@@ -34,7 +34,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var lessonId = parseInt(container.dataset.lessonId || '0', 10);
         var courseId = parseInt(container.dataset.courseId || '0', 10);
         var url = container.dataset.videoUrl || '';
-        if (!lessonId || !url) return;
+        var videoType = (container.dataset.videoType || '').toLowerCase();
+        if (!lessonId || !url || (videoType !== 'm3u8' && videoType !== 'mp4')) return;
 
         var storageKey = 'mathcourse_lesson_' + lessonId + '_time';
         var completionSent = false;
@@ -138,11 +139,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (time >= duration - Math.max(1, Math.min(5, duration * 0.01))) submitCompletion(art);
         }
 
-        var art = new Artplayer({
+        var options = {
             container: container,
             url: url,
             id: 'mathcourse-lesson-' + lessonId,
-            type: 'm3u8',
+            type: videoType,
             lang: 'zh-cn',
             theme: '#1677ff',
             volume: 0.7,
@@ -160,8 +161,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 playsInline: true,
                 'webkit-playsinline': true,
                 preload: 'metadata'
-            },
-            customType: {
+            }
+        };
+
+        // 只有 HLS 需要 hls.js；MP4 直接使用 ArtPlayer/HTML5 video 原生能力。
+        if (videoType === 'm3u8') {
+            options.customType = {
                 m3u8: function (video, sourceUrl) {
                     if (window.Hls && Hls.isSupported()) {
                         if (hls) hls.destroy();
@@ -177,8 +182,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.warn('MathCourse: current browser does not support HLS playback.');
                     }
                 }
-            }
-        });
+            };
+        }
+
+        var art = new Artplayer(options);
 
         window.mathcourseArtPlayers = window.mathcourseArtPlayers || {};
         window.mathcourseArtPlayers[lessonId] = art;
