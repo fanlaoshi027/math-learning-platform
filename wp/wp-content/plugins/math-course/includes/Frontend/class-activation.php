@@ -5,16 +5,22 @@ use MathCourse\Access\Activation_Service;
 class Activation {
  public function __construct(){add_shortcode('math_student_register',array($this,'register_shortcode'));add_filter('option_users_can_register',array($this,'disable_open_registration'));}
  public function disable_open_registration($value){return false;}
+ private function rate_key(){ $ip=sanitize_text_field($_SERVER['REMOTE_ADDR']??'unknown'); return 'mathcourse_activation_rate_'.hash_hmac('sha256',$ip,wp_salt('auth')); }
+ private function rate_limited(){ $key=$this->rate_key();$data=get_transient($key);return is_array($data)&&!empty($data['blocked']); }
+ private function record_failure(){ $key=$this->rate_key();$data=get_transient($key);if(!is_array($data))$data=array('count'=>0,'blocked'=>false);$data['count']=(int)$data['count']+1;if($data['count']>=10)$data['blocked']=true;set_transient($key,$data,10*MINUTE_IN_SECONDS); }
  public function register_shortcode(){
   if(is_user_logged_in())return '<div class="mathcourse-activation-card"><h2>你已经登录</h2><p>当前账号无需重复注册。</p></div>';
   $error='';$success='';
   if('POST'===strtoupper($_SERVER['REQUEST_METHOD']??'')&&isset($_POST['mathcourse_register_nonce'])){
-   if(!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['mathcourse_register_nonce'])),'mathcourse_register'))$error='页面已过期，请刷新后重试。';else{
+   if(!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['mathcourse_register_nonce'])),'mathcourse_register'))$error='页面已过期，请刷新后重试。';
+   elseif($this->rate_limited())$error='尝试次数过多，请 10 分钟后再试。';
+   else{
     $code=sanitize_text_field(wp_unslash($_POST['activation_code']??''));$username=sanitize_user(wp_unslash($_POST['username']??''));$password=(string)wp_unslash($_POST['password']??'');$confirm=(string)wp_unslash($_POST['password_confirm']??'');
     if(!$code||!$username||!$password)$error='请完整填写激活码、账号和密码。';elseif(strlen($password)<8)$error='密码至少需要 8 位。';elseif($password!==$confirm)$error='两次输入的密码不一致。';elseif(username_exists($username))$error='该账号已存在，请换一个账号。';else{
      global $wpdb;$table=$wpdb->prefix.'mathcourse_activation_codes';$hash=hash_hmac('sha256',strtoupper(preg_replace('/[^A-Z0-9]/i','',$code)),wp_salt('auth'));$row=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE code_hash=%s LIMIT 1",$hash));
-     if(!$row)$error='激活码无效。';elseif('unused'!==$row->status)$error='激活码已使用。';elseif(!empty($row->expires_at)&&strtotime($row->expires_at)<=current_time('timestamp'))$error='激活码已过期。';
-     if(!$error){$user_id=wp_insert_user(array('user_login'=>$username,'user_pass'=>$password,'role'=>'subscriber'));if(is_wp_error($user_id))$error=$user_id->get_error_message();else{$result=(new Activation_Service())->redeem($code,$user_id);if(is_wp_error($result)){require_once ABSPATH.'wp-admin/includes/user.php';wp_delete_user($user_id);$error=$result->get_error_message();}else{wp_set_auth_cookie($user_id,true);$success='注册成功，课程已自动激活。';}}}
+     if(!$row)$error='激活码无效。';elseif('unused'!==$row->status)$error='激活码已使用或已失效。';elseif(!empty($row->expires_at)&&strtotime($row->expires_at)<=current_time('timestamp'))$error='激活码已过期。';
+     if($error)$this->record_failure();
+     if(!$error){$user_id=wp_insert_user(array('user_login'=>$username,'user_pass'=>$password,'role'=>'subscriber'));if(is_wp_error($user_id))$error=$user_id->get_error_message();else{$result=(new Activation_Service())->redeem($code,$user_id);if(is_wp_error($result)){require_once ABSPATH.'wp-admin/includes/user.php';wp_delete_user($user_id);$error=$result->get_error_message();$this->record_failure();}else{wp_set_auth_cookie($user_id,true);$success='注册成功，课程已自动激活。';}}}
     }
    }
   }
