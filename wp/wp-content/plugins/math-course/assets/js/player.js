@@ -11,6 +11,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.head.appendChild(style);
     }
 
+    function applyInvert(container, enabled) {
+        var video = container.querySelector('video');
+        container.classList.toggle('mathcourse-inverted', !!enabled);
+        if (video) {
+            if (enabled) video.style.setProperty('filter', 'invert(1)', 'important');
+            else video.style.removeProperty('filter');
+        }
+    }
+
     function updateProgressUI(progress, lessonId) {
         if (!progress) return;
         document.querySelectorAll('.mc-course-player__progress span').forEach(function (el) {
@@ -52,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var restorePending = true;
         var lastSavedSecond = -1;
         var hls = null;
+        var invertEnabled = false;
 
         function getSavedTime() {
             try {
@@ -144,7 +154,6 @@ document.addEventListener('DOMContentLoaded', function () {
             autoPlayback: false,
             fullscreen: true,
             fullscreenWeb: true,
-            // 保留 ArtPlayer 的设置面板，仅用于弹出“倍速”选项；底部齿轮按钮会在 ready 后替换为我们自己的两个按钮。
             setting: true,
             playbackRate: true,
             flip: false,
@@ -210,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
         art.on('ready', function () {
             restorePosition(art);
 
-            // 官方齿轮仍然保留会让用户误以为是普通设置；这里移除它，改成并排的“反色 + 倍速”两个独立按钮。
+            // 隐藏官方齿轮按钮，但保留官方设置面板本身，倍速按钮直接打开它。
             try { art.controls.remove('setting'); } catch (e) {}
 
             art.controls.add({
@@ -219,7 +228,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 html: '☯',
                 tooltip: '反色播放',
                 click: function () {
-                    container.classList.toggle('mathcourse-inverted');
+                    invertEnabled = !invertEnabled;
+                    applyInvert(container, invertEnabled);
                 }
             });
 
@@ -229,11 +239,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 html: '倍速',
                 tooltip: '播放速度',
                 click: function () {
-                    art.setting.show = true;
+                    // ArtPlayer 官方设置组件提供 toggle API，比直接写 show 更稳健。
+                    try {
+                        art.setting.toggle();
+                    } catch (e) {
+                        art.setting.show = !art.setting.show;
+                    }
                 }
             });
+
+            applyInvert(container, invertEnabled);
         });
-        art.on('video:loadedmetadata', function () { restorePosition(art); });
+
+        // ArtPlayer 的窗口全屏会改变播放器尺寸/状态；重新把反色直接写回 video，避免全屏样式覆盖 filter。
+        art.on('fullscreen', function () {
+            if (!invertEnabled) return;
+            setTimeout(function () { applyInvert(container, true); }, 0);
+            setTimeout(function () { applyInvert(container, true); }, 120);
+        });
+        art.on('resize', function () {
+            if (!invertEnabled) return;
+            applyInvert(container, true);
+        });
+        art.on('video:loadedmetadata', function () {
+            restorePosition(art);
+            if (invertEnabled) applyInvert(container, true);
+        });
         art.on('video:durationchange', function () { restorePosition(art); });
         art.on('video:timeupdate', function () { savePosition(art, false); maybeCompleteAtEnd(art); });
         art.on('video:pause', function () { savePosition(art, true); });
