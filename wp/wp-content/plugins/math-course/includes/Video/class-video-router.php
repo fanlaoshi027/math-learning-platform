@@ -3,21 +3,101 @@ namespace MathCourse\Video;
 defined('ABSPATH') || exit;
 use MathCourse\Access\Access_Service;
 use MathCourse\Tutor\Adapter;
+
 class Video_Router {
-    private $access; private $adapter; private $token_ttl=600;
+    private $access;
+    private $adapter;
+    private $token_ttl=600;
+
     public function __construct($register_hooks=true){$this->access=new Access_Service();$this->adapter=new Adapter();if($register_hooks){add_action('init',array($this,'register_route'));add_action('template_redirect',array($this,'handle'));}}
+
     public function register_route(){add_rewrite_rule('^math-video/([0-9]+)/([0-9]+)/([A-Za-z0-9_-]+)/?$','index.php?math_video=$matches[1]&math_video_exp=$matches[2]&math_video_sig=$matches[3]','top');add_rewrite_tag('%math_video%','([0-9]+)');add_rewrite_tag('%math_video_exp%','([0-9]+)');add_rewrite_tag('%math_video_sig%','([A-Za-z0-9_-]+)');}
+
+    /** 统一识别 HLS 与 MP4，播放器永远只拿受保护网关地址。 */
+    public function get_media_type($source_url){
+        $path=(string)wp_parse_url((string)$source_url,PHP_URL_PATH);
+        $ext=strtolower(pathinfo($path,PATHINFO_EXTENSION));
+        return $ext==='m3u8'?'m3u8':($ext==='mp4'?'mp4':'');
+    }
+
     public function get_protected_url($lesson_id){$lesson_id=absint($lesson_id);if(!$lesson_id||!$this->adapter->get_lesson($lesson_id))return '';if(!$this->can_watch($lesson_id))return ''; $expires=time()+$this->token_ttl;return home_url('/math-video/'.$lesson_id.'/'.$expires.'/'.$this->sign($lesson_id,$expires,'').'/');}
     private function sign($lesson_id,$expires,$file){return rtrim(strtr(base64_encode(hash_hmac('sha256',absint($lesson_id).'|'.absint($expires).'|'.(string)$file,wp_salt('auth'),true)),'+/','-_'),'=');}
     private function valid_signature($lesson_id,$expires,$file,$signature){if(!$expires||$expires<time()||$expires>time()+DAY_IN_SECONDS)return false;return hash_equals($this->sign($lesson_id,$expires,$file),(string)$signature);}
     private function get_source_url($lesson_id){return $this->adapter->get_lesson_hls_url($lesson_id);}
     private function can_watch($lesson_id){$course_id=$this->adapter->get_lesson_course_id($lesson_id);if(!$course_id)return false;if(is_user_logged_in()&&$this->access->can_watch_lesson(get_current_user_id(),$course_id,$lesson_id))return true;return $this->access->can_preview($course_id,$lesson_id);}
-    public function handle(){ $lesson_id=absint(get_query_var('math_video'));if(!$lesson_id)return; $expires=absint(get_query_var('math_video_exp'));$signature=sanitize_text_field(get_query_var('math_video_sig'));$file=isset($_GET['file'])?wp_unslash($_GET['file']):'';if(!is_string($file))$file='';if(!$this->valid_signature($lesson_id,$expires,$file,$signature)){status_header(403);exit('视频访问链接已失效。');}if(!$this->can_watch($lesson_id)){status_header(403);exit('暂无观看权限，请联系老师开通课程。');}$source=$this->get_source_url($lesson_id);if(!$source){status_header(404);exit('视频不存在。');}if($file==='')$this->serve_playlist($lesson_id,$expires,$source);else$this->serve_media($lesson_id,$expires,$file,$source);exit; }
+
+    public function handle(){
+        $lesson_id=absint(get_query_var('math_video'));if(!$lesson_id)return;
+        $expires=absint(get_query_var('math_video_exp'));$signature=sanitize_text_field(get_query_var('math_video_sig'));
+        $file=isset($_GET['file'])?wp_unslash($_GET['file']):'';if(!is_string($file))$file='';
+        if(!$this->valid_signature($lesson_id,$expires,$file,$signature)){status_header(403);exit('视频访问链接已失效。');}
+        if(!$this->can_watch($lesson_id)){status_header(403);exit('暂无观看权限，请联系老师开通课程。');}
+        $source=$this->get_source_url($lesson_id);if(!$source){status_header(404);exit('视频不存在。');}
+        $media_type=$this->get_media_type($source);
+        if($media_type==='m3u8'){
+            if($file==='')$this->serve_playlist($lesson_id,$expires,$source);else$this->serve_media($lesson_id,$expires,$file,$source);
+        }elseif($media_type==='mp4'){
+            // MP4 与 HLS 共用同一 token、权限检查和隐藏源地址；直接流式代理原文件，避免一次性读入 PHP 内存。
+            if($file!==''){status_header(403);exit('视频地址无效。');}
+            $this->serve_mp4($lesson_id,$expires,$source);
+        }else{status_header(415);exit('暂不支持的视频格式。');}
+        exit;
+    }
+
     private function gateway_url($lesson_id,$expires,$file_ref){$sig=$this->sign($lesson_id,$expires,$file_ref);return add_query_arg('file',$file_ref,home_url('/math-video/'.$lesson_id.'/'.$expires.'/'.$sig.'/'));}
     private function normalize_file_reference($uri,$source_url){$uri=trim((string)$uri);if($uri==='')return ''; $source_parts=wp_parse_url($source_url);if(!$source_parts||empty($source_parts['scheme'])||empty($source_parts['host']))return false;if(preg_match('#^https?://#i',$uri)){$target=wp_parse_url($uri);if(!$target||empty($target['scheme'])||empty($target['host']))return false;if(strtolower($target['scheme'])!==strtolower($source_parts['scheme'])||strtolower($target['host'])!==strtolower($source_parts['host']))return false;if(!empty($source_parts['port'])&&(string)$source_parts['port']!==(string)($target['port']??''))return false;return(isset($target['path'])?$target['path']:'/').(!empty($target['query'])?'?'.$target['query']:'');} $uri_parts=wp_parse_url($uri);if(!$uri_parts||isset($uri_parts['host'])||isset($uri_parts['scheme']))return false;$base_path=isset($source_parts['path'])?$source_parts['path']:'/';$base_dir=trailingslashit(dirname($base_path));$path=$this->resolve_path($base_dir,isset($uri_parts['path'])?$uri_parts['path']:'');return $path.(!empty($uri_parts['query'])?'?'.$uri_parts['query']:'');}
     private function rewrite_playlist($lesson_id,$expires,$body,$source){if(false===wp_parse_url($source))return false;$lines=preg_split('/\r\n|\r|\n/',$body);foreach($lines as $index=>$line){$trimmed=trim($line);if($trimmed==='')continue;if(strpos($trimmed,'#')===0){$rewritten=preg_replace_callback('/URI=("|\')([^"\']+)\1/i',function($match)use($lesson_id,$expires,$source){$ref=$this->normalize_file_reference($match[2],$source);if(false===$ref||''===$ref)return $match[0];return 'URI='.$match[1].$this->gateway_url($lesson_id,$expires,$ref).$match[1];},$line);if(null===$rewritten)return false;$lines[$index]=$rewritten;continue;} $file_ref=$this->normalize_file_reference($trimmed,$source);if(false===$file_ref||''===$file_ref)return false;$lines[$index]=$this->gateway_url($lesson_id,$expires,$file_ref);}return implode("\n",$lines);}
     private function serve_playlist($lesson_id,$expires,$source){$response=wp_remote_get($source,array('timeout'=>15,'redirection'=>3,'sslverify'=>true,'headers'=>array('Accept'=>'application/vnd.apple.mpegurl, application/x-mpegURL, */*')));if(is_wp_error($response)||200!==(int)wp_remote_retrieve_response_code($response)){status_header(502);exit('视频源暂时无法访问。');}$body=wp_remote_retrieve_body($response);if(!$body){status_header(502);exit('视频播放列表为空。');}$rewritten=$this->rewrite_playlist($lesson_id,$expires,$body,$source);if(false===$rewritten){status_header(403);exit('视频播放列表包含无效来源。');}nocache_headers();header('Content-Type: application/vnd.apple.mpegurl');header('X-Content-Type-Options: nosniff');echo $rewritten;}
     private function resolve_source_file($source,$file_ref){$source_parts=wp_parse_url($source);if(!$source_parts||empty($source_parts['scheme'])||empty($source_parts['host']))return '';if(preg_match('#^https?://#i',$file_ref))return ''; $file_parts=wp_parse_url($file_ref);if(!$file_parts)return ''; $origin=strtolower($source_parts['scheme']).'://'.strtolower($source_parts['host']);if(!empty($source_parts['port']))$origin.=':'.$source_parts['port'];$base_dir=trailingslashit(dirname(isset($source_parts['path'])?$source_parts['path']:'/'));$path=!empty($file_parts['path'])&&strpos($file_parts['path'],'/')===0?$file_parts['path']:$this->resolve_path($base_dir,$file_parts['path']??'');return $origin.$path.(!empty($file_parts['query'])?'?'.$file_parts['query']:'');}
     private function resolve_path($base_dir,$relative){if(strpos($relative,'/')===0)return $relative;$segments=array();foreach(explode('/',$base_dir.$relative)as$segment){if($segment===''||$segment==='.')continue;if($segment==='..'){array_pop($segments);continue;}$segments[]=$segment;}return'/'.implode('/',$segments);}
+
+    /** HLS 分片代理；保持原有逻辑。 */
     private function serve_media($lesson_id,$expires,$file_ref,$source){$signature=sanitize_text_field(get_query_var('math_video_sig'));if(!$this->valid_signature($lesson_id,$expires,$file_ref,$signature)){status_header(403);exit('视频片段访问链接已失效。');}$file=$this->resolve_source_file($source,$file_ref);if(!$file){status_header(403);exit('视频片段地址无效。');}$request_headers=array('Accept'=>'*/*');if(!empty($_SERVER['HTTP_RANGE']))$request_headers['Range']=sanitize_text_field(wp_unslash($_SERVER['HTTP_RANGE']));$response=wp_remote_get($file,array('timeout'=>20,'redirection'=>0,'sslverify'=>true,'headers'=>$request_headers,'stream'=>false));if(is_wp_error($response)){status_header(502);exit('视频片段暂时无法访问。');}$code=(int)wp_remote_retrieve_response_code($response);if(200!==$code&&206!==$code){status_header(502);exit('视频片段暂时无法访问。');}$body=wp_remote_retrieve_body($response);$ext=strtolower(pathinfo((string)wp_parse_url($file,PHP_URL_PATH),PATHINFO_EXTENSION));if($ext==='m3u8'){$rewritten=$this->rewrite_playlist($lesson_id,$expires,$body,$file);if(false===$rewritten){status_header(403);exit('视频子播放列表包含无效来源。');}nocache_headers();header('Content-Type: application/vnd.apple.mpegurl');header('X-Content-Type-Options: nosniff');echo $rewritten;return;}$type='application/octet-stream';if($ext==='ts')$type='video/mp2t';elseif($ext==='m4s')$type='video/iso.segment';elseif($ext==='aac')$type='audio/aac';if(206===$code){status_header(206);$content_range=wp_remote_retrieve_header($response,'content-range');if($content_range)header('Content-Range: '.$content_range);header('Accept-Ranges: bytes');}nocache_headers();header('Content-Type: '.$type);header('Content-Length: '.strlen($body));header('X-Content-Type-Options: nosniff');echo $body;}
+
+    /**
+     * MP4 使用 Range + cURL 流式代理，避免把整部课程视频加载进 PHP 内存。
+     * 浏览器只看到 /math-video/... 的短期签名地址，不会拿到真实源 URL。
+     */
+    private function serve_mp4($lesson_id,$expires,$source){
+        if(!function_exists('curl_init')){status_header(500);exit('服务器暂不支持 MP4 流式播放。');}
+        $range=isset($_SERVER['HTTP_RANGE'])?trim((string)wp_unslash($_SERVER['HTTP_RANGE'])):'';
+        $ch=curl_init($source);
+        if(!$ch){status_header(502);exit('视频源暂时无法访问。');}
+        $response_headers=array();
+        $status_code=0;
+        curl_setopt_array($ch,array(
+            CURLOPT_FOLLOWLOCATION=>true,
+            CURLOPT_MAXREDIRS=>3,
+            CURLOPT_RETURNTRANSFER=>false,
+            CURLOPT_HEADER=>false,
+            CURLOPT_CONNECTTIMEOUT=>10,
+            CURLOPT_TIMEOUT=>0,
+            CURLOPT_SSL_VERIFYPEER=>true,
+            CURLOPT_SSL_VERIFYHOST=>2,
+            CURLOPT_USERAGENT=>'MathCourse Video Gateway',
+            CURLOPT_WRITEFUNCTION=>function($curl,$data){echo $data;flush();return strlen($data);},
+            CURLOPT_HEADERFUNCTION=>function($curl,$header)use(&$response_headers,&$status_code){$trim=trim($header);if(preg_match('#^HTTP/\S+\s+(\d+)#i',$trim,$m)){$status_code=(int)$m[1];return strlen($header);}if(strpos($trim,':')!==false){list($name,$value)=array_map('trim',explode(':',$trim,2));$lower=strtolower($name);if(in_array($lower,array('content-type','content-length','content-range','accept-ranges','last-modified','etag'),true))$response_headers[$lower]=$value;}return strlen($header);},
+        ));
+        if($range!==''&&preg_match('/^bytes=\d*-\d*$/i',$range))curl_setopt($ch,CURLOPT_RANGE,substr($range,6));
+        curl_exec($ch);
+        $curl_error=curl_error($ch);
+        $status_code=$status_code?:(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);
+        if($curl_error||($status_code!==200&&$status_code!==206)){
+            curl_close($ch);
+            if(!headers_sent()){status_header($status_code===416?416:502);}
+            exit('视频暂时无法播放。');
+        }
+        if(!headers_sent()){
+            status_header($status_code);
+            nocache_headers();
+            header('Content-Type: '.(!empty($response_headers['content-type'])?$response_headers['content-type']:'video/mp4'));
+            if(!empty($response_headers['content-length']))header('Content-Length: '.$response_headers['content-length']);
+            if(!empty($response_headers['content-range']))header('Content-Range: '.$response_headers['content-range']);
+            header('Accept-Ranges: bytes');
+            header('X-Content-Type-Options: nosniff');
+            if(!empty($response_headers['etag']))header('ETag: '.$response_headers['etag']);
+            if(!empty($response_headers['last-modified']))header('Last-Modified: '.$response_headers['last-modified']);
+        }
+        curl_close($ch);
+    }
 }
