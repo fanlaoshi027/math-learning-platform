@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.Artplayer) return;
 
-    // 保留 ArtPlayer 官方播放器菜单/控制器，只关闭 ArtPlayer 自带右键菜单。
     window.Artplayer.CONTEXTMENU = false;
 
     function updateProgressUI(progress, lessonId) {
@@ -98,17 +97,8 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append('action', 'mathcourse_complete_lesson');
             formData.append('nonce', mathcoursePlayer.nonce);
             formData.append('lesson_id', String(lessonId));
-
-            fetch(mathcoursePlayer.ajax_url, {
-                method: 'POST',
-                credentials: 'same-origin',
-                body: formData,
-                keepalive: true
-            })
-                .then(function (response) {
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    return response.json();
-                })
+            fetch(mathcoursePlayer.ajax_url, { method: 'POST', credentials: 'same-origin', body: formData, keepalive: true })
+                .then(function (response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
                 .then(function (result) {
                     if (!result || !result.success) throw new Error('progress rejected');
                     completedAt = Date.now();
@@ -117,17 +107,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     var serverCourseId = Number(data.course_id || courseId || 0);
                     updateProgressUI(data.progress || null, lessonId);
                     showCompletionPanel();
-                    document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', {
-                        detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null }
-                    }));
-                    document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', {
-                        detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null }
-                    }));
+                    document.dispatchEvent(new CustomEvent('mathcourse_lesson_complete', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
+                    document.dispatchEvent(new CustomEvent('mathcourse_progress_updated', { detail: { lessonId: lessonId, courseId: serverCourseId, progress: data.progress || null } }));
                 })
-                .catch(function (error) {
-                    completionSent = false;
-                    console.warn('MathCourse: unable to save lesson completion.', error);
-                });
+                .catch(function (error) { completionSent = false; console.warn('MathCourse: unable to save lesson completion.', error); });
         }
 
         function maybeCompleteAtEnd(art) {
@@ -166,11 +149,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (videoType === 'm3u8') {
             options.customType = {
                 m3u8: function (video, sourceUrl) {
-                    // Safari/iOS 等浏览器优先使用原生 HLS；其它支持 MSE 的浏览器使用 hls.js。
-                    if (video.canPlayType('application/vnd.apple.mpegurl') && 'ManagedMediaSource' in window) {
+                    // 能原生播放 HLS 的浏览器直接交给 HTML5，避免在 Safari/iOS 上强行走 MSE。
+                    if (video.canPlayType && video.canPlayType('application/vnd.apple.mpegurl')) {
                         video.src = sourceUrl;
+                        video.load();
                         return;
                     }
+                    // Chrome / Edge / Firefox 等没有原生 HLS 时使用 hls.js。
                     if (window.Hls && Hls.isSupported()) {
                         if (hls) hls.destroy();
                         hls = new Hls({
@@ -182,10 +167,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             startLevel: -1,
                             debug: false
                         });
-                        hls.attachMedia(video);
-                        hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-                            hls.loadSource(sourceUrl);
-                        });
                         hls.on(Hls.Events.ERROR, function (event, data) {
                             if (!data || !data.fatal) return;
                             console.warn('MathCourse HLS fatal error:', data.type, data.details);
@@ -193,13 +174,21 @@ document.addEventListener('DOMContentLoaded', function () {
                                 hls.startLoad();
                             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                                 hls.recoverMediaError();
+                            } else {
+                                hls.destroy();
+                                hls = null;
                             }
+                        });
+                        hls.attachMedia(video);
+                        hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                            hls.loadSource(sourceUrl);
                         });
                         return;
                     }
-                    // 最后的浏览器原生 HLS 回退。
-                    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    // 最后的原生能力回退。
+                    if (video.canPlayType && video.canPlayType('application/x-mpegURL')) {
                         video.src = sourceUrl;
+                        video.load();
                     } else {
                         console.warn('MathCourse: current browser does not support HLS playback.');
                     }
@@ -208,36 +197,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         var art = new Artplayer(options);
-
         window.mathcourseArtPlayers = window.mathcourseArtPlayers || {};
         window.mathcourseArtPlayers[lessonId] = art;
 
-        art.on('ready', function () {
-            restorePosition(art);
-        });
-        art.on('video:loadedmetadata', function () {
-            restorePosition(art);
-        });
-        art.on('video:durationchange', function () {
-            restorePosition(art);
-        });
-        art.on('video:timeupdate', function () {
-            savePosition(art, false);
-            maybeCompleteAtEnd(art);
-        });
-        art.on('video:pause', function () {
-            savePosition(art, true);
-        });
-        art.on('video:seeking', function () {
-            savePosition(art, true);
-        });
-        art.on('video:seeked', function () {
-            maybeCompleteAtEnd(art);
-        });
-        art.on('video:ended', function () {
-            submitCompletion(art);
-        });
-
+        art.on('ready', function () { restorePosition(art); });
+        art.on('video:loadedmetadata', function () { restorePosition(art); });
+        art.on('video:durationchange', function () { restorePosition(art); });
+        art.on('video:timeupdate', function () { savePosition(art, false); maybeCompleteAtEnd(art); });
+        art.on('video:pause', function () { savePosition(art, true); });
+        art.on('video:seeking', function () { savePosition(art, true); });
+        art.on('video:seeked', function () { maybeCompleteAtEnd(art); });
+        art.on('video:ended', function () { submitCompletion(art); });
         window.addEventListener('pagehide', function () { savePosition(art, true); });
         window.addEventListener('beforeunload', function () { savePosition(art, true); });
     });
