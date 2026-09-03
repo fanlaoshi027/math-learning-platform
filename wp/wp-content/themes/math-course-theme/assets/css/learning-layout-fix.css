@@ -61,3 +61,15 @@ body.mathcourse-site .math-learning-page .mc-learning-progress strong{font-size:
 body.mathcourse-site .math-learning-page .mc-learning-progress i{width:92px!important;height:5px!important;background:#e1e7ed!important}
 @media(max-width:850px){body.mathcourse-site .math-learning-page .mc-learning-header{height:52px!important;padding:0 14px!important}.mathcourse-site .math-learning-page .mc-learning-course-title{display:none!important}.mathcourse-site .math-learning-page .mc-learning-progress{flex:0 0 auto!important;width:auto!important}.mathcourse-site .math-learning-page .mc-learning-progress i{width:72px!important}}
 @media(max-width:600px){body.mathcourse-site .math-learning-page .mc-learning-header{height:50px!important;padding:0 11px!important}.mathcourse-site .math-learning-page .mc-learning-back{padding-left:0!important;font-size:11px!important}.mathcourse-site .math-learning-page .mc-learning-progress{gap:5px!important}.mathcourse-site .math-learning-page .mc-learning-progress span{font-size:9px!important}.mathcourse-site .math-learning-page .mc-learning-progress strong{font-size:10px!important}.mathcourse-site .math-learning-page .mc-learning-progress i{width:58px!important;height:4px!important}}
+
+/* V6: neutralize legacy learning-only selectors without changing the current player. */
+body.mathcourse-site .math-learning-page .mc-learning-layout,
+body.mathcourse-site .math-learning-page .mc-learning-breadcrumb,
+body.mathcourse-site .math-learning-page nav.mc-breadcrumb,
+body.mathcourse-site .math-learning-page .mc-video-card,
+body.mathcourse-site .math-learning-page .mc-outline-card,
+body.mathcourse-site .math-learning-page .mc-complete-banner{all:revert-layer}
+body.mathcourse-site .math-learning-page .mc-course-player{isolation:isolate!important}
+body.mathcourse-site .math-learning-page .mc-course-player__navigation{background:#fff!important}
+body.mathcourse-site .math-learning-page .mc-course-player__navigation a{color:inherit!important;text-decoration:none!important}
+@media(max-width:900px){body.mathcourse-site .math-learning-page .mc-learning-layout{display:block!important}}
