@@ -97,9 +97,9 @@ class Batch_Manager_V2 {
             var index=0;
             function esc(s){return String(s||'').replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]})}
             function addRow(data){data=data||{};index++;var n=index;
-                var d=document.createElement('div');d.className='mc-row mc-row-item';d.dataset.n=n;d.innerHTML='<span class="mc-index">'+n+'</span><input name="items['+n+'][title]" value="'+esc(data.title)+'" placeholder="例如：第5讲 综合练习" required><input name="items['+n+'][page]" value="'+esc(data.page)+'" placeholder="P6-P8"><input name="items['+n+'][video]" value="'+esc(data.video)+'" placeholder="video_005"><input name="items['+n+'][hls]" value="'+esc(data.hls)+'" placeholder="/uploads/.../index.m3u8"><label class="mc-preview-check"><input type="checkbox" name="items['+n+'][preview]" value="yes" '+(data.preview?'checked':'')+'></label><button type="button" class="mc-delete" aria-label="删除">×</button>';
+                var d=document.createElement('div');d.className='mc-row mc-row-item';d.dataset.n=n;d.innerHTML='<span class="mc-index">'+n+'</span><input name="items['+n+'][title]" value="'+esc(data.title)+'" placeholder="例如：第5讲 综合练习" required><input name="items['+n+'][page]" value="'+esc(data.page)+'" placeholder="P6-P8"><input name="items['+n+'][video]" value="'+esc(data.video)+'" placeholder="video_005"><input name="items['+n+'][hls]" value="'+esc(data.hls)+'" placeholder="/wp-content/uploads/.../index.m3u8"><label class="mc-preview-check"><input type="checkbox" name="items['+n+'][preview]" value="yes" '+(data.preview?'checked':'')+'></label><button type="button" class="mc-delete" aria-label="删除">×</button>';
                 desktop.appendChild(d);
-                var m=document.createElement('div');m.className='mc-mobile-card';m.dataset.n=n;m.innerHTML='<div class="mc-mobile-card-head"><strong class="mc-mobile-num">课时 '+n+'</strong><button type="button" class="mc-delete" aria-label="删除">×</button></div><label>课时名称</label><input name="items['+n+'][title]" value="'+esc(data.title)+'" placeholder="例如：第5讲 综合练习" required><div class="mc-mobile-inline"><div><label>教材页码</label><input name="items['+n+'][page]" value="'+esc(data.page)+'" placeholder="P6-P8"></div><div><label>视频ID</label><input name="items['+n+'][video]" value="'+esc(data.video)+'" placeholder="video_005"></div></div><label>HLS 地址</label><input name="items['+n+'][hls]" value="'+esc(data.hls)+'" placeholder="/uploads/.../index.m3u8"><div class="mc-mobile-preview"><span>免费试看</span><input type="checkbox" name="items['+n+'][preview]" value="yes" '+(data.preview?'checked':'')+'></div>';
+                var m=document.createElement('div');m.className='mc-mobile-card';m.dataset.n=n;m.innerHTML='<div class="mc-mobile-card-head"><strong class="mc-mobile-num">课时 '+n+'</strong><button type="button" class="mc-delete" aria-label="删除">×</button></div><label>课时名称</label><input name="items['+n+'][title]" value="'+esc(data.title)+'" placeholder="例如：第5讲 综合练习" required><div class="mc-mobile-inline"><div><label>教材页码</label><input name="items['+n+'][page]" value="'+esc(data.page)+'" placeholder="P6-P8"></div><div><label>视频ID</label><input name="items['+n+'][video]" value="'+esc(data.video)+'" placeholder="video_005"></div></div><label>HLS 地址</label><input name="items['+n+'][hls]" value="'+esc(data.hls)+'" placeholder="/wp-content/uploads/.../index.m3u8"><div class="mc-mobile-preview"><span>免费试看</span><input type="checkbox" name="items['+n+'][preview]" value="yes" '+(data.preview?'checked':'')+'></div>';
                 mobile.appendChild(m);
                 [d,m].forEach(function(el){el.querySelector('.mc-delete').addEventListener('click',function(){d.remove();m.remove();renumber()})});renumber();
             }
@@ -110,6 +110,23 @@ class Batch_Manager_V2 {
         })();
         </script>
         <?php
+    }
+
+    private function normalize_video_url($value) {
+        $value = trim((string)$value);
+        if ($value === '') return '';
+        $value = esc_url_raw($value);
+        if (preg_match('#^https?://#i', $value)) {
+            $parts = wp_parse_url($value);
+            $site_host = wp_parse_url(home_url('/'), PHP_URL_HOST);
+            if (!empty($parts['host']) && $site_host && strcasecmp($parts['host'], $site_host) === 0 && !empty($parts['path'])) {
+                $path = $parts['path'];
+                if (!empty($parts['query'])) $path .= '?' . $parts['query'];
+                return $path;
+            }
+            return $value;
+        }
+        return '/' . ltrim($value, '/');
     }
 
     public function create_task(){
@@ -125,7 +142,7 @@ class Batch_Manager_V2 {
             if(!is_array($item))continue;
             $title=sanitize_text_field($item['title']??'');
             if($title==='')continue;
-            $items[]=array('title'=>$title,'page'=>sanitize_text_field($item['page']??''),'video'=>sanitize_text_field($item['video']??''),'hls'=>sanitize_text_field(trim((string)($item['hls']??''))),'preview'=>isset($item['preview'])?'yes':'no');
+            $items[]=array('title'=>$title,'page'=>sanitize_text_field($item['page']??''),'video'=>sanitize_text_field($item['video']??''),'hls'=>$this->normalize_video_url($item['hls']??''),'preview'=>isset($item['preview'])?'yes':'no');
         }
         if(!$items)wp_die('请至少添加一个有效课时。');
         $task_id=wp_generate_uuid4();
