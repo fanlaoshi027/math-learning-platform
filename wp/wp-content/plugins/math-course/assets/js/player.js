@@ -3,6 +3,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.Artplayer.CONTEXTMENU = false;
 
+    function installInvertStyle() {
+        if (document.getElementById('mathcourse-invert-style')) return;
+        var style = document.createElement('style');
+        style.id = 'mathcourse-invert-style';
+        style.textContent = '.mathcourse-artplayer.mathcourse-inverted video{filter:invert(1)!important;}';
+        document.head.appendChild(style);
+    }
+
     function updateProgressUI(progress, lessonId) {
         if (!progress) return;
         document.querySelectorAll('.mc-course-player__progress span').forEach(function (el) {
@@ -35,6 +43,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var url = container.dataset.videoUrl || '';
         var videoType = (container.dataset.videoType || '').toLowerCase();
         if (!lessonId || !url || (videoType !== 'm3u8' && videoType !== 'mp4')) return;
+
+        installInvertStyle();
 
         var storageKey = 'mathcourse_lesson_' + lessonId + '_time';
         var completionSent = false;
@@ -134,8 +144,10 @@ document.addEventListener('DOMContentLoaded', function () {
             autoPlayback: false,
             fullscreen: true,
             fullscreenWeb: true,
+            // 保留 ArtPlayer 的设置面板，仅用于弹出“倍速”选项；底部齿轮按钮会在 ready 后替换为我们自己的两个按钮。
             setting: true,
             playbackRate: true,
+            flip: false,
             fastForward: true,
             autoOrientation: true,
             mutex: true,
@@ -149,13 +161,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (videoType === 'm3u8') {
             options.customType = {
                 m3u8: function (video, sourceUrl) {
-                    // 能原生播放 HLS 的浏览器直接交给 HTML5，避免在 Safari/iOS 上强行走 MSE。
                     if (video.canPlayType && video.canPlayType('application/vnd.apple.mpegurl')) {
                         video.src = sourceUrl;
                         video.load();
                         return;
                     }
-                    // Chrome / Edge / Firefox 等没有原生 HLS 时使用 hls.js。
                     if (window.Hls && Hls.isSupported()) {
                         if (hls) hls.destroy();
                         hls = new Hls({
@@ -179,13 +189,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                 hls = null;
                             }
                         });
-                        // 使用 hls.js 当前推荐的同步加载顺序：先登记 source，再绑定 video。
-                        // 这样不依赖 MEDIA_ATTACHED 事件时序，避免某些浏览器/版本出现“播放器已初始化但一直不请求 m3u8”。
                         hls.loadSource(sourceUrl);
                         hls.attachMedia(video);
                         return;
                     }
-                    // 最后的原生能力回退。
                     if (video.canPlayType && video.canPlayType('application/x-mpegURL')) {
                         video.src = sourceUrl;
                         video.load();
@@ -200,7 +207,32 @@ document.addEventListener('DOMContentLoaded', function () {
         window.mathcourseArtPlayers = window.mathcourseArtPlayers || {};
         window.mathcourseArtPlayers[lessonId] = art;
 
-        art.on('ready', function () { restorePosition(art); });
+        art.on('ready', function () {
+            restorePosition(art);
+
+            // 官方齿轮仍然保留会让用户误以为是普通设置；这里移除它，改成并排的“反色 + 倍速”两个独立按钮。
+            try { art.controls.remove('setting'); } catch (e) {}
+
+            art.controls.add({
+                name: 'mathcourse-invert',
+                position: 'right',
+                html: '☯',
+                tooltip: '反色播放',
+                click: function () {
+                    container.classList.toggle('mathcourse-inverted');
+                }
+            });
+
+            art.controls.add({
+                name: 'mathcourse-speed',
+                position: 'right',
+                html: '倍速',
+                tooltip: '播放速度',
+                click: function () {
+                    art.setting.show = true;
+                }
+            });
+        });
         art.on('video:loadedmetadata', function () { restorePosition(art); });
         art.on('video:durationchange', function () { restorePosition(art); });
         art.on('video:timeupdate', function () { savePosition(art, false); maybeCompleteAtEnd(art); });
