@@ -1,19 +1,17 @@
-<?php
-/**
- * Theme footer.
- *
- * @package MathCourseTheme
- */
-
-defined( 'ABSPATH' ) || exit;
-
-$is_learning_page = is_page( 'learning' );
-?>
-<footer class="mc-site-footer<?php echo $is_learning_page ? ' mc-site-footer--learning' : ''; ?>">
-	<div class="mc-container mc-site-footer__inner">
-		<span>© <?php echo esc_html( wp_date( 'Y' ) ); ?> 樊老师数学</span>
-		<span>专注初中数学系统学习</span>
-	</div>
+</main>
+<footer class="bg-[#f8fafc] text-slate-500 text-xs border-t border-slate-200/80 py-8 mt-auto" role="contentinfo">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-slate-600 font-medium">
+      <a href="<?php echo esc_url(home_url('/')); ?>" class="hover:text-blue-600 transition-colors">平台首页</a>
+      <span class="text-slate-300">|</span>
+      <a href="<?php echo esc_url(home_url('/course-center/')); ?>" class="hover:text-blue-600 transition-colors">课程中心</a>
+      <span class="text-slate-300">|</span>
+      <a href="<?php echo esc_url(home_url('/privacy/')); ?>" class="hover:text-blue-600 transition-colors">隐私政策</a>
+      <span class="text-slate-300">|</span>
+      <a href="<?php echo esc_url(home_url('/terms/')); ?>" class="hover:text-blue-600 transition-colors">用户协议</a>
+    </div>
+    <div class="text-slate-400 text-center md:text-right"><span>© <?php echo esc_html(wp_date('Y')); ?> <?php bloginfo('name'); ?>. All Rights Reserved.</span></div>
+  </div>
 </footer>
 <?php wp_footer(); ?>
 </body>
