@@ -1,0 +1,177 @@
+/* Mobile learning directory: a compact course switcher below Previous / Next. */
+.mc-course-player__mobile-directory {
+  display: none;
+}
+
+@media (max-width: 1050px) {
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory {
+    display: block;
+    margin: 18px 0 0;
+    border: 1px solid #2b3340;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #171c24;
+    color: #dce2ea;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 0 16px;
+    border-bottom: 1px solid #2b3340;
+    background: #202631;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory-title strong {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory-title span {
+    color: #8d98a8;
+    font-size: 13px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory-list {
+    padding: 7px 8px 9px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-topic + .mc-course-player__mobile-topic {
+    border-top: 1px solid #252d38;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-topic-toggle {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 46px;
+    padding: 8px 8px;
+    gap: 7px;
+    border: 0;
+    background: transparent;
+    color: #cbd2dc;
+    text-align: left;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-topic-toggle:active {
+    background: #252c36;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-topic-arrow {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    color: #8290a2;
+    font-size: 18px;
+    line-height: 1;
+    transition: transform .18s ease;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-topic.is-open .mc-course-player__mobile-topic-arrow {
+    transform: rotate(90deg);
+    color: #4d8dff;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-lessons {
+    padding: 0 5px 6px 31px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+    margin: 2px 0;
+    padding: 7px 8px;
+    gap: 8px;
+    border-radius: 7px;
+    background: transparent;
+    color: #a2acba;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item:active {
+    background: #292f3a;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item > span:nth-child(2) {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-check {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    border-radius: 50%;
+    color: #7f8998;
+    font-size: 11px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item:not(.is-complete):not(.is-active):not(.is-locked) .mc-course-player__mobile-check {
+    border: 2px solid #687487;
+    box-sizing: border-box;
+    color: transparent;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item.is-complete .mc-course-player__mobile-check {
+    background: #22ad58;
+    color: #fff;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item.is-active {
+    background: #303642;
+    color: #eef2f7;
+    box-shadow: inset 2px 0 0 #3984ff;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item.is-active .mc-course-player__mobile-check {
+    border: 2px solid #4d8cff;
+    color: #4d8cff;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item.is-locked {
+    color: #697586;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item small {
+    margin-left: auto;
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: #3a3024;
+    color: #e7a044;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 600px) {
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory {
+    margin-top: 14px;
+    border-radius: 10px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory-title {
+    min-height: 48px;
+    padding: 0 14px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-directory-list {
+    padding: 5px 6px 7px;
+  }
+
+  body.mathcourse-site:has(.mc-course-player) .mc-course-player__mobile-item {
+    font-size: 13px;
+  }
+}
