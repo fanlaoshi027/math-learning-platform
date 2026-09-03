@@ -5,13 +5,15 @@ use MathCourse\Access\Access_Service;
 use MathCourse\Tutor\Adapter;
 
 class Video_Router {
-    private $access; private $adapter; private $token_ttl=7200;
+    // 视频学习可能被学生暂停数小时甚至过夜；短 token 会导致“回来后无法继续播放”。
+    // 网关每次请求仍会重新校验观看权限，因此适当延长签名有效期不会绕过课程授权。
+    private $access; private $adapter; private $token_ttl=604800;
     public function __construct($register_hooks=true){$this->access=new Access_Service();$this->adapter=new Adapter();if($register_hooks){add_action('init',array($this,'register_route'));add_action('template_redirect',array($this,'handle'));}}
     public function register_route(){add_rewrite_rule('^math-video/([0-9]+)/([0-9]+)/([A-Za-z0-9_-]+)/?$','index.php?math_video=$matches[1]&math_video_exp=$matches[2]&math_video_sig=$matches[3]','top');add_rewrite_tag('%math_video%','([0-9]+)');add_rewrite_tag('%math_video_exp%','([0-9]+)');add_rewrite_tag('%math_video_sig%','([A-Za-z0-9_-]+)');}
     public function get_media_type($source_url){$path=(string)wp_parse_url((string)$source_url,PHP_URL_PATH);$ext=strtolower(pathinfo($path,PATHINFO_EXTENSION));return $ext==='m3u8'?'m3u8':($ext==='mp4'?'mp4':'');}
     public function get_protected_url($lesson_id){$lesson_id=absint($lesson_id);if(!$lesson_id||!$this->adapter->get_lesson($lesson_id))return '';if(!$this->can_watch($lesson_id))return ''; $expires=time()+$this->token_ttl;return home_url('/math-video/'.$lesson_id.'/'.$expires.'/'.$this->sign($lesson_id,$expires,'').'/');}
     private function sign($lesson_id,$expires,$file){return rtrim(strtr(base64_encode(hash_hmac('sha256',absint($lesson_id).'|'.absint($expires).'|'.(string)$file,wp_salt('auth'),true)),'+/','-_'),'=');}
-    private function valid_signature($lesson_id,$expires,$file,$signature){if(!$expires||$expires<time()||$expires>time()+DAY_IN_SECONDS)return false;return hash_equals($this->sign($lesson_id,$expires,$file),(string)$signature);}
+    private function valid_signature($lesson_id,$expires,$file,$signature){if(!$expires||$expires<time()||$expires>time()+7*DAY_IN_SECONDS)return false;return hash_equals($this->sign($lesson_id,$expires,$file),(string)$signature);}
     private function get_source_url($lesson_id){return $this->adapter->get_lesson_hls_url($lesson_id);}
     private function can_watch($lesson_id){$course_id=$this->adapter->get_lesson_course_id($lesson_id);if(!$course_id)return false;if(is_user_logged_in()&&$this->access->can_watch_lesson(get_current_user_id(),$course_id,$lesson_id))return true;return $this->access->can_preview($course_id,$lesson_id);}
     public function handle(){ $lesson_id=absint(get_query_var('math_video'));if(!$lesson_id)return;$expires=absint(get_query_var('math_video_exp'));$signature=sanitize_text_field(get_query_var('math_video_sig'));$file=isset($_GET['file'])?wp_unslash($_GET['file']):'';if(!is_string($file))$file='';if(!$this->valid_signature($lesson_id,$expires,$file,$signature)){status_header(403);exit('视频访问链接已失效。');}if(!$this->can_watch($lesson_id)){status_header(403);exit('暂无观看权限，请联系老师开通课程。');}$source=$this->get_source_url($lesson_id);if(!$source){status_header(404);exit('视频不存在。');}$media_type=$this->get_media_type($source);if($media_type==='m3u8'){if($file==='')$this->serve_playlist($lesson_id,$expires,$source);else$this->serve_media($lesson_id,$expires,$file,$source);}elseif($media_type==='mp4'){if($file!==''){status_header(403);exit('视频地址无效。');}$this->serve_mp4($lesson_id,$expires,$source);}else{status_header(415);exit('暂不支持的视频格式。');}exit; }
