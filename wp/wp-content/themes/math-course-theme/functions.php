@@ -43,7 +43,7 @@ function mc_theme_assets() {
         'design'          => 'assets/css/design-system-v2.css',
         'ui'              => 'assets/css/reference-ui.css',
         'scale'            => 'assets/css/ui-scale.css',
-        'detail'           => 'assets/css/course-detail.css',
+        'detail'          => 'assets/css/course-detail.css',
         'learning'        => 'assets/css/learning.css',
         'states'          => 'assets/css/learning-states.css',
         'nav'             => 'assets/css/learning-nav.css',
@@ -108,20 +108,12 @@ function mc_theme_assets() {
         wp_enqueue_style( 'mc-learning-nav', $uri . '/assets/css/learning-nav.css', array( 'mc-learning-states' ), $version['nav'] );
         wp_enqueue_style( 'mc-learning-ui-polish', $uri . '/assets/css/learning-ui-polish.css', array( 'mc-learning-nav' ), $version['learning_polish'] );
 
-        $player_ui_path = $base . '/assets/css/course-player-ui-v1.css';
-        if ( file_exists( $player_ui_path ) && ! is_page( 'learning-center' ) ) {
-            wp_enqueue_style(
-                'mc-course-player-ui-v1',
-                $uri . '/assets/css/course-player-ui-v1.css',
-                array( 'mc-learning-ui-polish' ),
-                (string) filemtime( $player_ui_path )
-            );
-        }
-
+        // The player is now owned by ArtPlayer + the MathCourse plugin CSS.
+        // Do not enqueue the legacy custom/native-control layer here.
         wp_enqueue_style(
             'mc-learning-v2',
             $uri . '/assets/css/learning-v2.css',
-            array( 'mc-learning-ui-polish', 'mc-course-player-ui-v1', 'mc-ui-reference-override' ),
+            array( 'mc-learning-ui-polish', 'mc-ui-reference-override' ),
             $version['learning_v2']
         );
         wp_enqueue_style( 'mc-learning-layout-fix', $uri . '/assets/css/learning-layout-fix.css', array( 'mc-learning-v2' ), $version['learning_layout'] );
