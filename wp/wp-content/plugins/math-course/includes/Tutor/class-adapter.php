@@ -1,5 +1,6 @@
 <?php
 namespace MathCourse\Tutor;
+
 defined('ABSPATH') || exit;
 
 /**
@@ -22,46 +23,6 @@ class Adapter {
     public function get_course_lessons($course_id,$include_unpublished=false) { $lessons=array(); foreach($this->get_topics($course_id,$include_unpublished) as $topic)foreach($this->get_lessons($topic->ID,$include_unpublished) as $lesson)$lessons[]=$lesson; return $lessons; }
     public function get_lesson($lesson_id) { $lesson=absint($lesson_id)?get_post(absint($lesson_id)):null; return ($lesson&&$this->is_lesson_post_type($lesson->post_type))?$lesson:null; }
     public function get_lesson_course_id($lesson_id) { $lesson=$this->get_lesson($lesson_id); if(!$lesson)return 0; $topic=$this->get_topic($lesson->post_parent); if(!$topic)return 0; $course=$this->get_course($topic->post_parent); return $course?(int)$course->ID:0; }
-
-    /** 创建专题：使用 Tutor 的 topics CPT。 */
-    public function create_topic($course_id, $title) {
-        $course_id=absint($course_id); $title=sanitize_text_field($title);
-        if(!$course_id||$title===''||!$this->get_course($course_id)) return 0;
-        $result=wp_insert_post(array('post_type'=>$this->get_topic_post_type(),'post_status'=>'publish','post_parent'=>$course_id,'post_title'=>$title,'menu_order'=>count($this->get_topics($course_id,true))),true);
-        return is_wp_error($result)?0:(int)$result;
-    }
-
-    /** 创建课时：使用 Tutor 的 lesson CPT。 */
-    public function create_lesson($topic_id, $title) {
-        $topic_id=absint($topic_id); $title=sanitize_text_field($title);
-        if(!$topic_id||$title===''||!$this->get_topic($topic_id)) return 0;
-        $result=wp_insert_post(array('post_type'=>$this->get_lesson_post_type(),'post_status'=>'publish','post_parent'=>$topic_id,'post_title'=>$title,'menu_order'=>count($this->get_lessons($topic_id,true))),true);
-        return is_wp_error($result)?0:(int)$result;
-    }
-
-    public function update_lesson($lesson_id, $data=array()) {
-        $lesson_id=absint($lesson_id); $lesson=$this->get_lesson($lesson_id);
-        if(!$lesson) return 0;
-        $post=array('ID'=>$lesson_id);
-        if(isset($data['post_title'])) $post['post_title']=sanitize_text_field($data['post_title']);
-        if(isset($data['post_content'])) $post['post_content']=wp_kses_post($data['post_content']);
-        if(isset($data['post_status'])) $post['post_status']=sanitize_key($data['post_status']);
-        if(count($post)===1) return $lesson_id;
-        $result=wp_update_post(wp_slash($post),true);
-        return is_wp_error($result)?0:(int)$result;
-    }
-
-    public function delete_lesson($lesson_id) {
-        $lesson_id=absint($lesson_id); if(!$this->get_lesson($lesson_id)) return false;
-        return false !== wp_delete_post($lesson_id,true);
-    }
-
-    public function delete_topic($topic_id) {
-        $topic_id=absint($topic_id); $topic=$this->get_topic($topic_id); if(!$topic) return false;
-        foreach($this->get_lessons($topic_id,true) as $lesson) wp_delete_post($lesson->ID,true);
-        return false !== wp_delete_post($topic_id,true);
-    }
-
     public function get_lesson_page_number($lesson_id) { $value=get_post_meta(absint($lesson_id),'_mathcourse_page_number',true); if($value==='')$value=get_post_meta(absint($lesson_id),'_mathcourse_page',true); return sanitize_text_field($value); }
     public function get_lesson_video_id($lesson_id) { $value=get_post_meta(absint($lesson_id),'_mathcourse_video_id',true); if($value==='')$value=get_post_meta(absint($lesson_id),'_mathcourse_video',true); return sanitize_text_field($value); }
     public function get_lesson_hls_url($lesson_id) { $value=trim((string)get_post_meta(absint($lesson_id),'_mathcourse_hls_url',true)); if($value==='')return ''; if(preg_match('#^https?://#i',$value))return esc_url_raw($value); if(strpos($value,'//')===0)return esc_url_raw((is_ssl()?'https:':'http:').$value); return esc_url_raw(home_url('/'.ltrim($value,'/'))); }
