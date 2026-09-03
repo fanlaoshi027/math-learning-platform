@@ -31,12 +31,11 @@ class Adapter {
 
     /**
      * 后台课程编辑器需要的基础 CRUD。
-     * 直接使用 WordPress 原生文章 API，让 Tutor 的 topics / lesson 作为普通层级内容保存，
-     * 避免依赖并不存在的 Tutor Adapter 自定义接口。
+     * 直接使用 WordPress 原生文章 API，让 Tutor 的 topics / lesson 作为普通层级内容保存。
      */
     public function create_topic($course_id,$title) {
         $course=$this->get_course($course_id);
-        if(!$course||''==='' trim((string)$title)) return 0;
+        if(!$course || '' === trim((string)$title)) return 0;
         $topics=$this->get_topics($course_id,true);
         $order=0;
         foreach($topics as $topic) $order=max($order,(int)$topic->menu_order+1);
@@ -53,7 +52,7 @@ class Adapter {
 
     public function create_lesson($topic_id,$title) {
         $topic=$this->get_topic($topic_id);
-        if(!$topic||''==='' trim((string)$title)) return 0;
+        if(!$topic || '' === trim((string)$title)) return 0;
         $lessons=$this->get_lessons($topic_id,true);
         $order=0;
         foreach($lessons as $lesson) $order=max($order,(int)$lesson->menu_order+1);
