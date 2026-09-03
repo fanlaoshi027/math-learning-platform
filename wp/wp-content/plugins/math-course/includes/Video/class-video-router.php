@@ -212,14 +212,19 @@ class Video_Router {
         if (!$ch) { status_header(502); exit('视频片段暂时无法访问。'); }
         $status = 0;
         $sent_status = false;
-        $forward_headers = array('content-length', 'content-range', 'last-modified', 'etag');
+        $header_map = array(
+            'content-length' => 'Content-Length',
+            'content-range' => 'Content-Range',
+            'last-modified' => 'Last-Modified',
+            'etag' => 'ETag',
+        );
 
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
         curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$status, &$sent_status, $forward_headers) {
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$status, &$sent_status, $header_map) {
             $trim = trim($header);
             if (preg_match('#^HTTP/\S+\s+(\d+)#i', $trim, $m)) {
                 $status = (int) $m[1];
@@ -232,7 +237,7 @@ class Video_Router {
             if (strpos($trim, ':') === false || !$sent_status) return strlen($header);
             list($name, $value) = array_map('trim', explode(':', $header, 2));
             $name = strtolower($name);
-            if (in_array($name, $forward_headers, true)) header(ucwords(str_replace('-', ' ', $name)) . ': ' . $value);
+            if (isset($header_map[$name])) header($header_map[$name] . ': ' . $value);
             return strlen($header);
         });
         curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $data) {
@@ -259,32 +264,35 @@ class Video_Router {
     }
 
     private function serve_mp4($source) {
-        if (!function_exists('curl_init')) { status_header(500); exit('服务器暂不支持 MP4 流式播放。'); }
+        if (!function_exists('curl_init')) { status_header(500); exit('服务器暂不支持视频流式传输。'); }
+        while (ob_get_level()) { @ob_end_clean(); }
+        nocache_headers();
+        header('Content-Type: video/mp4');
+        header('Accept-Ranges: bytes');
+        header('X-Content-Type-Options: nosniff');
         $range = isset($_SERVER['HTTP_RANGE']) ? trim((string) wp_unslash($_SERVER['HTTP_RANGE'])) : '';
         $ch = curl_init($source);
-        if (!$ch) { status_header(502); exit('视频源暂时无法访问。'); }
-        $headers = array();
-        $status = 0;
+        $sent_status = false;
+        $header_map = array('content-length' => 'Content-Length', 'content-range' => 'Content-Range', 'last-modified' => 'Last-Modified', 'etag' => 'ETag');
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
         curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$headers, &$status) {
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$sent_status, $header_map) {
             $trim = trim($header);
-            if (preg_match('#^HTTP/\S+\s+(\d+)#i', $trim, $m)) $status = (int) $m[1];
-            elseif (strpos($trim, ':') !== false) { list($name, $value) = array_map('trim', explode(':', $header, 2)); $headers[strtolower($name)] = $value; }
+            if (preg_match('#^HTTP/\S+\s+(\d+)#i', $trim, $m)) {
+                $status = (int) $m[1];
+                if ($status === 200 || $status === 206) { status_header($status); $sent_status = true; }
+                return strlen($header);
+            }
+            if (strpos($trim, ':') === false || !$sent_status) return strlen($header);
+            list($name, $value) = array_map('trim', explode(':', $header, 2));
+            $name = strtolower($name);
+            if (isset($header_map[$name])) header($header_map[$name] . ': ' . $value);
             return strlen($header);
         });
-        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $data) use (&$headers, &$status) {
-            if (!headers_sent()) {
-                status_header($status === 206 ? 206 : 200);
-                header('Content-Type: ' . (isset($headers['content-type']) ? $headers['content-type'] : 'video/mp4'));
-                if (isset($headers['content-range'])) header('Content-Range: ' . $headers['content-range']);
-                header('Accept-Ranges: bytes');
-            }
-            echo $data;
-            flush();
-            return strlen($data);
-        });
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $data) { echo $data; if (function_exists('flush')) @flush(); return strlen($data); });
         if ($range !== '' && preg_match('/^bytes=\d*-\d*$/i', $range)) curl_setopt($ch, CURLOPT_RANGE, substr($range, 6));
         curl_exec($ch);
         curl_close($ch);
