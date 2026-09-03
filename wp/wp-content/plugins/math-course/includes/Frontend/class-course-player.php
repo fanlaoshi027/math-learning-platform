@@ -24,16 +24,11 @@ class Course_Player {
         $navigation=$this->lesson_navigation($data,$current,$course_id); $this->assets();
         ob_start(); ?>
         <div class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
-            <header class="mc-course-player__topbar">
-                <a class="mc-course-player__back" href="<?php echo esc_url($base); ?>" aria-label="返回课程中心">‹</a>
-                <div class="mc-course-player__course-title"><?php echo esc_html($data['title']); ?></div>
-            </header>
-
             <div class="mc-course-player__workspace">
                 <aside class="mc-course-player__sidebar">
-                    <div class="mc-course-player__progress-card">
-                        <strong><?php echo esc_html($progress['percent']); ?>% <span>已完成</span></strong>
-                        <div class="mc-course-player__progress-track"><i style="width:<?php echo esc_attr($progress['percent']); ?>%"></i></div>
+                    <div class="mc-course-player__progress-line" aria-label="学习进度">
+                        <span>学习进度</span>
+                        <strong><?php echo esc_html($progress['percent']); ?>%</strong>
                     </div>
                     <div class="mc-course-player__topics">
                     <?php foreach($data['topics'] as $index=>$topic): $topic_open=$current&&$this->topic_contains_lesson($topic,$current['id']); ?><div class="mc-course-player__topic<?php echo $topic_open?' is-open':''; ?>"><h3 class="mc-course-player__topic-toggle" tabindex="0" role="button" aria-expanded="<?php echo $topic_open?'true':'false'; ?>"><span class="mc-course-player__topic-chevron" aria-hidden="true">›</span><span><?php echo esc_html($index+1); ?>. <?php echo esc_html($topic['title']); ?></span></h3><div class="mc-course-player__lessons"<?php echo $topic_open?'':' hidden'; ?>>
