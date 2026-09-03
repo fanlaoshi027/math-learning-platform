@@ -1,0 +1,42 @@
+<?php
+namespace MathCourse\Access;
+defined('ABSPATH') || exit;
+
+class Activation_Service {
+    private function table() { global $wpdb; return $wpdb->prefix . 'mathcourse_activation_codes'; }
+
+    public function make_code() {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $code = '';
+        for ($i = 0; $i < 12; $i++) { $code .= $alphabet[random_int(0, strlen($alphabet) - 1)]; }
+        return substr($code,0,4).'-'.substr($code,4,4).'-'.substr($code,8,4);
+    }
+    private function hash_code($code) { return hash_hmac('sha256', strtoupper(preg_replace('/[^A-Z0-9]/i','',(string)$code)), wp_salt('auth')); }
+
+    public function generate($course_id, $quantity=1, $expires_at=null) {
+        $course_id=absint($course_id); $quantity=max(1,min(1000,absint($quantity)));
+        if(!$course_id) return array();
+        global $wpdb; $table=$this->table(); $out=array(); $tries=0;
+        while(count($out)<$quantity && $tries<$quantity*3) {
+            $tries++; $code=$this->make_code(); $hash=$this->hash_code($code);
+            $ok=$wpdb->insert($table,array('code_hash'=>$hash,'course_id'=>$course_id,'status'=>'unused','created_at'=>current_time('mysql'),'expires_at'=>$expires_at?sanitize_text_field($expires_at):null),array('%s','%d','%s','%s','%s'));
+            if($ok) $out[]=$code;
+        }
+        return $out;
+    }
+
+    public function redeem($code, $user_id, $course_id=null) {
+        $user_id=absint($user_id); $code=trim((string)$code); if(!$user_id||!$code)return new \WP_Error('invalid_code','激活码无效。');
+        global $wpdb; $row=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$this->table()} WHERE code_hash=%s LIMIT 1",$this->hash_code($code)));
+        if(!$row)return new \WP_Error('invalid_code','激活码无效。');
+        if('unused'!==$row->status)return new \WP_Error('used_code','激活码已使用。');
+        if(!empty($row->expires_at)&&strtotime($row->expires_at)<=current_time('timestamp')) { $wpdb->update($this->table(),array('status'=>'expired'),array('id'=>$row->id),array('%s'),array('%d')); return new \WP_Error('expired_code','激活码已过期。'); }
+        if($course_id && absint($course_id)!==(int)$row->course_id)return new \WP_Error('course_mismatch','该激活码不对应此课程。');
+        $access=new Access_Service();
+        if($access->has_access($user_id,$row->course_id))return new \WP_Error('already_access','该账号已经拥有此课程。');
+        $updated=$wpdb->query($wpdb->prepare("UPDATE {$this->table()} SET status='used', used_by=%d, used_at=%s WHERE id=%d AND status='unused'",$user_id,current_time('mysql'),$row->id));
+        if(1!==$updated)return new \WP_Error('race','激活码状态发生变化，请重试。');
+        if(!$access->grant($user_id,$row->course_id,$row->expires_at)) { $wpdb->update($this->table(),array('status'=>'unused','used_by'=>null,'used_at'=>null),array('id'=>$row->id),array('%s','%d','%s'),array('%d')); return new \WP_Error('grant_failed','课程授权失败，请联系管理员。'); }
+        return array('course_id'=>(int)$row->course_id);
+    }
+}
