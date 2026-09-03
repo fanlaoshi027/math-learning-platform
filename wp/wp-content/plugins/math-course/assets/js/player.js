@@ -179,10 +179,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                 hls = null;
                             }
                         });
-                        // 先监听 MEDIA_ATTACHED，再 attachMedia，避免某些浏览器/版本中事件过快触发而漏掉 loadSource。
-                        hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-                            hls.loadSource(sourceUrl);
-                        });
+                        // 使用 hls.js 当前推荐的同步加载顺序：先登记 source，再绑定 video。
+                        // 这样不依赖 MEDIA_ATTACHED 事件时序，避免某些浏览器/版本出现“播放器已初始化但一直不请求 m3u8”。
+                        hls.loadSource(sourceUrl);
                         hls.attachMedia(video);
                         return;
                     }
