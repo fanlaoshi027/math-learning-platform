@@ -179,10 +179,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 hls = null;
                             }
                         });
-                        hls.attachMedia(video);
+                        // 先监听 MEDIA_ATTACHED，再 attachMedia，避免某些浏览器/版本中事件过快触发而漏掉 loadSource。
                         hls.on(Hls.Events.MEDIA_ATTACHED, function () {
                             hls.loadSource(sourceUrl);
                         });
+                        hls.attachMedia(video);
                         return;
                     }
                     // 最后的原生能力回退。
