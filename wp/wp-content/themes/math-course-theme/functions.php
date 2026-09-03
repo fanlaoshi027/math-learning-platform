@@ -54,6 +54,7 @@ function mc_theme_assets() {
         'cover'           => 'assets/css/course-cover.css',
         'learning_v2'     => 'assets/css/learning-v2.css',
         'learning_layout' => 'assets/css/learning-layout-fix.css',
+        'player_wide'     => 'assets/css/player-wide.css',
         'course_card'     => 'assets/css/course-card-v2.css',
         'solid'           => 'assets/css/solid-color-overrides-v2.css',
         'course_center'   => 'assets/css/course-center.css',
@@ -117,6 +118,7 @@ function mc_theme_assets() {
             $version['learning_v2']
         );
         wp_enqueue_style( 'mc-learning-layout-fix', $uri . '/assets/css/learning-layout-fix.css', array( 'mc-learning-v2' ), $version['learning_layout'] );
+        wp_enqueue_style( 'mc-player-wide', $uri . '/assets/css/player-wide.css', array( 'mc-learning-layout-fix' ), $version['player_wide'] );
     }
 
     // Global color overrides must not depend on a learning-page-only handle.
