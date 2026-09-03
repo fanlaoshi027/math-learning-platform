@@ -135,7 +135,6 @@ document.addEventListener('DOMContentLoaded', function () {
             var time = Number(art.currentTime || 0);
             var duration = Number(art.duration || 0);
             if (!Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0) return;
-            // 保留原有业务规则：用户主动拖到视频结尾，也视为完成课时。
             if (time >= duration - Math.max(1, Math.min(5, duration * 0.01))) submitCompletion(art);
         }
 
@@ -160,23 +159,46 @@ document.addEventListener('DOMContentLoaded', function () {
             moreVideoAttr: {
                 playsInline: true,
                 'webkit-playsinline': true,
-                preload: 'metadata'
+                preload: 'auto'
             }
         };
 
-        // 只有 HLS 需要 hls.js；MP4 直接使用 ArtPlayer/HTML5 video 原生能力。
         if (videoType === 'm3u8') {
             options.customType = {
                 m3u8: function (video, sourceUrl) {
+                    // Safari/iOS 等浏览器优先使用原生 HLS；其它支持 MSE 的浏览器使用 hls.js。
+                    if (video.canPlayType('application/vnd.apple.mpegurl') && 'ManagedMediaSource' in window) {
+                        video.src = sourceUrl;
+                        return;
+                    }
                     if (window.Hls && Hls.isSupported()) {
                         if (hls) hls.destroy();
-                        hls = new Hls({ enableWorker: true });
-                        hls.loadSource(sourceUrl);
-                        hls.attachMedia(video);
-                        hls.on(Hls.Events.ERROR, function (event, data) {
-                            if (data && data.fatal) console.warn('MathCourse HLS fatal error:', data.type, data.details);
+                        hls = new Hls({
+                            enableWorker: false,
+                            lowLatencyMode: false,
+                            backBufferLength: 90,
+                            maxBufferLength: 30,
+                            capLevelToPlayerSize: true,
+                            startLevel: -1,
+                            debug: false
                         });
-                    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                        hls.attachMedia(video);
+                        hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                            hls.loadSource(sourceUrl);
+                        });
+                        hls.on(Hls.Events.ERROR, function (event, data) {
+                            if (!data || !data.fatal) return;
+                            console.warn('MathCourse HLS fatal error:', data.type, data.details);
+                            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                hls.startLoad();
+                            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                hls.recoverMediaError();
+                            }
+                        });
+                        return;
+                    }
+                    // 最后的浏览器原生 HLS 回退。
+                    if (video.canPlayType('application/vnd.apple.mpegurl')) {
                         video.src = sourceUrl;
                     } else {
                         console.warn('MathCourse: current browser does not support HLS playback.');
