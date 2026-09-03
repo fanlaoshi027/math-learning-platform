@@ -27,7 +27,7 @@ class Course_Player {
         ob_start(); ?>
         <div class="mc-course-player" data-course-id="<?php echo esc_attr($course_id); ?>">
             <header class="mc-course-player__topbar">
-                <a class="mc-course-player__back" href="<?php echo esc_url($base); ?>" aria-label="返回课程中心">‹</a>
+                <a class="mc-course-player__back" href="<?php echo esc_url($base); ?>" aria-label="返回课程中心">←</a>
                 <div class="mc-course-player__course-title"><?php echo esc_html($course_title); ?></div>
             </header>
             <div class="mc-course-player__workspace">
