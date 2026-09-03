@@ -40,6 +40,7 @@ function mc_theme_assets() {
 
     $files = array(
         'style'           => 'style.css',
+        'home'            => 'assets/css/home.css',
         'design'          => 'assets/css/design-system-v2.css',
         'ui'              => 'assets/css/reference-ui.css',
         'scale'           => 'assets/css/ui-scale.css',
@@ -69,6 +70,10 @@ function mc_theme_assets() {
 
     wp_enqueue_style( 'mc-theme-style', $uri . '/style.css', array(), $version['style'] );
     wp_enqueue_style( 'mc-design-system-v2', $uri . '/assets/css/design-system-v2.css', array( 'mc-theme-style' ), $version['design'] );
+
+    if ( is_front_page() ) {
+        wp_enqueue_style( 'mc-home', $uri . '/assets/css/home.css', array( 'mc-design-system-v2' ), $version['home'] );
+    }
 
     $content = get_post_field( 'post_content', get_queried_object_id() );
     $load_course_ui = is_front_page() || is_page( array( 'course-center', 'xueyuan-denglu', 'learning', 'learning-center' ) );
