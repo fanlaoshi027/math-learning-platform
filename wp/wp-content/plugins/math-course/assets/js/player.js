@@ -34,6 +34,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function initializePlayers() {
+        if (!window.Hls || typeof window.Hls.isSupported !== 'function') {
+            console.warn('MathCourse: self-hosted HLS library is unavailable.');
+        }
+
         players.forEach(function (container) {
             const lessonId = parseInt(container.dataset.lessonId || '0', 10);
             const url = container.dataset.videoUrl || '';
@@ -141,34 +145,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             function createPlayer() {
-                const settings = [
-                    {
-                        name: 'math-speed',
-                        html: '播放速度',
-                        tooltip: '1×',
-                        selector: speeds.map(function (speed) {
-                            return { html: speed + '×', value: speed, default: speed === 1 };
-                        }),
-                        onSelect: function (item) {
-                            const speed = Number(item.value);
-                            if (Number.isFinite(speed) && art) art.playbackRate = speed;
-                            return item.html;
-                        },
-                    },
-                    {
-                        name: 'math-invert',
-                        html: '反色播放',
-                        tooltip: '关闭',
-                        switch: false,
-                        onSwitch: function (item) {
-                            invertEnabled = !item.switch;
-                            item.tooltip = invertEnabled ? '开启' : '关闭';
-                            syncInvertState();
-                            return invertEnabled;
-                        },
-                    },
-                ];
-
                 art = new Artplayer({
                     container: container,
                     url: url,
@@ -179,15 +155,49 @@ document.addEventListener('DOMContentLoaded', function () {
                     pip: false,
                     fullscreen: true,
                     fullscreenWeb: true,
+                    airplay: true,
                     playsInline: true,
                     autoOrientation: true,
-                    setting: true,
+                    setting: false,
                     playbackRate: false,
                     flip: false,
                     aspectRatio: false,
                     subtitleOffset: false,
                     contextmenu: [],
-                    settings: settings,
+                    controls: [
+                        {
+                            name: 'math-speed',
+                            index: 10,
+                            position: 'right',
+                            html: '1×',
+                            tooltip: '播放速度',
+                            selector: speeds.map(function (speed) {
+                                return {
+                                    html: speed + '×',
+                                    value: speed,
+                                    default: speed === 1,
+                                };
+                            }),
+                            onSelect: function (item) {
+                                const speed = Number(item.value);
+                                if (Number.isFinite(speed) && art) {
+                                    art.playbackRate = speed;
+                                }
+                                return item.html;
+                            },
+                        },
+                        {
+                            name: 'math-invert',
+                            index: 20,
+                            position: 'right',
+                            html: '反色',
+                            tooltip: '反色播放',
+                            click: function () {
+                                invertEnabled = !invertEnabled;
+                                syncInvertState();
+                            },
+                        },
+                    ],
                     moreVideoAttr: {
                         'webkit-playsinline': 'true',
                         playsinline: 'true',
@@ -200,8 +210,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                     customType: {
                         m3u8: function (video, sourceUrl, instance) {
-                            // Course media stays on the user's own server. hls.js is only
-                            // the local playback engine; no video CDN is used here.
+                            // Course media remains on the user's own server.
                             if (window.Hls && typeof window.Hls.isSupported === 'function' && window.Hls.isSupported()) {
                                 const hls = new window.Hls({
                                     enableWorker: true,
@@ -221,7 +230,6 @@ document.addEventListener('DOMContentLoaded', function () {
                                         try { hls.recoverMediaError(); } catch (e) {}
                                     }
                                 });
-                                // Attach first, then load the protected m3u8 URL.
                                 hls.attachMedia(video);
                                 hls.on(window.Hls.Events.MEDIA_ATTACHED, function () {
                                     hls.loadSource(sourceUrl);
