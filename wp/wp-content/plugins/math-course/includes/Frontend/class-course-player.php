@@ -11,6 +11,7 @@ class Course_Player {
         wp_enqueue_style('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/css/course-outline-accordion.css', array('mathcourse-course-player'), MATHCOURSE_VERSION);
         wp_enqueue_style('mathcourse-lock-modal-ui', MATHCOURSE_URL . 'assets/lock-modal-ui.css', array('mathcourse-course-player'), MATHCOURSE_VERSION);
         wp_enqueue_style('mathcourse-learning-layout-v3', MATHCOURSE_URL . 'assets/css/learning-layout-v3.css', array('mathcourse-course-outline-accordion'), MATHCOURSE_VERSION);
+        wp_enqueue_style('mathcourse-learning-mobile-directory', MATHCOURSE_URL . 'assets/css/learning-mobile-directory.css', array('mathcourse-learning-layout-v3'), MATHCOURSE_VERSION);
         wp_enqueue_script('mathcourse-course-outline-accordion', MATHCOURSE_URL . 'assets/js/course-outline-accordion.js', array(), MATHCOURSE_VERSION, true);
         wp_enqueue_script('mathcourse-course-directory-lock-modal', MATHCOURSE_URL . 'assets/course-directory.js', array(), MATHCOURSE_VERSION, true);
     }
@@ -57,6 +58,40 @@ class Course_Player {
                             <?php if($navigation['previous']): ?><a class="mc-course-player__nav-button" href="<?php echo esc_url($navigation['previous']['url']); ?>"<?php echo empty($navigation['previous']['accessible'])?' data-mathcourse-lock="1"':''; ?>><span>‹</span><small>上一课</small><strong><?php echo esc_html($navigation['previous']['title']); ?></strong></a><?php else: ?><span class="mc-course-player__nav-button is-disabled"><span>‹</span><small>上一课</small><strong>已经是第一课</strong></span><?php endif; ?>
                             <?php if($navigation['next']): ?><a class="mc-course-player__nav-button is-next" href="<?php echo esc_url($navigation['next']['url']); ?>"<?php echo empty($navigation['next']['accessible'])?' data-mathcourse-lock="1"':''; ?>><small>下一课</small><strong><?php echo esc_html($navigation['next']['title']); ?></strong><span>›</span></a><?php else: ?><span class="mc-course-player__nav-button is-disabled is-next"><small>下一课</small><strong>已经是最后一课</strong><span>›</span></span><?php endif; ?>
                         </nav>
+
+                        <!-- 手机端目录：位于上一课/下一课下方，避免学生必须返回页面才能换课。 -->
+                        <section class="mc-course-player__mobile-directory" aria-label="课程目录">
+                            <div class="mc-course-player__mobile-directory-title">
+                                <strong>课程目录</strong>
+                                <span><?php echo esc_html($progress['completed']); ?>/<?php echo esc_html($progress['total']); ?></span>
+                            </div>
+                            <div class="mc-course-player__mobile-directory-list">
+                            <?php foreach($data['topics'] as $index=>$topic): $topic_open=$current&&$this->topic_contains_lesson($topic,$current['id']); ?>
+                                <div class="mc-course-player__mobile-topic<?php echo $topic_open?' is-open':''; ?>">
+                                    <button type="button" class="mc-course-player__mobile-topic-toggle" aria-expanded="<?php echo $topic_open?'true':'false'; ?>">
+                                        <span class="mc-course-player__mobile-topic-arrow">›</span>
+                                        <span><?php echo esc_html($index+1); ?>. <?php echo esc_html($topic['title']); ?></span>
+                                    </button>
+                                    <div class="mc-course-player__mobile-lessons"<?php echo $topic_open?'':' hidden'; ?>>
+                                    <?php foreach($topic['lessons'] as $lesson): $active=$current&&(int)$current['id']===(int)$lesson['id']; $url=add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base); if($lesson['accessible']): ?>
+                                        <a class="mc-course-player__mobile-item <?php echo $active?'is-active ':''; echo $lesson['completed']?'is-complete':''; ?>" href="<?php echo esc_url($url); ?>">
+                                            <span class="mc-course-player__mobile-check"><?php echo $lesson['completed']?'✓':($active?'▶':''); ?></span>
+                                            <span><?php echo esc_html($lesson['title']); ?></span>
+                                            <?php if($lesson['preview']): ?><small>试看</small><?php endif; ?>
+                                        </a>
+                                    <?php else: ?>
+                                        <div class="mc-course-player__mobile-item is-locked" data-mathcourse-lock="1" role="button" tabindex="0">
+                                            <span class="mc-course-player__mobile-check">🔒</span>
+                                            <span><?php echo esc_html($lesson['title']); ?></span>
+                                            <small>需授权</small>
+                                        </div>
+                                    <?php endif; endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                            </div>
+                        </section>
+
                         <div class="mc-course-player__completion" hidden aria-live="polite">
                             <div><strong>✓ 本课已完成</strong><span class="mc-course-player__completion-text">学习进度已更新</span></div>
                             <?php if($navigation['next']): ?><a class="mc-course-player__completion-next" href="<?php echo esc_url($navigation['next']['url']); ?>">下一课：<?php echo esc_html($navigation['next']['title']); ?><span>→</span></a><?php else: ?><a class="mc-course-player__completion-next" href="<?php echo esc_url($base); ?>">返回课程<span>→</span></a><?php endif; ?>
