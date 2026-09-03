@@ -102,6 +102,11 @@ class Video_Router {
             $target = wp_parse_url($uri);
             if (!$target || empty($target['scheme']) || empty($target['host'])) return false;
             if (strtolower($target['scheme']) !== strtolower($source_parts['scheme']) || strtolower($target['host']) !== strtolower($source_parts['host'])) return false;
+            $source_port = (int) ($source_parts['port'] ?? 0);
+            $target_port = (int) ($target['port'] ?? 0);
+            $source_effective = $source_port ?: ('https' === strtolower($source_parts['scheme']) ? 443 : 80);
+            $target_effective = $target_port ?: ('https' === strtolower($target['scheme']) ? 443 : 80);
+            if ($source_effective !== $target_effective) return false;
             return (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
         }
         $uri_parts = wp_parse_url($uri);
@@ -164,23 +169,93 @@ class Video_Router {
     private function serve_media($lesson_id, $expires, $file_ref, $source) {
         $file = $this->resolve_source_file($source, $file_ref);
         if (!$file) { status_header(403); exit('视频片段地址无效。'); }
-        $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true));
-        if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
-        $code = (int) wp_remote_retrieve_response_code($response);
-        if ($code !== 200 && $code !== 206) { status_header(502); exit('视频片段暂时无法访问。'); }
-        $body = wp_remote_retrieve_body($response);
         $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
         if ($ext === 'm3u8') {
-            $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $file);
+            $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true));
+            if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
+            $code = (int) wp_remote_retrieve_response_code($response);
+            if ($code !== 200 && $code !== 206) { status_header(502); exit('视频片段暂时无法访问。'); }
+            $rewritten = $this->rewrite_playlist($lesson_id, $expires, wp_remote_retrieve_body($response), $file);
             if ($rewritten === false) { status_header(403); exit('视频子播放列表包含无效来源。'); }
             $this->send_hls_headers('application/vnd.apple.mpegurl');
             echo $rewritten;
             return;
         }
         $type = $ext === 'ts' ? 'video/mp2t' : ($ext === 'm4s' ? 'video/iso.segment' : ($ext === 'aac' ? 'audio/aac' : 'application/octet-stream'));
-        $this->send_hls_headers($type);
-        header('Content-Length: ' . strlen($body));
-        echo $body;
+        $this->stream_media($file, $type);
+    }
+
+    /**
+     * 直接把 HLS 分片从源站流式转发给浏览器。
+     * 旧实现会先把整个 .ts/.m4s 读入 PHP 内存，再一次性 echo；
+     * 这会增加首包延迟、内存占用，并让拖动/切片切换明显变慢。
+     */
+    private function stream_media($file, $type) {
+        if (!function_exists('curl_init')) {
+            $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true, 'stream' => true));
+            if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
+            $code = (int) wp_remote_retrieve_response_code($response);
+            if ($code !== 200 && $code !== 206) { status_header(502); exit('视频片段暂时无法访问。'); }
+            $this->send_hls_headers($type);
+            echo wp_remote_retrieve_body($response);
+            return;
+        }
+
+        while (ob_get_level()) { @ob_end_clean(); }
+        nocache_headers();
+        header('Content-Type: ' . $type);
+        header('Accept-Ranges: bytes');
+        header('X-Content-Type-Options: nosniff');
+
+        $request_range = isset($_SERVER['HTTP_RANGE']) ? trim((string) wp_unslash($_SERVER['HTTP_RANGE'])) : '';
+        $ch = curl_init($file);
+        if (!$ch) { status_header(502); exit('视频片段暂时无法访问。'); }
+        $status = 0;
+        $sent_status = false;
+        $forward_headers = array('content-length', 'content-range', 'last-modified', 'etag');
+
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$status, &$sent_status, $forward_headers) {
+            $trim = trim($header);
+            if (preg_match('#^HTTP/\S+\s+(\d+)#i', $trim, $m)) {
+                $status = (int) $m[1];
+                if ($status === 200 || $status === 206) {
+                    status_header($status);
+                    $sent_status = true;
+                }
+                return strlen($header);
+            }
+            if (strpos($trim, ':') === false || !$sent_status) return strlen($header);
+            list($name, $value) = array_map('trim', explode(':', $header, 2));
+            $name = strtolower($name);
+            if (in_array($name, $forward_headers, true)) header(ucwords(str_replace('-', ' ', $name)) . ': ' . $value);
+            return strlen($header);
+        });
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $data) {
+            echo $data;
+            if (function_exists('flush')) @flush();
+            return strlen($data);
+        });
+
+        if ($request_range !== '' && preg_match('/^bytes=\d*-\d*$/i', $request_range)) {
+            curl_setopt($ch, CURLOPT_RANGE, substr($request_range, 6));
+        }
+
+        $ok = curl_exec($ch);
+        $error = curl_error($ch);
+        $http_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (!$ok && $http_code < 200) {
+            if (!headers_sent()) status_header(502);
+            exit($error ? '视频片段暂时无法访问。' : '视频片段暂时无法访问。');
+        }
+        if (!$sent_status && ($http_code === 200 || $http_code === 206) && !headers_sent()) status_header($http_code);
+        if ($http_code !== 200 && $http_code !== 206) exit('视频片段暂时无法访问。');
     }
 
     private function serve_mp4($source) {
