@@ -55,3 +55,39 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Learning page: no top information bar. Progress is a single compact line above the lesson list. */
+body.mathcourse-site .mc-course-player__topbar,
+body.mathcourse-site .mc-course-player__top {
+  display: none !important;
+}
+body.mathcourse-site .mc-course-player__progress-card {
+  display: none !important;
+}
+body.mathcourse-site .mc-course-player__progress-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid #2a323d;
+  background: #1b212a;
+  color: #9faab7;
+  font-size: 13px;
+  line-height: 1;
+}
+body.mathcourse-site .mc-course-player__progress-line strong {
+  color: #eef3f8;
+  font-size: 13px;
+  font-weight: 750;
+}
+@media (min-width: 1051px) {
+  body.mathcourse-site .mc-course-player__workspace {
+    margin-top: 0 !important;
+  }
+}
+@media (max-width: 1050px) {
+  body.mathcourse-site .mc-course-player__progress-line {
+    display: none;
+  }
+}
