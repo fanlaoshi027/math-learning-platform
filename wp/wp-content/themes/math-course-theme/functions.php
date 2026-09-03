@@ -31,6 +31,7 @@ function mc_theme_assets() {
 	$polish_path=get_stylesheet_directory().'/assets/css/course-ui-polish.css';
 	$learning_polish_path=get_stylesheet_directory().'/assets/css/learning-ui-polish.css';
 	$learning_center_ui_path=get_stylesheet_directory().'/assets/css/learning-center-ui-v1.css';
+	$learning_center_v2_path=get_stylesheet_directory().'/assets/css/learning-center-ui-v2.css';
 	$home_path=get_stylesheet_directory().'/assets/css/home-ui-v2.css';
 	$reference_override_path=get_stylesheet_directory().'/assets/css/ui-reference-override.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
@@ -45,6 +46,7 @@ function mc_theme_assets() {
 	$polish_version=file_exists($polish_path)?(string)filemtime($polish_path):'1.0.0';
 	$learning_polish_version=file_exists($learning_polish_path)?(string)filemtime($learning_polish_path):'1.0.0';
 	$learning_center_ui_version=file_exists($learning_center_ui_path)?(string)filemtime($learning_center_ui_path):'1.0.0';
+	$learning_center_v2_version=file_exists($learning_center_v2_path)?(string)filemtime($learning_center_v2_path):'1.0.0';
 	$home_version=file_exists($home_path)?(string)filemtime($home_path):'1.0.0';
 	$reference_override_version=file_exists($reference_override_path)?(string)filemtime($reference_override_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
@@ -65,6 +67,7 @@ function mc_theme_assets() {
 	}
 	if(is_page('learning-center')){
 		wp_enqueue_style('mc-learning-center-ui-v1',get_stylesheet_directory_uri().'/assets/css/learning-center-ui-v1.css',array('mc-course-cover'),$learning_center_ui_version);
+		wp_enqueue_style('mc-learning-center-ui-v2',get_stylesheet_directory_uri().'/assets/css/learning-center-ui-v2.css',array('mc-learning-center-ui-v1'),$learning_center_v2_version);
 	}
 	if($load_course_ui&&(isset($_GET['course_id'])||has_shortcode($queried_content,'mathcourse_course_directory')||is_front_page())){
 		wp_enqueue_style('mc-course-detail',get_stylesheet_directory_uri().'/assets/css/course-detail.css',array('mc-ui-scale'),$detail_version);
