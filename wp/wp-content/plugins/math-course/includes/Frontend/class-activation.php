@@ -3,8 +3,9 @@ namespace MathCourse\Frontend;
 defined('ABSPATH') || exit;
 use MathCourse\Access\Activation_Service;
 class Activation {
- public function __construct(){add_shortcode('math_student_register',array($this,'register_shortcode'));add_filter('option_users_can_register',array($this,'disable_open_registration'));}
+ public function __construct(){add_shortcode('math_student_register',array($this,'register_shortcode'));add_filter('option_users_can_register',array($this,'disable_open_registration'));add_filter('registration_errors',array($this,'block_open_registration'),10,3);}
  public function disable_open_registration($value){return false;}
+ public function block_open_registration($errors,$sanitized_user_login,$user_email){$errors->add('mathcourse_activation_required','请使用课程激活注册页面，并输入老师提供的课程激活码。');return $errors;}
  private function rate_key(){ $ip=sanitize_text_field($_SERVER['REMOTE_ADDR']??'unknown'); return 'mathcourse_activation_rate_'.hash_hmac('sha256',$ip,wp_salt('auth')); }
  private function rate_limited(){ $key=$this->rate_key();$data=get_transient($key);return is_array($data)&&!empty($data['blocked']); }
  private function record_failure(){ $key=$this->rate_key();$data=get_transient($key);if(!is_array($data))$data=array('count'=>0,'blocked'=>false);$data['count']=(int)$data['count']+1;if($data['count']>=10)$data['blocked']=true;set_transient($key,$data,10*MINUTE_IN_SECONDS); }
