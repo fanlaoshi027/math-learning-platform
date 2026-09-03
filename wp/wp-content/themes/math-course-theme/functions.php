@@ -42,7 +42,7 @@ function mc_theme_assets() {
         'style'           => 'style.css',
         'design'          => 'assets/css/design-system-v2.css',
         'ui'              => 'assets/css/reference-ui.css',
-        'scale'            => 'assets/css/ui-scale.css',
+        'scale'           => 'assets/css/ui-scale.css',
         'detail'          => 'assets/css/course-detail.css',
         'learning'        => 'assets/css/learning.css',
         'states'          => 'assets/css/learning-states.css',
@@ -87,7 +87,6 @@ function mc_theme_assets() {
         wp_enqueue_style( 'mc-course-cover', $uri . '/assets/css/course-cover.css', array( 'mc-course-ui-polish' ), $version['cover'] );
     }
 
-    // Register the reference override before any stylesheet that depends on it.
     wp_enqueue_style( 'mc-ui-reference-override', $uri . '/assets/css/ui-reference-override.css', array( 'mc-course-ui-polish' ), $version['override'] );
 
     if ( $load_course_ui ) {
@@ -111,9 +110,6 @@ function mc_theme_assets() {
         wp_enqueue_style( 'mc-learning-states', $uri . '/assets/css/learning-states.css', array( 'mc-learning' ), $version['states'] );
         wp_enqueue_style( 'mc-learning-nav', $uri . '/assets/css/learning-nav.css', array( 'mc-learning-states' ), $version['nav'] );
         wp_enqueue_style( 'mc-learning-ui-polish', $uri . '/assets/css/learning-ui-polish.css', array( 'mc-learning-nav' ), $version['learning_polish'] );
-
-        // The player is owned by ArtPlayer + the MathCourse plugin CSS.
-        // Do not enqueue the legacy custom/native-control layer here.
         wp_enqueue_style(
             'mc-learning-v2',
             $uri . '/assets/css/learning-v2.css',
@@ -123,7 +119,8 @@ function mc_theme_assets() {
         wp_enqueue_style( 'mc-learning-layout-fix', $uri . '/assets/css/learning-layout-fix.css', array( 'mc-learning-v2' ), $version['learning_layout'] );
     }
 
-    wp_enqueue_style( 'mc-solid-color-v2', $uri . '/assets/css/solid-color-overrides-v2.css', array( 'mc-ui-reference-override', 'mc-learning-v2' ), $version['solid'] );
+    // Global color overrides must not depend on a learning-page-only handle.
+    wp_enqueue_style( 'mc-solid-color-v2', $uri . '/assets/css/solid-color-overrides-v2.css', array( 'mc-ui-reference-override' ), $version['solid'] );
 }
 add_action( 'wp_enqueue_scripts', 'mc_theme_assets' );
 
