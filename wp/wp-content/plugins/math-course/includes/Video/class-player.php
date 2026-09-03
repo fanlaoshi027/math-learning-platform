@@ -25,9 +25,11 @@ class Player {
         $service = new Course_Service(); $video = $service->get_lesson_video( $lesson_id, $user_id );
         if ( empty( $video['id'] ) || empty( $video['accessible'] ) ) return '<div class="mc-video-locked">该课时需要课程授权或试看权限后才能观看。</div>';
         $course_id = absint( $video['course_id'] ?: $course_id );
-        if ( ! empty( $video['hls_url'] ) ) {
+        $media_url = ! empty( $video['media_url'] ) ? $video['media_url'] : '';
+        $media_type = ! empty( $video['media_type'] ) ? $video['media_type'] : '';
+        if ( $media_url && in_array( $media_type, array( 'm3u8', 'mp4' ), true ) ) {
             $this->assets(); ob_start(); ?>
-            <div id="mathcourse-player-<?php echo esc_attr( $lesson_id ); ?>" class="mathcourse-artplayer" data-video-url="<?php echo esc_attr( $video['hls_url'] ); ?>" data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>" data-course-id="<?php echo esc_attr( $course_id ); ?>" aria-label="课程视频播放器"></div>
+            <div id="mathcourse-player-<?php echo esc_attr( $lesson_id ); ?>" class="mathcourse-artplayer" data-video-url="<?php echo esc_attr( $media_url ); ?>" data-video-type="<?php echo esc_attr( $media_type ); ?>" data-lesson-id="<?php echo esc_attr( $lesson_id ); ?>" data-course-id="<?php echo esc_attr( $course_id ); ?>" aria-label="课程视频播放器"></div>
             <?php return ob_get_clean();
         }
         $tutor_player = $this->tutor->render_lesson_video( $lesson_id );
