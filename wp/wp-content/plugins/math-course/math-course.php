@@ -3,7 +3,7 @@
 Plugin Name: MathCourse
 Plugin URI:
 Description: 数学课程管理系统
-Version: 1.0.5
+Version: 1.0.6
 Author:
 Author URI:
 Text Domain: mathcourse
@@ -11,7 +11,7 @@ Text Domain: mathcourse
 
 defined('ABSPATH') || exit;
 
-define('MATHCOURSE_VERSION', '1.0.5');
+define('MATHCOURSE_VERSION', '1.0.6');
 define('MATHCOURSE_PATH', plugin_dir_path(__FILE__));
 define('MATHCOURSE_URL', plugin_dir_url(__FILE__));
 
@@ -33,9 +33,9 @@ register_activation_hook(__FILE__, function () {
         \MathCourse\Access\Access_Schema::install();
     }
 
-    // Protected HLS 使用 WordPress rewrite route；激活时必须刷新一次规则。
+    // 激活阶段使用不自动挂钩的 Router 注册一次 rewrite 规则。
     if (class_exists('\\MathCourse\\Video\\Video_Router')) {
-        (new \MathCourse\Video\Video_Router())->register_route();
+        (new \MathCourse\Video\Video_Router(false))->register_route();
         flush_rewrite_rules(false);
     }
 
@@ -57,13 +57,14 @@ add_action('plugins_loaded', function () {
         }
     }
 
-    // 版本更新后刷新一次 Protected HLS rewrite rules，避免旧站点继续返回 404。
+    // 版本更新后必须等到 init 阶段再刷新 rewrite rules。
+    // plugins_loaded 时 WP_Rewrite 可能尚未完成初始化，直接 add_rewrite_rule() 会导致 fatal error。
     if (get_option('mathcourse_rewrite_version', '') !== MATHCOURSE_VERSION) {
-        if (class_exists('\\MathCourse\\Video\\Video_Router')) {
-            (new \MathCourse\Video\Video_Router())->register_route();
+        add_action('init', function () {
+            // Video_Router 自身会在 init 注册规则；此处只负责在其后刷新并记录版本。
             flush_rewrite_rules(false);
             update_option('mathcourse_rewrite_version', MATHCOURSE_VERSION, false);
-        }
+        }, 99);
     }
 
     // 主插件启动
