@@ -28,12 +28,16 @@ class Course_Player {
             <div class="mc-course-player__workspace">
                 <aside class="mc-course-player__sidebar">
                     <div class="mc-course-player__progress-line" aria-label="学习进度">
-                        <span>学习进度</span>
-                        <strong><?php echo esc_html($progress['percent']); ?>%</strong>
+                        <div class="mc-course-player__progress-copy">
+                            <span>学习进度</span>
+                            <strong><?php echo esc_html($progress['percent']); ?>%</strong>
+                        </div>
+                        <div class="mc-course-player__progress-track" aria-hidden="true"><i style="width:<?php echo esc_attr(max(0,min(100,(float)$progress['percent']))); ?>%"></i></div>
+                        <div class="mc-course-player__progress-count"><?php echo esc_html($progress['completed']); ?> / <?php echo esc_html($progress['total']); ?> 课时</div>
                     </div>
                     <div class="mc-course-player__topics">
                     <?php foreach($data['topics'] as $index=>$topic): $topic_open=$current&&$this->topic_contains_lesson($topic,$current['id']); ?><div class="mc-course-player__topic<?php echo $topic_open?' is-open':''; ?>"><h3 class="mc-course-player__topic-toggle" tabindex="0" role="button" aria-expanded="<?php echo $topic_open?'true':'false'; ?>"><span class="mc-course-player__topic-chevron" aria-hidden="true">›</span><span><?php echo esc_html($index+1); ?>. <?php echo esc_html($topic['title']); ?></span></h3><div class="mc-course-player__lessons"<?php echo $topic_open?'':' hidden'; ?>>
-                    <?php foreach($topic['lessons'] as $lesson): $active=$current&&(int)$current['id']===(int)$lesson['id']; $url=add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base); if($lesson['accessible']): ?><a class="mc-course-player__item <?php echo $active?'is-active ':''; echo $lesson['completed']?'is-complete':''; ?>" href="<?php echo esc_url($url); ?>"><span class="mc-course-player__check"><?php echo $lesson['completed']?'✓':($active?'▶':'○'); ?></span><span><?php echo esc_html($lesson['title']); ?></span><?php if($lesson['preview']): ?><small>试看</small><?php endif; ?></a><?php else: ?><div class="mc-course-player__item is-locked" data-mathcourse-lock="1" role="button" tabindex="0"><span class="mc-course-player__check">🔒</span><span><?php echo esc_html($lesson['title']); ?></span><small>需授权</small></div><?php endif; endforeach; ?>
+                    <?php foreach($topic['lessons'] as $lesson): $active=$current&&(int)$current['id']===(int)$lesson['id']; $url=add_query_arg(array('course_id'=>$course_id,'lesson_id'=>$lesson['id']),$base); if($lesson['accessible']): ?><a class="mc-course-player__item <?php echo $active?'is-active ':''; echo $lesson['completed']?'is-complete':''; ?>" href="<?php echo esc_url($url); ?>"><span class="mc-course-player__check"><?php echo $lesson['completed']?'✓':($active?'▶':''); ?></span><span><?php echo esc_html($lesson['title']); ?></span><?php if($lesson['preview']): ?><small>试看</small><?php endif; ?></a><?php else: ?><div class="mc-course-player__item is-locked" data-mathcourse-lock="1" role="button" tabindex="0"><span class="mc-course-player__check">🔒</span><span><?php echo esc_html($lesson['title']); ?></span><small>需授权</small></div><?php endif; endforeach; ?>
                     </div></div><?php endforeach; ?>
                     </div>
                     <div class="mc-course-player__more"><span>•••</span><strong>更多</strong></div>
