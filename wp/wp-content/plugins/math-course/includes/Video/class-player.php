@@ -14,6 +14,7 @@ class Player {
     }
 
     public function assets() {
+        wp_enqueue_style( 'mathcourse-course-player-responsive-fix', MATHCOURSE_URL . 'assets/course-player-responsive-fix.css', array( 'mathcourse-course-player' ), MATHCOURSE_VERSION );
         wp_enqueue_script( 'hls-js', 'https://cdn.jsdelivr.net/npm/hls.js@1.6.2/dist/hls.min.js', array(), '1.6.2', true );
         wp_enqueue_script( 'artplayer', MATHCOURSE_URL . 'assets/artplayer/artplayer.js', array( 'hls-js' ), '5.4.1-local', true );
         wp_enqueue_script( 'mathcourse-player', MATHCOURSE_URL . 'assets/js/player.js', array( 'artplayer', 'hls-js' ), MATHCOURSE_VERSION . '-artplayer-local', true );
