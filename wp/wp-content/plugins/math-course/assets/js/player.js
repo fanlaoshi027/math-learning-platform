@@ -108,9 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-            function onFullscreenChange() {
-                setFullscreenState();
-            }
+            function onFullscreenChange() { setFullscreenState(); }
 
             function bindFullscreenEvents(video) {
                 document.addEventListener('fullscreenchange', onFullscreenChange);
@@ -202,6 +200,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                     customType: {
                         m3u8: function (video, sourceUrl, instance) {
+                            // Course media stays on the user's own server. hls.js is only
+                            // the local playback engine; no video CDN is used here.
                             if (window.Hls && typeof window.Hls.isSupported === 'function' && window.Hls.isSupported()) {
                                 const hls = new window.Hls({
                                     enableWorker: true,
@@ -212,17 +212,22 @@ document.addEventListener('DOMContentLoaded', function () {
                                 });
                                 instance._mathcourseHls = hls;
                                 hls.on(window.Hls.Events.ERROR, function (_event, data) {
-                                    if (!data || !data.fatal) return;
-                                    console.warn('MathCourse HLS error:', data.type, data.details);
+                                    if (!data) return;
+                                    console.warn('MathCourse HLS error:', data.type, data.details, data.fatal ? '(fatal)' : '');
+                                    if (!data.fatal) return;
                                     if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
                                         try { hls.startLoad(); } catch (e) {}
                                     } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
                                         try { hls.recoverMediaError(); } catch (e) {}
                                     }
                                 });
-                                hls.loadSource(sourceUrl);
+                                // Attach first, then load the protected m3u8 URL.
                                 hls.attachMedia(video);
+                                hls.on(window.Hls.Events.MEDIA_ATTACHED, function () {
+                                    hls.loadSource(sourceUrl);
+                                });
                             } else {
+                                // Safari/iOS can play the same self-hosted HLS URL natively.
                                 video.src = sourceUrl;
                                 video.load();
                             }
@@ -239,12 +244,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (art.contextmenu) art.contextmenu.show = false;
                 bindFullscreenEvents(art.video);
 
-                art.on('fullscreen', function () {
-                    setFullscreenState();
-                });
-                art.on('fullscreenWeb', function () {
-                    setFullscreenState();
-                });
+                art.on('fullscreen', setFullscreenState);
+                art.on('fullscreenWeb', setFullscreenState);
                 art.on('fullscreenError', onFullscreenChange);
 
                 art.on('ready', function () {
@@ -296,7 +297,5 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // hls.js is enqueued locally by MathCourse\Video\Player before this script.
-    // Do not load video assets from CDN: course media is served by the user's own server.
     initializePlayers();
 });
