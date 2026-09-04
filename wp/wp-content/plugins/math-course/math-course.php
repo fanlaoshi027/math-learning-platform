@@ -41,6 +41,7 @@ $mathcourse_files=array(
  'includes/Video/class-video-router.php',
  'includes/Video/class-hls-accelerator.php',
  'includes/Video/class-local-hls-source.php',
+ 'includes/Video/class-hls-converter.php',
  'includes/Frontend/class-activation.php',
  'includes/Frontend/class-student-auth.php',
  'includes/Frontend/class-course-directory.php',
