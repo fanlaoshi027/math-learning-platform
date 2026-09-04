@@ -199,8 +199,8 @@ class Hls_Converter {
 
         $title = str_replace( array( '上册', '下册' ), array( 'shang', 'xia' ), $title );
 
-        if ( class_exists( '\\Transliterator' ) ) {
-            $transliterator = \\Transliterator::create( 'Han-Latin; Latin-ASCII' );
+        if ( class_exists( '\Transliterator' ) ) {
+            $transliterator = \Transliterator::create( 'Han-Latin; Latin-ASCII' );
             if ( $transliterator ) $title = $transliterator->transliterate( $title );
         } else {
             $fallback = array(
@@ -217,7 +217,7 @@ class Hls_Converter {
         }
 
         $title = strtolower( $title );
-        $title = preg_replace( '/[\\x{3000}\\s]+/u', '', $title );
+        $title = preg_replace( '/[\x{3000}\s]+/u', '', $title );
         $title = preg_replace( '/[^a-z0-9]+/i', '-', $title );
         $title = trim( $title, '-' );
         return $title;
@@ -225,10 +225,10 @@ class Hls_Converter {
 
     private function probe( $source ) {
         $ffprobe = defined( 'MATHCOURSE_FFPROBE_PATH' ) ? MATHCOURSE_FFPROBE_PATH : '/usr/bin/ffprobe';
-        if ( ! is_executable( $ffprobe ) ) return new \\WP_Error( 'ffprobe_missing', '找不到 ffprobe：' . $ffprobe );
+        if ( ! is_executable( $ffprobe ) ) return new \WP_Error( 'ffprobe_missing', '找不到 ffprobe：' . $ffprobe );
         $cmd = escapeshellarg( $ffprobe ) . ' -v error -show_entries format=duration:stream=index,codec_type,codec_name,width,height,r_frame_rate -of json ' . escapeshellarg( $source );
         $data = json_decode( (string) @shell_exec( $cmd ), true );
-        if ( empty( $data ) || empty( $data['streams'] ) ) return new \\WP_Error( 'ffprobe_failed', '无法读取 MP4 视频信息。' );
+        if ( empty( $data ) || empty( $data['streams'] ) ) return new \WP_Error( 'ffprobe_failed', '无法读取 MP4 视频信息。' );
         $info = array( 'duration' => isset( $data['format']['duration'] ) ? round( (float) $data['format']['duration'], 2 ) : 0, 'video_codec' => '', 'audio_codec' => '', 'width' => 0, 'height' => 0, 'fps' => '' );
         foreach ( $data['streams'] as $stream ) {
             if ( 'video' === ( $stream['codec_type'] ?? '' ) && ! $info['video_codec'] ) { $info['video_codec'] = $stream['codec_name'] ?? ''; $info['width'] = absint( $stream['width'] ?? 0 ); $info['height'] = absint( $stream['height'] ?? 0 ); $info['fps'] = $this->fps( $stream['r_frame_rate'] ?? '' ); }
