@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MathCourse
  * Description: 樊老师数学网校课程管理与学员授权系统。
- * Version: 1.0.10
+ * Version: 1.0.11
  * Author: 樊老师
  */
 defined('ABSPATH') || exit;
 
-define('MATHCOURSE_VERSION','1.0.10');
+define('MATHCOURSE_VERSION','1.0.11');
 define('MATHCOURSE_FILE',__FILE__);
 define('MATHCOURSE_DIR',plugin_dir_path(__FILE__));
 define('MATHCOURSE_URL',plugin_dir_url(__FILE__));
@@ -81,6 +81,15 @@ function mathcourse_boot(){
     if(class_exists('MathCourse\\Plugin')) (new MathCourse\Plugin())->run();
 }
 add_action('plugins_loaded','mathcourse_boot',20);
+
+/* 更新插件后自动刷新一次重写规则，确保 /math-video/ 保护播放路由立即生效。 */
+add_action('init', function(){
+    $rewrite_version = '1.0.11';
+    if (get_option('_mathcourse_rewrite_version') !== $rewrite_version) {
+        flush_rewrite_rules(false);
+        update_option('_mathcourse_rewrite_version', $rewrite_version, false);
+    }
+}, 99);
 
 register_activation_hook(__FILE__,function(){
     if(class_exists('MathCourse\\Access\\Access_Schema')) (new MathCourse\Access\Access_Schema())->install();
