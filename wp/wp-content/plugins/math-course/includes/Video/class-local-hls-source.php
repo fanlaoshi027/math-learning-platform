@@ -19,6 +19,14 @@ class Local_Hls_Source {
         add_filter('pre_http_request', array($this, 'intercept'), 10, 3);
     }
 
+    private function same_site_host($a, $b) {
+        $a = strtolower(ltrim((string) $a, '.'));
+        $b = strtolower(ltrim((string) $b, '.'));
+        if (strpos($a, 'www.') === 0) $a = substr($a, 4);
+        if (strpos($b, 'www.') === 0) $b = substr($b, 4);
+        return $a !== '' && $a === $b;
+    }
+
     public function intercept($preempt, $args, $url) {
         if (false !== $preempt || !defined('MATHCOURSE_MEDIA_ROOT') || !MATHCOURSE_MEDIA_ROOT) {
             return $preempt;
@@ -28,7 +36,7 @@ class Local_Hls_Source {
         $site = wp_parse_url(home_url('/'));
         if (!$parts || !$site) return $preempt;
         if (strtolower((string) ($parts['scheme'] ?? '')) !== strtolower((string) ($site['scheme'] ?? ''))) return $preempt;
-        if (strtolower((string) ($parts['host'] ?? '')) !== strtolower((string) ($site['host'] ?? ''))) return $preempt;
+        if (!$this->same_site_host($parts['host'] ?? '', $site['host'] ?? '')) return $preempt;
         if (!empty($site['port']) && (int) ($parts['port'] ?? 0) !== (int) $site['port']) return $preempt;
 
         $path = (string) ($parts['path'] ?? '');
