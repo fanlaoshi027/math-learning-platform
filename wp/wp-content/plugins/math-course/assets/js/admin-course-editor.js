@@ -68,9 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.history.replaceState({ lessonId: lessonId }, '', stateUrl.toString());
                 side.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             })
-            .catch(function () {
-                window.location.href = url;
-            });
+            .catch(function () { window.location.href = url; });
     }
 
     function refreshFromResponse(html, lessonId) {
@@ -78,15 +76,12 @@ document.addEventListener('DOMContentLoaded', function () {
         var newList = doc.querySelector('.mathcourse-topic-list');
         var currentList = wrap.querySelector('.mathcourse-topic-list');
         if (newList && currentList) currentList.replaceWith(newList);
-
         var newSide = doc.querySelector('#mathcourse-lesson-side');
         var side = document.getElementById('mathcourse-lesson-side');
         if (newSide && side) side.innerHTML = newSide.innerHTML;
-
         bindLessonPanel(side);
         bindLessonLinks();
         normalizeHlsInput(document);
-
         if (lessonId) {
             var link = wrap.querySelector('.mathcourse-lesson-edit[data-lesson-id="' + String(lessonId).replace(/"/g, '') + '"]');
             if (link) openLessonEditor(link);
@@ -102,15 +97,8 @@ document.addEventListener('DOMContentLoaded', function () {
             side.classList.add('is-loading');
             side.innerHTML = placeholder(action === 'save_lesson' ? '正在保存课时' : '正在创建课时', '保存完成后会继续留在当前课程。');
         }
-        return fetch(window.location.href, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            body: data
-        }).then(function (response) {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return response.text();
-        });
+        return fetch(window.location.href, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data })
+            .then(function (response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.text(); });
     }
 
     function bindLessonLinks() {
@@ -118,11 +106,20 @@ document.addEventListener('DOMContentLoaded', function () {
         wrap.querySelectorAll('.mathcourse-lesson-edit').forEach(function (link) {
             if (link.dataset.mcBound === '1') return;
             link.dataset.mcBound = '1';
-            link.addEventListener('click', function (event) {
-                event.preventDefault();
-                openLessonEditor(link);
-            });
+            link.addEventListener('click', function (event) { event.preventDefault(); openLessonEditor(link); });
         });
+    }
+
+    function nativeLessonSubmit(form, action) {
+        var actionInput = form.querySelector('input[name="mathcourse_action"][type="hidden"]');
+        if (!actionInput) {
+            actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'mathcourse_action';
+            form.appendChild(actionInput);
+        }
+        actionInput.value = action;
+        form.submit();
     }
 
     function bindContinuousLessonForms() {
@@ -130,7 +127,6 @@ document.addEventListener('DOMContentLoaded', function () {
         var form = document.getElementById('mathcourse-course-form');
         if (!form || form.dataset.mcContinuous === '1') return;
         form.dataset.mcContinuous = '1';
-
         form.addEventListener('submit', function (event) {
             var submitter = event.submitter;
             if (!submitter) return;
@@ -138,20 +134,16 @@ document.addEventListener('DOMContentLoaded', function () {
             var isAdd = action.indexOf('add_lesson_') === 0;
             var isSave = action === 'save_lesson';
             if (!isAdd && !isSave) return;
-
             event.preventDefault();
             var oldText = submitter.textContent;
             submitter.disabled = true;
             submitter.textContent = isSave ? '保存中…' : '添加中…';
-
-            var extra = {};
             var lessonId = '';
             if (isSave) {
                 var editing = form.querySelector('[name="editing_lesson_id"]');
                 lessonId = editing ? editing.value : '';
             }
-
-            asyncLessonSubmit(form, action, extra)
+            asyncLessonSubmit(form, action, {})
                 .then(function (html) {
                     refreshFromResponse(html, lessonId);
                     if (isAdd) {
@@ -173,12 +165,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 })
                 .catch(function () {
-                    /* 连续编辑失败时回退到浏览器原生提交，确保原功能仍可用。 */
                     form.dataset.mcContinuous = '0';
                     submitter.disabled = false;
                     submitter.textContent = oldText;
-                    form.submit();
-                    return;
+                    nativeLessonSubmit(form, action);
                 })
                 .finally(function () {
                     submitter.disabled = false;
@@ -200,31 +190,15 @@ document.addEventListener('DOMContentLoaded', function () {
     var coverInput = document.getElementById('course_cover');
     if (coverInput && window.wp && wp.media) {
         var coverRow = coverInput.parentNode;
-        var tools = document.createElement('div');
-        tools.className = 'mathcourse-cover-tools';
-        var chooseButton = document.createElement('button');
-        chooseButton.type = 'button'; chooseButton.className = 'button mathcourse-cover-choose'; chooseButton.textContent = '从媒体库选择';
-        var clearButton = document.createElement('button');
-        clearButton.type = 'button'; clearButton.className = 'button mathcourse-cover-clear'; clearButton.textContent = '清除封面';
-        var preview = document.createElement('div');
-        preview.className = 'mathcourse-cover-preview'; preview.setAttribute('aria-live', 'polite');
-        var updatePreview = function () {
-            var url = (coverInput.value || '').trim(); preview.innerHTML = '';
-            if (!url) { preview.classList.remove('has-image'); return; }
-            var img = document.createElement('img'); img.alt = '课程封面预览'; img.loading = 'lazy'; img.src = url;
-            img.addEventListener('error', function () { preview.classList.remove('has-image'); });
-            img.addEventListener('load', function () { preview.classList.add('has-image'); }); preview.appendChild(img);
-        };
+        var tools = document.createElement('div'); tools.className = 'mathcourse-cover-tools';
+        var chooseButton = document.createElement('button'); chooseButton.type = 'button'; chooseButton.className = 'button mathcourse-cover-choose'; chooseButton.textContent = '从媒体库选择';
+        var clearButton = document.createElement('button'); clearButton.type = 'button'; clearButton.className = 'button mathcourse-cover-clear'; clearButton.textContent = '清除封面';
+        var preview = document.createElement('div'); preview.className = 'mathcourse-cover-preview'; preview.setAttribute('aria-live', 'polite');
+        var updatePreview = function () { var url = (coverInput.value || '').trim(); preview.innerHTML = ''; if (!url) { preview.classList.remove('has-image'); return; } var img = document.createElement('img'); img.alt = '课程封面预览'; img.loading = 'lazy'; img.src = url; img.addEventListener('error', function () { preview.classList.remove('has-image'); }); img.addEventListener('load', function () { preview.classList.add('has-image'); }); preview.appendChild(img); };
         var frame = null;
-        chooseButton.addEventListener('click', function (event) {
-            event.preventDefault(); if (frame) { frame.open(); return; }
-            frame = wp.media({ title: '选择课程封面', button: { text: '使用此封面' }, library: { type: 'image' }, multiple: false });
-            frame.on('select', function () { var attachment = frame.state().get('selection').first().toJSON(); if (!attachment || !attachment.url) return; coverInput.value = attachment.url; coverInput.dispatchEvent(new Event('change', { bubbles: true })); coverInput.focus(); });
-            frame.open();
-        });
+        chooseButton.addEventListener('click', function (event) { event.preventDefault(); if (frame) { frame.open(); return; } frame = wp.media({ title: '选择课程封面', button: { text: '使用此封面' }, library: { type: 'image' }, multiple: false }); frame.on('select', function () { var attachment = frame.state().get('selection').first().toJSON(); if (!attachment || !attachment.url) return; coverInput.value = attachment.url; coverInput.dispatchEvent(new Event('change', { bubbles: true })); coverInput.focus(); }); frame.open(); });
         clearButton.addEventListener('click', function (event) { event.preventDefault(); coverInput.value = ''; coverInput.dispatchEvent(new Event('change', { bubbles: true })); coverInput.focus(); });
-        coverInput.addEventListener('input', updatePreview); coverInput.addEventListener('change', updatePreview);
-        tools.appendChild(chooseButton); tools.appendChild(clearButton); coverRow.appendChild(tools); coverRow.appendChild(preview); updatePreview();
+        coverInput.addEventListener('input', updatePreview); coverInput.addEventListener('change', updatePreview); tools.appendChild(chooseButton); tools.appendChild(clearButton); coverRow.appendChild(tools); coverRow.appendChild(preview); updatePreview();
     }
 
     var codeBox = document.querySelector('.mathcourse-code-output');
