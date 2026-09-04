@@ -1,0 +1,39 @@
+/* Math Course Theme — learning navigation, touch-first. */
+.mc-learning-page .mc-learning-nav {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	margin: 12px 0;
+}
+.mc-learning-page .mc-learning-nav a,
+.mc-learning-page .mc-learning-nav button {
+	min-height: 48px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 10px 14px;
+	border: 1px solid var(--mc-line, #e5eaf0);
+	border-radius: 12px;
+	background: #fff;
+	color: var(--mc-navy, #0d2942);
+	font-weight: 700;
+	text-decoration: none;
+	-webkit-tap-highlight-color: transparent;
+}
+.mc-learning-page .mc-learning-nav a:hover { transform: translateY(-1px); }
+.mc-learning-page .mc-learning-nav a:focus-visible {
+	outline: 3px solid rgba(23,105,224,.22);
+	outline-offset: 2px;
+}
+.mc-learning-page .mc-learning-nav .is-primary {
+	background: var(--mc-navy, #0d2942);
+	border-color: var(--mc-navy, #0d2942);
+	color: #fff;
+}
+@media (max-width: 640px) {
+	.mc-learning-page .mc-learning-nav { gap: 8px; margin: 10px 0; }
+	.mc-learning-page .mc-learning-nav a { min-height: 50px; font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.mc-learning-page .mc-learning-nav a { transform: none !important; }
+}
