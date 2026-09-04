@@ -12,9 +12,8 @@ body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:first-child>span:first-child{flex:0 0 28px;text-align:center!important;color:#98a2b3!important;font-size:12px}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:first-child>span:not(:first-child){display:inline-flex;align-items:center;min-height:22px;padding:2px 7px;border-radius:999px;background:#f2f4f7;color:#667085!important;font-size:11px;font-weight:600}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:first-child>span[style*="#2271b1"]{background:#eff8ff!important;color:#175cd3!important}
-body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:last-child{flex:0 0 auto;opacity:.82}
+body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:last-child{flex:0 0 auto;opacity:.82;display:flex;align-items:center;gap:12px}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row:hover>div:last-child{opacity:1}
-body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:last-child{display:flex;align-items:center;gap:12px}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:last-child a{font-weight:600;color:#155eef;text-decoration:none}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row>div:last-child a:hover{text-decoration:underline}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body .mathcourse-lesson-row button{font-size:12px}
@@ -24,7 +23,7 @@ body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-topic-body
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-content-workspace>div:last-child{box-shadow:none}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-content-workspace>div:last-child input{background:#fff}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor{position:relative}
-body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor:before{content:'课时设置';display:block;margin:-2px 0 14px;color:#175cd3;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor:before{content:'课时设置';display:block;margin:-2px 0 14px;color:#175cd3;font-size:11px;font-weight:700;letter-spacing:.04em}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor>div:first-child h3{color:#101828;font-size:18px!important}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor>div:first-child a{font-size:13px;color:#667085;text-decoration:none}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor>div:first-child a:hover{color:#155eef}
@@ -32,6 +31,8 @@ body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-edi
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor p{margin-bottom:16px}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor input[type=checkbox]{accent-color:#155eef}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor small{line-height:1.6}
+body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor input[type=text],body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor input[type=url],body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor select,body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor textarea{width:100%;box-sizing:border-box}
+body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-lesson-editor .button-primary{min-height:40px;padding:8px 16px}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-cover-tools{display:flex;align-items:center;gap:8px;margin-top:9px}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-cover-tools .button{min-height:36px!important;padding:7px 12px!important}
 body.admin_page_mathcourse-course-edit .mathcourse-editor .mathcourse-cover-select{border-color:#b2ddff!important;color:#155eef!important;background:#f8fbff!important}
