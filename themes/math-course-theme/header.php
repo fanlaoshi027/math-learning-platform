@@ -24,14 +24,10 @@ defined( 'ABSPATH' ) || exit;
             <?php endif; ?>
         </nav>
 
-        <form class="mc-header-search" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
-            <input type="search" name="s" value="<?php echo esc_attr( get_search_query() ); ?>" placeholder="搜索课程或专题" aria-label="搜索课程或专题">
-            <button type="submit" aria-label="搜索">⌕</button>
-        </form>
-
         <div class="mc-header-actions">
             <?php if ( is_user_logged_in() ) : ?>
-                <a class="mc-user-pill" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>"><b>樊</b><span>樊同学</span><i>|</i><span>退出</span></a>
+                <?php $current_user = wp_get_current_user(); $student_name = $current_user->display_name ?: $current_user->user_login; $student_initial = function_exists( 'mb_substr' ) ? mb_substr( $student_name, 0, 1 ) : substr( $student_name, 0, 1 ); ?>
+                <a class="mc-user-pill" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>"><b><?php echo esc_html( $student_initial ); ?></b><span><?php echo esc_html( $student_name ); ?></span><i>|</i><span>退出</span></a>
             <?php else : ?>
                 <?php $login_url = wp_login_url( home_url( '/learning-center/' ) ); ?>
                 <a class="mc-header-login" href="<?php echo esc_url( $login_url ); ?>">学生登录</a>
