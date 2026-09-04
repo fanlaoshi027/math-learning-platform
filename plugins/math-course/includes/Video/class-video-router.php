@@ -104,16 +104,20 @@ class Video_Router {
         $uri = trim((string) $uri);
         if ($uri === '') return '';
         $source_parts = wp_parse_url($source_url);
-        if (!$source_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return false;
+        if (!$source_parts) return false;
         if (preg_match('#^https?://#i', $uri)) {
             $target = wp_parse_url($uri);
             if (!$target || empty($target['scheme']) || empty($target['host'])) return false;
-            if (strtolower($target['scheme']) !== strtolower($source_parts['scheme']) || strtolower($target['host']) !== strtolower($source_parts['host'])) return false;
-            $source_port = (int) ($source_parts['port'] ?? 0);
-            $target_port = (int) ($target['port'] ?? 0);
-            $source_effective = $source_port ?: ('https' === strtolower($source_parts['scheme']) ? 443 : 80);
-            $target_effective = $target_port ?: ('https' === strtolower($target['scheme']) ? 443 : 80);
-            if ($source_effective !== $target_effective) return false;
+            if (!empty($source_parts['scheme']) && !empty($source_parts['host'])) {
+                if (strtolower($target['scheme']) !== strtolower($source_parts['scheme']) || strtolower($target['host']) !== strtolower($source_parts['host'])) return false;
+                $source_port = (int) ($source_parts['port'] ?? 0);
+                $target_port = (int) ($target['port'] ?? 0);
+                $source_effective = $source_port ?: ('https' === strtolower($source_parts['scheme']) ? 443 : 80);
+                $target_effective = $target_port ?: ('https' === strtolower($target['scheme']) ? 443 : 80);
+                if ($source_effective !== $target_effective) return false;
+            } else {
+                return false;
+            }
             return (isset($target['path']) ? $target['path'] : '/') . (!empty($target['query']) ? '?' . $target['query'] : '');
         }
         $uri_parts = wp_parse_url($uri);
@@ -175,7 +179,8 @@ class Video_Router {
         if ($local) return $local;
         $source_parts = wp_parse_url($source);
         $file_parts = wp_parse_url($file_ref);
-        if (!$source_parts || !$file_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return '';
+        if (!$source_parts || !$file_parts) return '';
+        if (empty($source_parts['scheme']) || empty($source_parts['host'])) return '';
         $origin = strtolower($source_parts['scheme']) . '://' . strtolower($source_parts['host']);
         if (!empty($source_parts['port'])) $origin .= ':' . $source_parts['port'];
         $base_dir = trailingslashit(dirname(isset($source_parts['path']) ? $source_parts['path'] : '/'));
