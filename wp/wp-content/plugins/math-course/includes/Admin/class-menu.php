@@ -6,7 +6,7 @@ class Menu {
  public function __construct(){add_action('admin_menu',array($this,'register_menu'));add_action('admin_enqueue_scripts',array($this,'enqueue_admin_assets'));}
  public function enqueue_admin_assets($hook){
   if(false===strpos((string)$hook,'mathcourse')) return;
-  wp_enqueue_style('mathcourse-admin-ui',MATHCOURSE_PLUGIN_URL.'assets/admin-ui.css',array(),MATHCOURSE_VERSION);
+  wp_enqueue_style('mathcourse-admin-ui',MATHCOURSE_URL.'assets/admin-ui.css',array(),MATHCOURSE_VERSION);
  }
  public function register_menu(){
   add_menu_page('MathCourse','数学课程','manage_options','mathcourse',array($this,'dashboard'),'dashicons-welcome-learn-more',30);
