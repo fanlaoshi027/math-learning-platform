@@ -45,7 +45,8 @@ class Course_Editor {
 				</div>
 				<div class="mathcourse-editor-head-actions">
 					<a class="button" href="<?php echo esc_url( add_query_arg( array( 'post' => $course_id, 'action' => 'edit' ), admin_url( 'post.php' ) ) ); ?>">打开 Tutor LMS</a>
-					<button type="submit" form="mathcourse-course-form" name="mathcourse_action" value="freeze_course" class="button mathcourse-freeze-button" onclick="return confirm('冻结后课程将变为私密状态，前台不再公开显示。确定继续吗？');">冻结课程</button>
+					<?php $course_frozen = 'private' === $post->post_status; ?>
+					<button type="submit" form="mathcourse-course-form" name="mathcourse_action" value="<?php echo $course_frozen ? 'unfreeze_course' : 'freeze_course'; ?>" class="button mathcourse-freeze-button" onclick="return confirm('<?php echo $course_frozen ? '解冻后课程将恢复为已发布状态。确定继续吗？' : '冻结后课程将变为私密状态，前台不再公开显示。确定继续吗？'; ?>');"><?php echo $course_frozen ? '解冻课程' : '冻结课程'; ?></button>
 				</div>
 			</div>
 			<?php if ( $message ) : ?><div class="notice notice-<?php echo esc_attr( $message_type ); ?> is-dismissible"><p><?php echo esc_html( $message ); ?></p></div><?php endif; ?>
@@ -71,11 +72,11 @@ class Course_Editor {
 								<div class="mathcourse-empty-content"><strong>还没有专题</strong><span>先创建第一个专题，再添加课时。</span></div>
 							<?php else : ?>
 								<div class="mathcourse-topic-list">
-								<?php foreach ( $topics as $topic ) : $lessons = $this->tutor->get_lessons( $topic->ID, true ); ?>
-									<div class="mathcourse-topic-card">
+								<?php foreach ( $topics as $topic ) : $lessons = $this->tutor->get_lessons( $topic->ID, true ); $topic_frozen = 'private' === $topic->post_status; ?>
+									<div class="mathcourse-topic-card" data-topic-id="<?php echo esc_attr( $topic->ID ); ?>">
 										<div class="mathcourse-topic-header">
 											<div><strong><?php echo esc_html( $topic->post_title ); ?></strong><span>（<?php echo esc_html( count( $lessons ) ); ?> 个课时）</span></div>
-											<button type="submit" name="mathcourse_action" value="freeze_topic_<?php echo esc_attr( $topic->ID ); ?>" class="button-link mathcourse-freeze-link" onclick="return confirm('冻结后该专题及其课时将变为私密状态。确定继续吗？');">冻结专题</button>
+											<button type="submit" name="mathcourse_action" value="<?php echo $topic_frozen ? 'unfreeze_topic_' : 'freeze_topic_'; ?><?php echo esc_attr( $topic->ID ); ?>" class="button-link mathcourse-freeze-link" onclick="return confirm('<?php echo $topic_frozen ? '解冻后该专题及其课时将恢复为已发布状态。确定继续吗？' : '冻结后该专题及其课时将变为私密状态。确定继续吗？'; ?>');"><?php echo $topic_frozen ? '解冻专题' : '冻结专题'; ?></button>
 										</div>
 										<div class="mathcourse-topic-body">
 											<?php if ( empty( $lessons ) ) : ?><div class="mathcourse-no-lessons">暂无课时。</div><?php else : ?>
@@ -85,10 +86,11 @@ class Course_Editor {
 													$preview = get_post_meta( $lesson->ID, '_mathcourse_preview', true );
 													$status_class = 'publish' === $lesson->post_status ? 'is-published' : ( 'private' === $lesson->post_status ? 'is-private' : 'is-draft' );
 													$status_text = 'publish' === $lesson->post_status ? '已发布' : ( 'private' === $lesson->post_status ? '已冻结' : '草稿' );
+													$lesson_frozen = 'private' === $lesson->post_status;
 													?>
 													<div class="mathcourse-lesson-row <?php echo esc_attr( $edit_lesson_id === $lesson->ID ? 'is-selected' : '' ); ?>" data-lesson-id="<?php echo esc_attr( $lesson->ID ); ?>">
 														<div class="mathcourse-lesson-main"><span class="mathcourse-lesson-index"><?php echo esc_html( $index + 1 ); ?>.</span><strong><?php echo esc_html( $lesson->post_title ); ?></strong><?php if ( 'yes' === $preview ) : ?><span class="mathcourse-preview-badge">试看</span><?php endif; ?><span class="mathcourse-status-badge <?php echo esc_attr( $status_class ); ?>"><?php echo esc_html( $status_text ); ?></span></div>
-														<div class="mathcourse-lesson-actions"><a class="mathcourse-lesson-edit" href="<?php echo esc_url( $lesson_edit_url ); ?>" data-lesson-id="<?php echo esc_attr( $lesson->ID ); ?>">编辑</a><button type="submit" name="mathcourse_action" value="freeze_lesson_<?php echo esc_attr( $lesson->ID ); ?>" class="button-link mathcourse-freeze-link" onclick="return confirm('冻结后该课时将变为私密状态。确定继续吗？');">冻结</button></div>
+														<div class="mathcourse-lesson-actions"><a class="mathcourse-lesson-edit" href="<?php echo esc_url( $lesson_edit_url ); ?>" data-lesson-id="<?php echo esc_attr( $lesson->ID ); ?>">编辑</a><button type="submit" name="mathcourse_action" value="<?php echo $lesson_frozen ? 'unfreeze_lesson_' : 'freeze_lesson_'; ?><?php echo esc_attr( $lesson->ID ); ?>" class="button-link mathcourse-freeze-link" onclick="return confirm('<?php echo $lesson_frozen ? '解冻后该课时将恢复为已发布状态。确定继续吗？' : '冻结后该课时将变为私密状态。确定继续吗？'; ?>');"><?php echo $lesson_frozen ? '解冻' : '冻结'; ?></button></div>
 													</div>
 												<?php endforeach; ?>
 											<?php endif; ?>
@@ -168,6 +170,9 @@ class Course_Editor {
 		} elseif ( 'freeze_course' === $action ) {
 			wp_update_post( array( 'ID' => $course_id, 'post_status' => 'private' ) );
 			$message = '课程已冻结，当前为私密状态。';
+		} elseif ( 'unfreeze_course' === $action ) {
+			wp_update_post( array( 'ID' => $course_id, 'post_status' => 'publish' ) );
+			$message = '课程已解冻，当前为已发布状态。';
 		} elseif ( 'add_topic' === $action ) {
 			$title = isset( $_POST['topic_title'] ) ? sanitize_text_field( wp_unslash( $_POST['topic_title'] ) ) : '';
 			if ( ! $title ) { $message = '请输入专题名称。'; $message_type = 'warning'; return; }
@@ -221,10 +226,22 @@ class Course_Editor {
 				wp_update_post( array( 'ID' => $topic_id, 'post_status' => 'private' ) );
 				$message = '专题已冻结。';
 			}
+		} elseif ( 0 === strpos( $action, 'unfreeze_topic_' ) ) {
+			$topic_id = absint( substr( $action, 15 ) );
+			if ( $topic_id ) {
+				$lessons = $this->tutor->get_lessons( $topic_id, true );
+				foreach ( $lessons as $lesson ) { wp_update_post( array( 'ID' => $lesson->ID, 'post_status' => 'publish' ) ); }
+				wp_update_post( array( 'ID' => $topic_id, 'post_status' => 'publish' ) );
+				$message = '专题已解冻。';
+			}
 		} elseif ( 0 === strpos( $action, 'freeze_lesson_' ) ) {
 			$lesson_id = absint( substr( $action, 14 ) );
 			$lesson = $lesson_id ? $this->tutor->get_lesson( $lesson_id ) : null;
 			if ( $lesson && $course_id === $this->tutor->get_lesson_course_id( $lesson_id ) ) { wp_update_post( array( 'ID' => $lesson_id, 'post_status' => 'private' ) ); $message = '课时已冻结。'; }
+		} elseif ( 0 === strpos( $action, 'unfreeze_lesson_' ) ) {
+			$lesson_id = absint( substr( $action, 16 ) );
+			$lesson = $lesson_id ? $this->tutor->get_lesson( $lesson_id ) : null;
+			if ( $lesson && $course_id === $this->tutor->get_lesson_course_id( $lesson_id ) ) { wp_update_post( array( 'ID' => $lesson_id, 'post_status' => 'publish' ) ); $message = '课时已解冻。'; }
 		}
 	}
 
