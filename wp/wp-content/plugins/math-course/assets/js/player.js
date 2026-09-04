@@ -183,11 +183,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         hls = new HlsClass({
                             enableWorker: true,
                             lowLatencyMode: false,
+                            // VOD：预取首片段，缩短点击播放后的首屏等待。
                             startFragPrefetch: true,
-                            backBufferLength: 30,
-                            maxBufferLength: 60,
+                            // 控制缓冲窗口，避免长视频越播越占内存，同时保留足够的拖动余量。
+                            backBufferLength: 15,
+                            maxBufferLength: 30,
+                            maxMaxBufferLength: 60,
+                            maxBufferHole: 0.5,
                             capLevelToPlayerSize: true,
                             startLevel: -1,
+                            // 网络抖动时优先快速恢复，不让单个片段的重试拖住整个播放器。
+                            fragLoadingMaxRetry: 3,
+                            manifestLoadingMaxRetry: 3,
+                            levelLoadingMaxRetry: 3,
+                            nudgeMaxRetry: 5,
+                            highBufferWatchdogPeriod: 2,
                             debug: false
                         });
                         hls.on(HlsClass.Events.ERROR, function (event, data) {
