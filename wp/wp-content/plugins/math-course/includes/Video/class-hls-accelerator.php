@@ -108,7 +108,6 @@ class Hls_Accelerator {
         if (!$source_parts || !$site_parts) return;
         if (strtolower($source_parts['scheme'] ?? '') !== strtolower($site_parts['scheme'] ?? '') || strtolower($source_parts['host'] ?? '') !== strtolower($site_parts['host'] ?? '')) return;
 
-        $source_path = isset($source_parts['path']) ? $source_parts['path'] : '';
         $normalized = $this->normalize_file_reference($file, $source);
         if (false === $normalized || '' === $normalized) return;
 
@@ -122,10 +121,12 @@ class Hls_Accelerator {
         $relative = ltrim(substr($normalized, strlen($uploads_url_path)), '/');
         if ($relative === '' || preg_match('#(^|/)\.\.?(/|$)#', $relative)) return;
 
-        nocache_headers();
+        while (ob_get_level()) { @ob_end_clean(); }
         header('Content-Type: '.$this->content_type($type));
         header('Accept-Ranges: bytes');
         header('X-Content-Type-Options: nosniff');
+        // HLS 分片是不可变文件，允许浏览器/中间层在授权 URL 生命周期内复用。
+        header('Cache-Control: private, max-age=3600, immutable');
         $origin = home_url('/');
         $origin_parts = wp_parse_url($origin);
         if ($origin_parts && !empty($origin_parts['scheme']) && !empty($origin_parts['host'])) {
