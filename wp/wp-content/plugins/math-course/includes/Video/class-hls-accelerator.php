@@ -12,13 +12,17 @@ use MathCourse\Tutor\Adapter;
  * PHP 只负责一次授权/签名校验；真正的 .ts/.m4s 文件由 Nginx
  * X-Accel-Redirect 直接传输，避免 PHP 读取并复制整个分片。
  *
- * 默认关闭，避免服务器尚未配置 internal location 时影响现有播放。
- * 在 wp-config.php 中加入：define('MATHCOURSE_HLS_ACCEL', true);
+ * 默认关闭。在 wp-config.php 中加入：
+ * define('MATHCOURSE_HLS_ACCEL', true);
+ *
+ * 启用独立媒体目录后，再加入：
+ * define('MATHCOURSE_MEDIA_ROOT', '/www/wwwroot/fanlaoshishu-media/hls');
  */
 class Hls_Accelerator {
     private $access;
     private $adapter;
     private $token_ttl = 604800;
+    private $url_prefix = '/__mathcourse_hls/';
 
     public function __construct() {
         if (!defined('MATHCOURSE_HLS_ACCEL') || !MATHCOURSE_HLS_ACCEL) return;
@@ -83,8 +87,8 @@ class Hls_Accelerator {
     }
 
     /**
-     * 仅接管已经由 Router 生成的带 file 参数的 HLS 分片请求。
-     * m3u8 本身仍由原 Router 重写，只有静态分片走 Nginx。
+     * 仅接管 Router 生成的带 file 参数的 HLS 分片请求。
+     * m3u8 仍由 Router 读取/重写；静态分片交给 Nginx。
      */
     public function handle() {
         $lesson_id = absint(get_query_var('math_video'));
@@ -110,22 +114,14 @@ class Hls_Accelerator {
 
         $normalized = $this->normalize_file_reference($file, $source);
         if (false === $normalized || '' === $normalized) return;
-
-        // 只允许网站 uploads 下的文件进入内部别名，防止 file 参数变成任意文件路径。
-        $uploads = wp_upload_dir();
-        $uploads_url_path = wp_parse_url($uploads['baseurl'], PHP_URL_PATH);
-        $uploads_url_path = rtrim((string)$uploads_url_path, '/');
-        if ($uploads_url_path === '' || strpos($normalized, $uploads_url_path.'/') !== 0) return;
-
-        // 由 Nginx internal location /__mathcourse_hls/ 映射到 uploads 目录。
-        $relative = ltrim(substr($normalized, strlen($uploads_url_path)), '/');
+        $relative = $this->get_media_relative_path($normalized);
+        if (false === $relative) return;
         if ($relative === '' || preg_match('#(^|/)\.\.?(/|$)#', $relative)) return;
 
         while (ob_get_level()) { @ob_end_clean(); }
         header('Content-Type: '.$this->content_type($type));
         header('Accept-Ranges: bytes');
         header('X-Content-Type-Options: nosniff');
-        // HLS 分片是不可变文件，允许浏览器/中间层在授权 URL 生命周期内复用。
         header('Cache-Control: private, max-age=3600, immutable');
         $origin = home_url('/');
         $origin_parts = wp_parse_url($origin);
@@ -138,6 +134,27 @@ class Hls_Accelerator {
 
         header('X-Accel-Redirect: /__mathcourse_hls/'.$relative);
         exit;
+    }
+
+    /**
+     * 把受信任的逻辑媒体 URL 映射为媒体根目录下的相对路径。
+     * 配置 MATHCOURSE_MEDIA_ROOT 后，媒体文件脱离 WordPress uploads。
+     * 未配置时保留原 uploads 映射，兼容旧课程。
+     */
+    private function get_media_relative_path($normalized) {
+        $prefix = rtrim($this->url_prefix, '/');
+        if (strpos($normalized, $prefix.'/') === 0) {
+            $relative = ltrim(substr($normalized, strlen($prefix)), '/');
+            if (defined('MATHCOURSE_MEDIA_ROOT') && MATHCOURSE_MEDIA_ROOT) {
+                return $relative;
+            }
+        }
+
+        $uploads = wp_upload_dir();
+        $uploads_url_path = wp_parse_url($uploads['baseurl'], PHP_URL_PATH);
+        $uploads_url_path = rtrim((string)$uploads_url_path, '/');
+        if ($uploads_url_path === '' || strpos($normalized, $uploads_url_path.'/') !== 0) return false;
+        return ltrim(substr($normalized, strlen($uploads_url_path)), '/');
     }
 
     private function get_extension($file) {
