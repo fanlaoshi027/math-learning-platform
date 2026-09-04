@@ -12,7 +12,12 @@ class Course_Page {
         $adapter = new Adapter();
         $courses = $adapter->get_courses(true, -1);
         $total_lessons = 0;
-        foreach ($courses as $course) $total_lessons += $adapter->get_course_lesson_count((int)$course->ID);
+        $total_ready_videos = 0;
+        foreach ($courses as $course) {
+            $course_stats = $this->get_video_stats($adapter, (int) $course->ID);
+            $total_lessons += $course_stats['total'];
+            $total_ready_videos += $course_stats['ready'];
+        }
         $new_course_url = wp_nonce_url(
             admin_url('admin.php?page=mathcourse-courses&action=new'),
             'mathcourse_new_course'
@@ -31,7 +36,7 @@ class Course_Page {
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">全部课程</div><div class="mathcourse-stat-num"><?php echo esc_html(count($courses)); ?></div></div>
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">已发布课程</div><div class="mathcourse-stat-num"><?php echo esc_html($this->count_status($courses, 'publish')); ?></div></div>
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">全部课时</div><div class="mathcourse-stat-num"><?php echo esc_html($total_lessons); ?></div></div>
-                <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">课程结构</div><div class="mathcourse-stat-num mathcourse-stat-structure">课程 → 专题 → 课时</div></div>
+                <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">视频已就绪</div><div class="mathcourse-stat-num"><?php echo esc_html($total_ready_videos); ?><span class="mathcourse-stat-suffix"> / <?php echo esc_html($total_lessons); ?></span></div></div>
             </div>
 
             <div class="mathcourse-card mathcourse-course-list-card">
@@ -58,7 +63,10 @@ class Course_Page {
                         if (!$cover) $cover = get_post_meta($id, '_mathcourse_cover', true);
                         $type = get_post_meta($id, '_mathcourse_type', true);
                         $grade = get_post_meta($id, '_mathcourse_grade', true);
-                        $lesson_count = $adapter->get_course_lesson_count($id);
+                        $video_stats = $this->get_video_stats($adapter, $id);
+                        $lesson_count = $video_stats['total'];
+                        $ready_count = $video_stats['ready'];
+                        $ready_percent = $lesson_count > 0 ? min(100, (int) round(($ready_count / $lesson_count) * 100)) : 0;
                         $is_publish = 'publish' === $course->post_status;
                         $status_text = $is_publish ? '已发布' : ('private' === $course->post_status ? '私密' : '草稿');
                         $edit_url = admin_url('admin.php?page=mathcourse-course-edit&course_id='.$id);
@@ -83,6 +91,11 @@ class Course_Page {
                                     <span><?php echo esc_html($grade ? $grade . '年级' : '未设置年级'); ?></span>
                                     <span><?php echo esc_html('supplementary' === $type ? '教辅配套课' : '专题课程'); ?></span>
                                 </div>
+                                <div class="mathcourse-video-readiness">
+                                    <div class="mathcourse-video-readiness-head"><span>视频完成度</span><strong><?php echo esc_html($ready_count); ?> / <?php echo esc_html($lesson_count); ?></strong></div>
+                                    <div class="mathcourse-video-readiness-track"><i style="width:<?php echo esc_attr($ready_percent); ?>%"></i></div>
+                                    <small><?php echo esc_html($lesson_count ? $ready_percent . '% 已就绪' : '暂无线下课时'); ?></small>
+                                </div>
                                 <div class="mathcourse-course-footer">
                                     <div class="mathcourse-lesson-count"><strong><?php echo esc_html($lesson_count); ?></strong><span>个课时</span></div>
                                     <div class="mathcourse-course-actions">
@@ -98,6 +111,22 @@ class Course_Page {
             </div>
         </div>
         <?php
+    }
+
+    private function get_video_stats($adapter, $course_id) {
+        $total = 0;
+        $ready = 0;
+        $topics = $adapter->get_topics($course_id, true);
+        foreach ($topics as $topic) {
+            $lessons = $adapter->get_lessons($topic->ID, true);
+            foreach ($lessons as $lesson) {
+                $total++;
+                if ('ready' === get_post_meta($lesson->ID, '_mathcourse_video_status', true) && get_post_meta($lesson->ID, '_mathcourse_hls_url', true)) {
+                    $ready++;
+                }
+            }
+        }
+        return array('total' => $total, 'ready' => $ready);
     }
 
     private function count_status($courses, $status) {
