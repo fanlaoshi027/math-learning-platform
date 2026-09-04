@@ -52,81 +52,125 @@ class Progress_Page {
         $progress_service = new Progress_Service();
         $access_service   = new Access_Service();
         ?>
-        <div class="wrap">
-            <h1>学习进度</h1>
-            <p style="color:#646970;">查看学员课程完成情况。视频播放位置仍保存在学员浏览器，本页面只统计已完成课时。</p>
+        <div class="wrap mathcourse-admin-wrap mathcourse-progress-page">
+            <div class="mathcourse-admin-header">
+                <div>
+                    <div class="mathcourse-admin-eyebrow">MathCourse · 数据中心</div>
+                    <h1>学习进度</h1>
+                    <p>查看已授权学员的课程完成情况，掌握每位学员的学习进展。</p>
+                </div>
+            </div>
 
-            <form method="get" style="margin:18px 0;display:flex;gap:8px;align-items:center;">
+            <form method="get" class="mathcourse-progress-toolbar">
                 <input type="hidden" name="page" value="mathcourse-progress">
-                <input type="search" name="s" value="<?php echo esc_attr( $keyword ); ?>" placeholder="搜索学员用户名、姓名或邮箱" style="min-width:300px;">
-                <select name="course_id">
+                <div class="mathcourse-progress-search">
+                    <span class="dashicons dashicons-search" aria-hidden="true"></span>
+                    <input class="mathcourse-search-input" type="search" name="s" value="<?php echo esc_attr( $keyword ); ?>" placeholder="搜索学员用户名、姓名或邮箱">
+                </div>
+                <select name="course_id" class="mathcourse-progress-select">
                     <option value="0">全部课程</option>
                     <?php foreach ( $courses as $course ) : ?>
                         <option value="<?php echo esc_attr( $course->ID ); ?>" <?php selected( $course_id, $course->ID ); ?>><?php echo esc_html( $course->post_title ); ?></option>
                     <?php endforeach; ?>
                 </select>
-                <button class="button">筛选</button>
+                <button class="button mathcourse-primary" type="submit">筛选</button>
             </form>
 
-            <div style="background:#fff;border:1px solid #dcdcde;border-radius:12px;overflow:hidden;max-width:1180px;">
-                <table class="widefat striped" style="border:0;">
-                    <thead>
-                        <tr>
-                            <th>学员</th>
-                            <th>课程</th>
-                            <th>学习进度</th>
-                            <th>完成率</th>
-                            <th>最后完成课时</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php
-                    $rows = 0;
-                    foreach ( $users as $user ) :
-                        foreach ( $courses as $course ) :
-                            if ( $course_id && (int) $course->ID !== $course_id ) {
-                                continue;
-                            }
+            <div class="mathcourse-progress-card">
+                <div class="mathcourse-card-title">
+                    <div>
+                        <h2>学员学习情况</h2>
+                        <p>只统计已授权课程中已经完成的课时。</p>
+                    </div>
+                    <?php if ( $keyword || $course_id ) : ?>
+                        <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=mathcourse-progress' ) ); ?>">清除筛选</a>
+                    <?php endif; ?>
+                </div>
 
-                            $access = $access_service->get_access_info( $user->ID, $course->ID );
-                            if ( empty( $access['access'] ) ) {
-                                continue;
-                            }
-
-                            $progress = $progress_service->get_admin_course_progress( $course->ID, $user->ID );
-                            $rows++;
-                            $last_lesson = $progress['last_lesson_id'] ? get_post( $progress['last_lesson_id'] ) : null;
-                            ?>
+                <div class="mathcourse-progress-table-wrap">
+                    <table class="mathcourse-progress-table">
+                        <thead>
                             <tr>
-                                <td>
-                                    <strong><?php echo esc_html( $user->display_name ); ?></strong><br>
-                                    <small style="color:#646970;"><?php echo esc_html( $user->user_email ); ?></small>
-                                </td>
-                                <td><?php echo esc_html( $course->post_title ); ?></td>
-                                <td><?php echo esc_html( $progress['completed'] . ' / ' . $progress['total'] . ' 课时' ); ?></td>
-                                <td>
-                                    <div style="display:flex;align-items:center;gap:10px;min-width:150px;">
-                                        <div style="height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;flex:1;">
-                                            <div style="height:100%;width:<?php echo esc_attr( min( 100, max( 0, (int) $progress['percent'] ) ) ); ?>%;background:#2271b1;border-radius:99px;"></div>
+                                <th>学员</th>
+                                <th>课程</th>
+                                <th>学习进度</th>
+                                <th>完成率</th>
+                                <th>最后完成课时</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php
+                        $rows = 0;
+                        foreach ( $users as $user ) :
+                            foreach ( $courses as $course ) :
+                                if ( $course_id && (int) $course->ID !== $course_id ) {
+                                    continue;
+                                }
+
+                                $access = $access_service->get_access_info( $user->ID, $course->ID );
+                                if ( empty( $access['access'] ) ) {
+                                    continue;
+                                }
+
+                                $progress = $progress_service->get_admin_course_progress( $course->ID, $user->ID );
+                                $rows++;
+                                $last_lesson = $progress['last_lesson_id'] ? get_post( $progress['last_lesson_id'] ) : null;
+                                $percent     = min( 100, max( 0, (int) $progress['percent'] ) );
+                                $avatar_name = trim( (string) $user->display_name );
+                                $avatar_char = function_exists( 'mb_substr' ) ? mb_substr( $avatar_name, 0, 1 ) : substr( $avatar_name, 0, 1 );
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="mathcourse-user-cell">
+                                            <div class="mathcourse-user-avatar"><?php echo esc_html( $avatar_char ? $avatar_char : '学' ); ?></div>
+                                            <div>
+                                                <strong><?php echo esc_html( $user->display_name ); ?></strong>
+                                                <span><?php echo esc_html( $user->user_email ); ?></span>
+                                            </div>
                                         </div>
-                                        <strong><?php echo esc_html( $progress['percent'] ); ?>%</strong>
+                                    </td>
+                                    <td>
+                                        <div class="mathcourse-progress-course"><?php echo esc_html( $course->post_title ); ?></div>
+                                        <small>课程 ID <?php echo esc_html( $course->ID ); ?></small>
+                                    </td>
+                                    <td>
+                                        <strong class="mathcourse-progress-value"><?php echo esc_html( $progress['completed'] . ' / ' . $progress['total'] ); ?></strong>
+                                        <span class="mathcourse-progress-unit">课时</span>
+                                    </td>
+                                    <td>
+                                        <div class="mathcourse-progress-percent">
+                                            <div class="mathcourse-progress-track">
+                                                <div class="mathcourse-progress-fill" style="width:<?php echo esc_attr( $percent ); ?>%;"></div>
+                                            </div>
+                                            <strong><?php echo esc_html( $percent ); ?>%</strong>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="mathcourse-last-lesson"><?php echo $last_lesson ? esc_html( $last_lesson->post_title ) : '尚未完成课时'; ?></span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                        <?php if ( ! $rows ) : ?>
+                            <tr class="mathcourse-progress-empty-row">
+                                <td colspan="5">
+                                    <div class="mathcourse-progress-empty">
+                                        <span class="dashicons dashicons-chart-bar" aria-hidden="true"></span>
+                                        <strong>暂无学习记录</strong>
+                                        <span>当前筛选条件下没有找到已授权学员的学习进度。</span>
                                     </div>
                                 </td>
-                                <td><?php echo $last_lesson ? esc_html( $last_lesson->post_title ) : '尚未完成课时'; ?></td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php endforeach; ?>
-                    <?php if ( ! $rows ) : ?>
-                        <tr><td colspan="5" style="padding:30px;text-align:center;color:#646970;">暂无符合条件的学习记录。</td></tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
         <?php
     }
 
     private function notice( $message, $type = 'error' ) {
-        echo '<div class="wrap"><h1>学习进度</h1><div class="notice notice-' . esc_attr( $type ) . ' inline"><p>' . esc_html( $message ) . '</p></div></div>';
+        echo '<div class="wrap mathcourse-admin-wrap mathcourse-progress-page"><div class="mathcourse-admin-header"><div><div class="mathcourse-admin-eyebrow">MathCourse · 数据中心</div><h1>学习进度</h1></div></div><div class="notice notice-' . esc_attr( $type ) . ' inline"><p>' . esc_html( $message ) . '</p></div></div>';
     }
 }
