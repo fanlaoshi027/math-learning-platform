@@ -1,7 +1,4 @@
-/* MathCourse course sorting.
- * Sorting is controlled only by dedicated handles. Lessons have their own
- * container, so a lesson can never be moved into another topic.
- */
+/* MathCourse course sorting. */
 (function () {
   'use strict';
 
@@ -21,27 +18,19 @@
     placeholder.style.cssText = 'display:block;box-sizing:border-box;height:44px;margin:6px 0;border:2px dashed #2271b1;border-radius:8px;background:#f0f6fc;pointer-events:none;';
 
     function topicCards() {
-      return Array.prototype.slice.call(document.querySelectorAll('button[name="mathcourse_action"][value^="delete_topic_"]')).map(function (button) {
-        return button.parentElement && button.parentElement.parentElement;
-      }).filter(Boolean);
+      return Array.prototype.slice.call(document.querySelectorAll('.mathcourse-topic-card'));
     }
 
     function topicId(card) {
-      var button = card.querySelector('button[name="mathcourse_action"][value^="delete_topic_"]');
-      return button ? parseInt(button.value.replace('delete_topic_', ''), 10) || 0 : 0;
+      return parseInt(card.getAttribute('data-topic-id') || '0', 10) || 0;
     }
 
     function lessonRows(card) {
-      return Array.prototype.slice.call(card.querySelectorAll('button[name="mathcourse_action"][value^="delete_lesson_"]')).map(function (button) {
-        return button.parentElement && button.parentElement.parentElement;
-      }).filter(function (row, index, rows) {
-        return row && rows.indexOf(row) === index;
-      });
+      return Array.prototype.slice.call(card.querySelectorAll('.mathcourse-lesson-row'));
     }
 
     function lessonId(row) {
-      var button = row.querySelector('button[name="mathcourse_action"][value^="delete_lesson_"]');
-      return button ? parseInt(button.value.replace('delete_lesson_', ''), 10) || 0 : 0;
+      return parseInt(row.getAttribute('data-lesson-id') || '0', 10) || 0;
     }
 
     function lessonContainer(card) {
@@ -49,33 +38,30 @@
       return rows.length ? rows[0].parentElement : null;
     }
 
-    function makeHandle(text) {
+    function makeHandle(text, extraClass) {
       var handle = document.createElement('span');
-      handle.className = 'mathcourse-sort-handle';
+      handle.className = 'mathcourse-sort-handle ' + extraClass;
       handle.textContent = '⋮⋮';
       handle.title = text;
       handle.setAttribute('aria-label', text);
+      handle.setAttribute('draggable', 'true');
       handle.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:30px;min-width:30px;margin-right:8px;color:#8c8f94;font-size:17px;font-weight:700;line-height:1;cursor:grab;user-select:none;touch-action:none;';
       return handle;
     }
 
     function installHandles() {
       topicCards().forEach(function (card) {
-        var header = card.querySelector('button[name="mathcourse_action"][value^="delete_topic_"]');
-        if (header && header.parentElement && !header.parentElement.querySelector('.mathcourse-topic-sort-handle')) {
-          var topicHandle = makeHandle('拖动调整专题顺序');
-          topicHandle.className += ' mathcourse-topic-sort-handle';
-          header.parentElement.insertBefore(topicHandle, header.parentElement.firstChild);
+        var header = card.querySelector('.mathcourse-topic-header');
+        if (header && !header.querySelector('.mathcourse-topic-sort-handle')) {
+          var topicHandle = makeHandle('拖动调整专题顺序', 'mathcourse-topic-sort-handle');
+          header.insertBefore(topicHandle, header.firstChild);
           bind(topicHandle, card, 'topic');
         }
 
         var rows = lessonRows(card);
-        var container = lessonContainer(card);
-        if (!container) return;
         rows.forEach(function (row) {
           if (row.querySelector('.mathcourse-lesson-sort-handle')) return;
-          var handle = makeHandle('拖动调整课时顺序');
-          handle.className += ' mathcourse-lesson-sort-handle';
+          var handle = makeHandle('拖动调整课时顺序', 'mathcourse-lesson-sort-handle');
           row.insertBefore(handle, row.firstChild);
           bind(handle, row, 'lesson');
         });
@@ -87,10 +73,8 @@
         if (event.button !== undefined && event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
-
         var container = item.parentElement;
         if (!container) return;
-
         active = { el: item, type: type, container: container, pointerId: event.pointerId };
         placeholder.style.height = Math.max(44, Math.round(item.getBoundingClientRect().height)) + 'px';
         container.insertBefore(placeholder, item);
@@ -102,23 +86,35 @@
 
       handle.addEventListener('pointermove', function (event) {
         if (!active || active.pointerId !== event.pointerId) return;
-        event.preventDefault();
-        var container = active.container;
-        var selector = active.type === 'lesson' ? '.mathcourse-lesson-sort-handle' : '.mathcourse-topic-sort-handle';
-        var rows = Array.prototype.slice.call(container.children).filter(function (child) {
-          return child !== active.el && child !== placeholder && child.querySelector && child.querySelector(selector);
-        });
-        var before = null;
-        for (var i = 0; i < rows.length; i++) {
-          var rect = rows[i].getBoundingClientRect();
-          if (event.clientY < rect.top + rect.height / 2) { before = rows[i]; break; }
-        }
-        if (before) container.insertBefore(placeholder, before);
-        else container.appendChild(placeholder);
+        movePlaceholder(event.clientY);
       });
-
       handle.addEventListener('pointerup', finish);
       handle.addEventListener('pointercancel', finish);
+    }
+
+    document.addEventListener('pointermove', function (event) {
+      if (!active || active.pointerId !== event.pointerId) return;
+      movePlaceholder(event.clientY);
+    }, { passive: false });
+
+    document.addEventListener('pointerup', function (event) {
+      if (active && active.pointerId === event.pointerId) finish(event);
+    });
+
+    function movePlaceholder(clientY) {
+      if (!active) return;
+      var container = active.container;
+      var selector = active.type === 'lesson' ? '.mathcourse-lesson-row' : '.mathcourse-topic-card';
+      var items = Array.prototype.slice.call(container.children).filter(function (child) {
+        return child !== active.el && child !== placeholder && child.matches && child.matches(selector);
+      });
+      var before = null;
+      for (var i = 0; i < items.length; i++) {
+        var rect = items[i].getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) { before = items[i]; break; }
+      }
+      if (before) container.insertBefore(placeholder, before);
+      else container.appendChild(placeholder);
     }
 
     function finish(event) {
