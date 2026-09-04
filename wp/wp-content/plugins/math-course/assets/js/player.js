@@ -180,7 +180,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     function attachHls(HlsClass) {
                         if (!HlsClass || !HlsClass.isSupported()) return false;
                         if (hls) hls.destroy();
-                        hls = new HlsClass({ enableWorker: false, lowLatencyMode: false, backBufferLength: 90, maxBufferLength: 30, capLevelToPlayerSize: true, startLevel: -1, debug: false });
+                        hls = new HlsClass({
+                            enableWorker: true,
+                            lowLatencyMode: false,
+                            startFragPrefetch: true,
+                            backBufferLength: 30,
+                            maxBufferLength: 60,
+                            capLevelToPlayerSize: true,
+                            startLevel: -1,
+                            debug: false
+                        });
                         hls.on(HlsClass.Events.ERROR, function (event, data) {
                             if (!data || !data.fatal) return;
                             if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) hls.startLoad();
