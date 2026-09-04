@@ -72,7 +72,13 @@ class Course_Actions {
 
 			$course = $adapter->get_course( $course_id );
 			if ( $course && current_user_can( 'delete_post', $course_id ) ) {
+				// 冻结课程后不再继续执行尚未完成的 MP4 → HLS 转换任务。
+				foreach ( $adapter->get_course_lessons( $course_id, true ) as $lesson ) {
+					wp_clear_scheduled_hook( 'mathcourse_convert_video', array( (int) $lesson->ID ) );
+				}
 				wp_trash_post( $course_id );
+				wp_safe_redirect( admin_url( 'admin.php?page=mathcourse-courses' ) );
+				exit;
 			}
 		}
 	}
