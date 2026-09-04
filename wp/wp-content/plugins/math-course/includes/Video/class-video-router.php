@@ -138,7 +138,7 @@ class Video_Router {
         }
     }
     private function serve_playlist($lesson_id, $expires, $source) {
-        $response = wp_remote_get($source, array('timeout' => 15, 'redirection' => 3, 'sslverify' => true));
+        $response = wp_remote_get($source, array('timeout' => 10, 'redirection' => 1, 'sslverify' => true));
         if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) { status_header(502); exit('视频源暂时无法访问。'); }
         $body = wp_remote_retrieve_body($response);
         $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $source);
@@ -161,7 +161,7 @@ class Video_Router {
         if (!$file) { status_header(403); exit('视频片段地址无效。'); }
         $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
         if ($ext === 'm3u8') {
-            $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true));
+            $response = wp_remote_get($file, array('timeout' => 10, 'redirection' => 1, 'sslverify' => true));
             if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
             $code = (int) wp_remote_retrieve_response_code($response);
             if ($code !== 200 && $code !== 206) { status_header(502); exit('视频片段暂时无法访问。'); }
@@ -176,7 +176,7 @@ class Video_Router {
     }
     private function stream_media($file, $type) {
         if (!function_exists('curl_init')) {
-            $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 3, 'sslverify' => true, 'stream' => true));
+            $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 1, 'sslverify' => true, 'stream' => true));
             if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
             $code = (int) wp_remote_retrieve_response_code($response);
             if ($code !== 200 && $code !== 206) { status_header(502); exit('视频片段暂时无法访问。'); }
@@ -195,10 +195,9 @@ class Video_Router {
         $status = 0;
         $sent_status = false;
         $header_map = array('content-length' => 'Content-Length', 'content-range' => 'Content-Range', 'last-modified' => 'Last-Modified', 'etag' => 'ETag');
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         curl_setopt($ch, CURLOPT_TIMEOUT, 0);
         curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$status, &$sent_status, $header_map) {
             $trim = trim($header);
