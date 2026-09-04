@@ -139,7 +139,7 @@ class Course_Editor {
 				<div><label for="lesson_title_edit"><strong>课时名称</strong></label><input id="lesson_title_edit" name="lesson_title_edit" type="text" class="large-text" value="<?php echo esc_attr( $lesson->post_title ); ?>"></div>
 				<div><label for="lesson_description_edit"><strong>课时简介</strong></label><textarea id="lesson_description_edit" name="lesson_description_edit" rows="4" class="large-text"><?php echo esc_textarea( $lesson->post_content ); ?></textarea></div>
 				<div class="mathcourse-lesson-inline"><label class="mathcourse-check"><input type="checkbox" name="lesson_preview_edit" value="yes" <?php checked( $preview, 'yes' ); ?>> <strong>允许试看</strong></label><label><strong>状态</strong><select id="lesson_status_edit" name="lesson_status_edit"><option value="draft" <?php selected( $status, 'draft' ); ?>>草稿</option><option value="publish" <?php selected( $status, 'publish' ); ?>>已发布</option><option value="private" <?php selected( $status, 'private' ); ?>>私密 / 已冻结</option></select></label></div>
-				<div class="mathcourse-media-settings"><div class="mathcourse-subheading"><strong>教材与视频</strong><span>播放资源设置</span></div><div class="mathcourse-media-grid"><div><label for="lesson_page_edit"><strong>教材页码</strong></label><input id="lesson_page_edit" name="lesson_page_edit" type="text" value="<?php echo esc_attr( $page ); ?>" placeholder="例如：P9"></div><div><label for="lesson_video_edit"><strong>视频资源标识</strong></label><input id="lesson_video_edit" name="lesson_video_edit" type="text" value="<?php echo esc_attr( $video ); ?>" placeholder="视频 ID 或资源标识"></div></div><div><label for="lesson_hls_edit"><strong>HLS 流媒体地址</strong></label><input id="lesson_hls_edit" name="lesson_hls_edit" type="url" inputmode="url" autocomplete="off" value="<?php echo esc_attr( $hls ); ?>" placeholder="https://.../index.m3u8"><small>仅服务器端保存；前台使用受保护的短时地址。留空表示保持原地址。</small></div></div>
+				<div class="mathcourse-media-settings"><div class="mathcourse-subheading"><strong>教材与视频</strong><span>播放资源设置</span></div><div class="mathcourse-media-grid"><div><label for="lesson_page_edit"><strong>教材页码</strong></label><input id="lesson_page_edit" name="lesson_page_edit" type="text" value="<?php echo esc_attr( $page ); ?>" placeholder="例如：P9"></div><div><label for="lesson_video_edit"><strong>视频资源标识</strong></label><input id="lesson_video_edit" name="lesson_video_edit" type="text" value="<?php echo esc_attr( $video ); ?>" placeholder="视频 ID 或资源标识"></div></div><div><label for="lesson_hls_edit"><strong>HLS 流媒体地址</strong></label><input id="lesson_hls_edit" name="lesson_hls_edit" type="url" inputmode="url" autocomplete="off" value="<?php echo esc_attr( $hls ); ?>" placeholder="https://.../index.m3u8"><small>仅服务器端保存；前台使用受保护的短时地址。留空将删除现有 HLS 地址。</small></div></div>
 			</div>
 			<div class="mathcourse-lesson-savebar"><button type="submit" name="mathcourse_action" value="save_lesson" class="button button-primary button-large">保存课时</button><span>保存后仍停留在当前课程编辑页。</span></div>
 		</div>
@@ -192,12 +192,26 @@ class Course_Editor {
 			$status = isset( $_POST['lesson_status_edit'] ) ? sanitize_key( wp_unslash( $_POST['lesson_status_edit'] ) ) : 'draft';
 			$page = isset( $_POST['lesson_page_edit'] ) ? sanitize_text_field( wp_unslash( $_POST['lesson_page_edit'] ) ) : '';
 			$video = isset( $_POST['lesson_video_edit'] ) ? sanitize_text_field( wp_unslash( $_POST['lesson_video_edit'] ) ) : '';
+			$hls = isset( $_POST['lesson_hls_edit'] ) ? esc_url_raw( wp_unslash( $_POST['lesson_hls_edit'] ) ) : '';
 			if ( ! in_array( $status, array( 'draft', 'publish', 'private' ), true ) ) { $status = 'draft'; }
 			wp_update_post( array( 'ID' => $lesson_id, 'post_title' => $title, 'post_content' => $description, 'post_status' => $status ) );
 			update_post_meta( $lesson_id, '_mathcourse_preview', $preview );
 			update_post_meta( $lesson_id, '_mathcourse_page_number', $page );
 			update_post_meta( $lesson_id, '_mathcourse_video_id', $video );
-			if ( isset( $_POST['lesson_hls_edit'] ) && '' !== trim( (string) wp_unslash( $_POST['lesson_hls_edit'] ) ) ) { update_post_meta( $lesson_id, '_mathcourse_hls_url', esc_url_raw( wp_unslash( $_POST['lesson_hls_edit'] ) ) ); }
+			if ( '' !== $hls ) {
+				update_post_meta( $lesson_id, '_mathcourse_hls_url', $hls );
+				$video_status = get_post_meta( $lesson_id, '_mathcourse_video_status', true );
+				if ( ! in_array( $video_status, array( 'pending', 'processing' ), true ) ) {
+					update_post_meta( $lesson_id, '_mathcourse_video_status', 'ready' );
+					delete_post_meta( $lesson_id, '_mathcourse_video_error' );
+				}
+			} else {
+				delete_post_meta( $lesson_id, '_mathcourse_hls_url' );
+				$video_status = get_post_meta( $lesson_id, '_mathcourse_video_status', true );
+				if ( 'ready' === $video_status ) {
+					update_post_meta( $lesson_id, '_mathcourse_video_status', 'none' );
+				}
+			}
 			$message = '课时已保存。';
 		} elseif ( 0 === strpos( $action, 'freeze_topic_' ) ) {
 			$topic_id = absint( substr( $action, 13 ) );
