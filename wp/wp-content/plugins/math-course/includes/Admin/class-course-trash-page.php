@@ -116,7 +116,7 @@ class Course_Trash_Page {
                                         <input type="hidden" name="mathcourse_trash_nonce" value="<?php echo esc_attr($delete_nonce); ?>">
                                         <button type="submit" class="button">恢复课程</button>
                                     </form>
-                                    <form method="post" class="mathcourse-trash-delete-form">
+                                    <form method="post" class="mathcourse-trash-delete-form" onsubmit="return confirm('彻底删除后将无法恢复，并会删除课程、专题、课时、授权、进度、激活码以及该课程的视频文件。确定继续吗？');">
                                         <input type="hidden" name="mathcourse_trash_action" value="delete_permanently">
                                         <input type="hidden" name="course_id" value="<?php echo esc_attr($id); ?>">
                                         <input type="hidden" name="mathcourse_trash_nonce" value="<?php echo esc_attr($delete_nonce); ?>">
@@ -155,7 +155,7 @@ class Course_Trash_Page {
             }
         }
 
-        // 停止冻结课程仍在等待执行的转换任务，并删除其本地媒体目录。
+        // 停止冻结课程仍在等待执行的转换任务，并删除其本地媒体目录/待转换 MP4。
         foreach ( $lesson_ids as $lesson_id ) {
             wp_clear_scheduled_hook('mathcourse_convert_video', array($lesson_id));
         }
@@ -208,8 +208,9 @@ class Course_Trash_Page {
         foreach ( $users as $user ) {
             $completed = get_user_meta($user->ID, 'mc_completed_lessons', true);
             if ( ! is_array($completed) ) continue;
-            $filtered = array_values(array_diff(array_map('intval', $completed), $lesson_ids));
-            if ( $filtered !== array_map('intval', $completed) ) {
+            $original = array_values(array_unique(array_map('intval', $completed)));
+            $filtered = array_values(array_diff($original, $lesson_ids));
+            if ( $filtered !== $original ) {
                 update_user_meta($user->ID, 'mc_completed_lessons', $filtered);
             }
         }
@@ -222,21 +223,37 @@ class Course_Trash_Page {
     }
 
     private function remove_course_media($course_id) {
+        $course_id = absint($course_id);
         $roots = array();
+        $upload_roots = array();
+
         if ( defined('MATHCOURSE_MEDIA_ROOT') && MATHCOURSE_MEDIA_ROOT ) {
             $roots[] = untrailingslashit(MATHCOURSE_MEDIA_ROOT);
+            $upload_roots[] = dirname(untrailingslashit(MATHCOURSE_MEDIA_ROOT)) . '/uploads';
         }
         if ( defined('MATHCOURSE_VIDEO_UPLOAD_ROOT') && MATHCOURSE_VIDEO_UPLOAD_ROOT ) {
-            $roots[] = untrailingslashit(MATHCOURSE_VIDEO_UPLOAD_ROOT);
-        } elseif ( ! empty($roots) ) {
-            $roots[] = dirname($roots[0]) . '/uploads';
+            $upload_roots[] = untrailingslashit(MATHCOURSE_VIDEO_UPLOAD_ROOT);
         }
+        $roots = array_unique($roots);
+        $upload_roots = array_unique($upload_roots);
 
-        foreach ( array_unique($roots) as $root ) {
+        foreach ( $roots as $root ) {
             $root = untrailingslashit($root);
             if ( ! $root || ! is_dir($root) ) continue;
-            $course_dir = $root . '/course-' . absint($course_id);
+            $course_dir = $root . '/course-' . $course_id;
             $this->remove_dir($course_dir, $root);
+        }
+
+        // 转换成功后原 MP4 会自动删除；如果课程在转换前被冻结，这里清理遗留源文件。
+        foreach ( $upload_roots as $upload_root ) {
+            $upload_root = untrailingslashit($upload_root);
+            if ( ! $upload_root || ! is_dir($upload_root) ) continue;
+            $files = glob($upload_root . '/course-' . $course_id . '-lesson-*.mp4');
+            if ( is_array($files) ) {
+                foreach ( $files as $file ) {
+                    if ( is_file($file) || is_link($file) ) @unlink($file);
+                }
+            }
         }
     }
 
