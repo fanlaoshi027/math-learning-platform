@@ -26,6 +26,7 @@ $mathcourse_files=array(
  'includes/Admin/class-settings.php',
  'includes/Admin/class-course-actions.php',
  'includes/Admin/class-course-page.php',
+ 'includes/Admin/class-course-trash-page.php',
  'includes/Admin/class-course-editor.php',
  'includes/Admin/class-course-sort.php',
  'includes/Admin/class-batch-manager-v2.php',
