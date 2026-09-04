@@ -10,7 +10,7 @@ class Course_Page {
     public function render() {
         if (!current_user_can('manage_options')) return;
         $adapter = new Adapter();
-        $courses = $adapter->get_courses(true, 50);
+        $courses = $adapter->get_courses(true, -1);
         $total_lessons = 0;
         foreach ($courses as $course) $total_lessons += $adapter->get_course_lesson_count((int)$course->ID);
         $new_course_url = wp_nonce_url(
@@ -63,13 +63,14 @@ class Course_Page {
                         $status_text = $is_publish ? '已发布' : ('private' === $course->post_status ? '私密' : '草稿');
                         $edit_url = admin_url('admin.php?page=mathcourse-course-edit&course_id='.$id);
                         $batch_url = admin_url('admin.php?page=mathcourse-batch&course_id='.$id);
+                        $title_mark = function_exists('mb_substr') ? mb_substr($course->post_title, 0, 2) : substr($course->post_title, 0, 2);
                     ?>
                         <article class="mathcourse-course-item">
                             <a class="mathcourse-course-cover" href="<?php echo esc_url($edit_url); ?>" aria-label="编辑 <?php echo esc_attr($course->post_title); ?>">
                                 <?php if ($cover): ?>
                                     <img src="<?php echo esc_url($cover); ?>" alt="">
                                 <?php else: ?>
-                                    <span class="mathcourse-cover-fallback"><b><?php echo esc_html(mb_substr($course->post_title, 0, 2)); ?></b><small>数学课程</small></span>
+                                    <span class="mathcourse-cover-fallback"><b><?php echo esc_html($title_mark); ?></b><small>数学课程</small></span>
                                 <?php endif; ?>
                                 <span class="mathcourse-course-status <?php echo $is_publish ? 'is-published' : ('private' === $course->post_status ? 'is-private' : 'is-draft'); ?>"><?php echo esc_html($status_text); ?></span>
                             </a>
