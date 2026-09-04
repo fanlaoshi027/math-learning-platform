@@ -19,6 +19,9 @@ class Menu {
         if (isset($_GET['page']) && 'mathcourse' === sanitize_key(wp_unslash($_GET['page']))) {
             wp_enqueue_style('mathcourse-admin-dashboard', MATHCOURSE_URL . 'assets/admin-dashboard.css', array('mathcourse-admin-ui'), MATHCOURSE_VERSION);
         }
+        if (isset($_GET['page']) && 'mathcourse-course-edit' === sanitize_key(wp_unslash($_GET['page']))) {
+            wp_enqueue_style('mathcourse-admin-course-editor', MATHCOURSE_URL . 'assets/admin-course-editor.css', array('mathcourse-admin-ui'), MATHCOURSE_VERSION);
+        }
     }
 
     public function register_menu() {
