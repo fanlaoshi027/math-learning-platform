@@ -50,6 +50,8 @@ class Hls_Converter {
             'ffmpeg_executable' => is_executable( $ffmpeg ),
             'ffprobe' => $ffprobe,
             'ffprobe_executable' => is_executable( $ffprobe ),
+            'exec_available' => function_exists( 'exec' ),
+            'shell_exec_available' => function_exists( 'shell_exec' ),
         ) );
     }
 
@@ -159,6 +161,7 @@ class Hls_Converter {
         $pattern = trailingslashit( $hls_dir ) . 'segment-%05d.ts';
         $ffmpeg = defined( 'MATHCOURSE_FFMPEG_PATH' ) ? MATHCOURSE_FFMPEG_PATH : '/usr/bin/ffmpeg';
         if ( ! is_executable( $ffmpeg ) ) { $this->fail( $lesson_id, '找不到可执行的 FFmpeg：' . $ffmpeg ); return; }
+        if ( ! function_exists( 'exec' ) ) { $this->fail( $lesson_id, 'PHP 禁用了 exec()，无法调用 FFmpeg 进行 HLS 转换。请在宝塔 PHP 禁用函数中移除 exec。' ); return; }
 
         $cmd = escapeshellarg( $ffmpeg ) . ' -hide_banner -loglevel error -y -i ' . escapeshellarg( $source ) . ' -map 0:v:0 -map 0:a? -c copy -start_number 0 -hls_time 8 -hls_list_size 0 -hls_segment_type mpegts -hls_segment_filename ' . escapeshellarg( $pattern ) . ' -f hls ' . escapeshellarg( $playlist ) . ' 2>&1';
         $output = array(); $exit = 0;
@@ -183,11 +186,16 @@ class Hls_Converter {
     }
 
     private function fail( $lesson_id, $message ) { update_post_meta( $lesson_id, self::META_STATUS, 'failed' ); update_post_meta( $lesson_id, self::META_ERROR, sanitize_textarea_field( (string) $message ) ); }
+
     private function probe( $source ) {
         $ffprobe = defined( 'MATHCOURSE_FFPROBE_PATH' ) ? MATHCOURSE_FFPROBE_PATH : '/usr/bin/ffprobe';
         if ( ! is_executable( $ffprobe ) ) return new \WP_Error( 'ffprobe_missing', '找不到 ffprobe：' . $ffprobe );
+        if ( ! function_exists( 'exec' ) ) return new \WP_Error( 'exec_missing', 'PHP 禁用了 exec()，无法调用 ffprobe 读取 MP4 信息。请在宝塔 PHP 禁用函数中移除 exec。' );
         $cmd = escapeshellarg( $ffprobe ) . ' -v error -show_entries format=duration:stream=index,codec_type,codec_name,width,height,r_frame_rate -of json ' . escapeshellarg( $source );
-        $data = json_decode( (string) @shell_exec( $cmd ), true );
+        $output = array(); $exit = 0;
+        exec( $cmd, $output, $exit );
+        if ( 0 !== $exit ) return new \WP_Error( 'ffprobe_failed', 'ffprobe 无法读取 MP4 视频信息：' . trim( implode( "\n", array_slice( $output, -5 ) ) ) );
+        $data = json_decode( implode( "\n", $output ), true );
         if ( empty( $data ) || empty( $data['streams'] ) ) return new \WP_Error( 'ffprobe_failed', '无法读取 MP4 视频信息。' );
         $info = array( 'duration' => isset( $data['format']['duration'] ) ? round( (float) $data['format']['duration'], 2 ) : 0, 'video_codec' => '', 'audio_codec' => '', 'width' => 0, 'height' => 0, 'fps' => '' );
         foreach ( $data['streams'] as $stream ) {
