@@ -32,6 +32,7 @@ function mc_theme_assets() {
 	$learning_polish_path=get_stylesheet_directory().'/assets/css/learning-ui-polish.css';
 	$learning_center_v2_path=get_stylesheet_directory().'/assets/css/learning-center-ui-v2.css';
 	$home_path=get_stylesheet_directory().'/assets/css/home-ui-v2.css';
+	$home_refine_path=get_stylesheet_directory().'/assets/css/home-reference-refine.css';
 	$reference_override_path=get_stylesheet_directory().'/assets/css/ui-reference-override.css';
 	$final_ui_path=get_stylesheet_directory().'/assets/css/final-ui-pass.css';
 	$header_polish_path=get_stylesheet_directory().'/assets/css/header-ui-polish.css';
@@ -48,6 +49,7 @@ function mc_theme_assets() {
 	$learning_polish_version=file_exists($learning_polish_path)?(string)filemtime($learning_polish_path):'1.0.0';
 	$learning_center_v2_version=file_exists($learning_center_v2_path)?(string)filemtime($learning_center_v2_path):'1.0.0';
 	$home_version=file_exists($home_path)?(string)filemtime($home_path):'1.0.0';
+	$home_refine_version=file_exists($home_refine_path)?(string)filemtime($home_refine_path):'1.0.0';
 	$reference_override_version=file_exists($reference_override_path)?(string)filemtime($reference_override_path):'1.0.0';
 	$final_ui_version=file_exists($final_ui_path)?(string)filemtime($final_ui_path):'1.0.0';
 	$header_polish_version=file_exists($header_polish_path)?(string)filemtime($header_polish_path):'1.0.0';
@@ -66,6 +68,7 @@ function mc_theme_assets() {
 	wp_enqueue_style('mc-header-ui-polish',get_stylesheet_directory_uri().'/assets/css/header-ui-polish.css',array('mc-theme-style'),$header_polish_version);
 	if(is_front_page()){
 		wp_enqueue_style('mc-home-ui-v2',get_stylesheet_directory_uri().'/assets/css/home-ui-v2.css',array('mc-course-ui-polish'),$home_version);
+		wp_enqueue_style('mc-home-reference-refine',get_stylesheet_directory_uri().'/assets/css/home-reference-refine.css',array('mc-home-ui-v2'),$home_refine_version);
 	}
 	if(is_page('learning-center')){
 		wp_enqueue_style('mc-learning-center-ui-v2',get_stylesheet_directory_uri().'/assets/css/learning-center-ui-v2.css',array('mc-course-cover'),$learning_center_v2_version);
