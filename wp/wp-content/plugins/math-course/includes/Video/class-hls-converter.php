@@ -54,6 +54,7 @@ class Hls_Converter {
     }
 
     public function ajax_upload() {
+        $this->register_upload_fatal_handler();
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( array( 'message' => '没有上传权限。' ), 403 );
         check_ajax_referer( 'mathcourse_video_upload', 'nonce' );
         $lesson_id = isset( $_POST['lesson_id'] ) ? absint( $_POST['lesson_id'] ) : 0;
@@ -102,6 +103,28 @@ class Hls_Converter {
         if ( function_exists( 'spawn_cron' ) ) spawn_cron( time() );
 
         wp_send_json_success( array( 'status' => 'pending', 'message' => 'MP4 已上传，服务器开始准备 HLS 转换。', 'info' => $info ) );
+    }
+
+    private function register_upload_fatal_handler() {
+        static $registered = false;
+        if ( $registered ) return;
+        $registered = true;
+        register_shutdown_function( function () {
+            $error = error_get_last();
+            if ( ! is_array( $error ) ) return;
+            $fatal_types = array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR );
+            if ( ! in_array( $error['type'], $fatal_types, true ) ) return;
+            while ( ob_get_level() ) @ob_end_clean();
+            status_header( 500 );
+            nocache_headers();
+            header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
+            echo wp_json_encode( array(
+                'success' => false,
+                'data' => array(
+                    'message' => 'PHP 在处理视频上传时发生致命错误：' . sanitize_text_field( $error['message'] ) . '（文件：' . wp_basename( $error['file'] ) . '，第 ' . absint( $error['line'] ) . ' 行）',
+                ),
+            ) );
+        } );
     }
 
     public function ajax_status() {
@@ -173,7 +196,8 @@ class Hls_Converter {
         }
         return $info;
     }
+
     private function get_upload_root() { if ( defined( 'MATHCOURSE_VIDEO_UPLOAD_ROOT' ) && MATHCOURSE_VIDEO_UPLOAD_ROOT ) return untrailingslashit( MATHCOURSE_VIDEO_UPLOAD_ROOT ); if ( defined( 'MATHCOURSE_MEDIA_ROOT' ) && MATHCOURSE_MEDIA_ROOT ) return dirname( untrailingslashit( MATHCOURSE_MEDIA_ROOT ) ) . '/uploads'; return WP_CONTENT_DIR . '/uploads/mathcourse-video-source'; }
-    private function get_hls_dir( $course_id, $lesson_id ) { $root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls'; return $root . '/course-' . absint( $course_id ) . '/lesson-' . absint( $lesson_id ); }
-    private function remove_dir( $dir ) { if ( ! is_dir( $dir ) ) return; $items = scandir( $dir ); if ( ! is_array( $items ) ) return; foreach ( $items as $item ) { if ( '.' === $item || '..' === $item ) continue; $path = $dir . '/' . $item; if ( is_dir( $path ) ) $this->remove_dir( $path ); else @unlink( $path ); } @rmdir( $dir ); }
+    private function get_hls_dir( $course_id, $lesson_id ) { $root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls'; return trailingslashit( $root ) . 'course-' . absint( $course_id ) . '/lesson-' . absint( $lesson_id ); }
+    private function remove_dir( $dir ) { if ( ! is_dir( $dir ) ) return; $items = scandir( $dir ); if ( is_array( $items ) ) foreach ( $items as $item ) { if ( '.' === $item || '..' === $item ) continue; $path = trailingslashit( $dir ) . $item; if ( is_dir( $path ) ) $this->remove_dir( $path ); else @unlink( $path ); } @rmdir( $dir ); }
 }
