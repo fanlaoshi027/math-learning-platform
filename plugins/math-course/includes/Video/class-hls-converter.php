@@ -8,7 +8,7 @@ use MathCourse\Tutor\Adapter;
 /**
  * 后台 MP4 → HLS 转换器。
  * 上传 MP4 后保存到临时源目录，FFmpeg 无重新编码切成 HLS，
- * HLS 按「课程 slug / p页码」写入独立媒体目录，与播放器的媒体路由保持一致。
+ * HLS 按「课程全拼 / lesson-ID」写入独立媒体目录，与播放器的媒体路由保持一致。
  */
 class Hls_Converter {
     const META_STATUS = '_mathcourse_video_status';
@@ -154,7 +154,7 @@ class Hls_Converter {
         if ( ! $has_segment ) { $this->fail( $lesson_id, 'HLS 播放列表已生成，但没有找到有效视频分片。' ); return; }
 
         $relative = $this->get_hls_relative_path( $course_id, $lesson_id );
-        if ( ! $relative ) { $this->fail( $lesson_id, '无法确定课程的视频目录。请检查课程名称/课时页码。' ); return; }
+        if ( ! $relative ) { $this->fail( $lesson_id, '无法确定课程的视频目录。请检查课程名称/课时信息。' ); return; }
         update_post_meta( $lesson_id, self::META_HLS, '/__mathcourse_hls/' . $relative . '/index.m3u8' );
         update_post_meta( $lesson_id, self::META_STATUS, 'ready' );
         delete_post_meta( $lesson_id, self::META_ERROR );
@@ -165,23 +165,16 @@ class Hls_Converter {
     private function fail( $lesson_id, $message ) { update_post_meta( $lesson_id, self::META_STATUS, 'failed' ); update_post_meta( $lesson_id, self::META_ERROR, sanitize_textarea_field( (string) $message ) ); }
 
     /**
-     * HLS 目录必须与 Local_Hls_Source / Hls_Accelerator 使用的逻辑 URL 一致：
-     *   {媒体根目录}/{课程 slug}/p{教材页码}/index.m3u8
-     * 例如：/fanlaoshishu-media/hls/8shang-dapeiyou-2026/p1/index.m3u8
+     * HLS 目录固定为：
+     *   {媒体根目录}/{课程全拼}/lesson-{课时ID}/index.m3u8
+     * 例如：/www/wwwroot/fanlaoshishu-media/hls/8shang-dapeiyou-2026/lesson-338/index.m3u8
      */
     private function get_hls_relative_path( $course_id, $lesson_id ) {
         $course = $this->adapter->get_course( $course_id );
         if ( ! $course ) return '';
         $slug = sanitize_title( $course->post_name ? $course->post_name : $course->post_title );
         if ( '' === $slug ) $slug = 'course-' . absint( $course_id );
-        $page = $this->adapter->get_lesson_page_number( $lesson_id );
-        $page = trim( (string) $page );
-        if ( '' !== $page ) {
-            $page = preg_replace( '/[^A-Za-z0-9_-]+/', '-', $page );
-            $page = trim( (string) $page, '-' );
-        }
-        $page = '' !== $page ? 'p' . $page : 'lesson-' . absint( $lesson_id );
-        return trim( $slug . '/' . $page, '/' );
+        return trim( $slug . '/lesson-' . absint( $lesson_id ), '/' );
     }
 
     private function probe( $source ) {
