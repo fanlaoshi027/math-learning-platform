@@ -13,6 +13,7 @@
     var saveButton = null;
     var noticeBox = null;
     var active = null;
+    var savePending = false;
     var placeholder = document.createElement('div');
     placeholder.className = 'mathcourse-sort-placeholder';
     placeholder.style.cssText = 'display:block;box-sizing:border-box;height:44px;margin:6px 0;border:2px dashed #2271b1;border-radius:8px;background:#f0f6fc;pointer-events:none;';
@@ -31,11 +32,6 @@
 
     function lessonId(row) {
       return parseInt(row.getAttribute('data-lesson-id') || '0', 10) || 0;
-    }
-
-    function lessonContainer(card) {
-      var rows = lessonRows(card);
-      return rows.length ? rows[0].parentElement : null;
     }
 
     function makeHandle(text, extraClass) {
@@ -58,8 +54,7 @@
           bind(topicHandle, card, 'topic');
         }
 
-        var rows = lessonRows(card);
-        rows.forEach(function (row) {
+        lessonRows(card).forEach(function (row) {
           if (row.querySelector('.mathcourse-lesson-sort-handle')) return;
           var handle = makeHandle('拖动调整课时顺序', 'mathcourse-lesson-sort-handle');
           row.insertBefore(handle, row.firstChild);
@@ -75,7 +70,13 @@
         event.stopPropagation();
         var container = item.parentElement;
         if (!container) return;
-        active = { el: item, type: type, container: container, pointerId: event.pointerId };
+        active = {
+          el: item,
+          type: type,
+          container: container,
+          pointerId: event.pointerId,
+          originalNext: item.nextElementSibling
+        };
         placeholder.style.height = Math.max(44, Math.round(item.getBoundingClientRect().height)) + 'px';
         container.insertBefore(placeholder, item);
         item.style.opacity = '0.45';
@@ -94,6 +95,7 @@
 
     document.addEventListener('pointermove', function (event) {
       if (!active || active.pointerId !== event.pointerId) return;
+      event.preventDefault();
       movePlaceholder(event.clientY);
     }, { passive: false });
 
@@ -111,7 +113,10 @@
       var before = null;
       for (var i = 0; i < items.length; i++) {
         var rect = items[i].getBoundingClientRect();
-        if (clientY < rect.top + rect.height / 2) { before = items[i]; break; }
+        if (clientY < rect.top + rect.height / 2) {
+          before = items[i];
+          break;
+        }
       }
       if (before) container.insertBefore(placeholder, before);
       else container.appendChild(placeholder);
@@ -121,12 +126,26 @@
       if (!active || active.pointerId !== event.pointerId) return;
       event.preventDefault();
       event.stopPropagation();
+
+      var changed = placeholder.parentNode === active.container && placeholder.nextElementSibling !== active.el;
       if (placeholder.parentNode === active.container) active.container.insertBefore(active.el, placeholder);
       active.el.style.opacity = '';
       active.el.style.boxShadow = '';
       if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
       document.body.classList.remove('mathcourse-sorting');
       active = null;
+
+      if (changed) {
+        markDirty();
+        saveOrder();
+      }
+    }
+
+    function markDirty() {
+      if (saveButton) {
+        saveButton.classList.add('button-primary');
+        saveButton.textContent = '保存排序';
+      }
     }
 
     function showNotice(text, error) {
@@ -158,6 +177,8 @@
     }
 
     function saveOrder() {
+      if (savePending) return;
+
       var cards = topicCards();
       var topicOrder = [];
       var lessonOrder = {};
@@ -167,28 +188,69 @@
         topicOrder.push(tid);
         lessonOrder[tid] = lessonRows(card).map(lessonId).filter(Boolean);
       });
-      if (!topicOrder.length) { showNotice('没有检测到可保存的课程结构。', true); return; }
+
+      if (!topicOrder.length) {
+        showNotice('没有检测到可保存的课程结构。', true);
+        return;
+      }
 
       var params = new URLSearchParams(window.location.search);
+      var courseId = parseInt(params.get('course_id') || '0', 10) || 0;
+      if (!courseId) {
+        showNotice('未找到课程 ID，排序无法保存。', true);
+        return;
+      }
+
       var data = new FormData();
       data.append('action', 'mathcourse_save_order');
       data.append('nonce', MathCourseOrder.nonce);
-      data.append('course_id', params.get('course_id') || '');
+      data.append('course_id', String(courseId));
       topicOrder.forEach(function (tid) { data.append('topic_order[]', String(tid)); });
       Object.keys(lessonOrder).forEach(function (tid) {
-        lessonOrder[tid].forEach(function (lid) { data.append('lesson_order[' + tid + '][]', String(lid)); });
+        lessonOrder[tid].forEach(function (lid) {
+          data.append('lesson_order[' + tid + '][]', String(lid));
+        });
       });
 
-      saveButton.disabled = true;
-      saveButton.textContent = MathCourseOrder.saving || '正在保存排序…';
-      fetch(MathCourseOrder.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data })
-        .then(function (response) { return response.json(); })
-        .then(function (result) {
-          if (!result || !result.success) throw new Error(result && result.data && result.data.message ? result.data.message : (MathCourseOrder.error || '排序保存失败。'));
-          showNotice(result.data && result.data.message ? result.data.message : (MathCourseOrder.saved || '排序已保存。'), false);
+      savePending = true;
+      if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = MathCourseOrder.saving || '正在保存排序…';
+      }
+
+      fetch(MathCourseOrder.ajaxUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: data
+      })
+        .then(function (response) {
+          return response.text().then(function (text) {
+            var result;
+            try {
+              result = JSON.parse(text);
+            } catch (e) {
+              throw new Error('服务器返回的数据不是有效的 JSON。');
+            }
+            return result;
+          });
         })
-        .catch(function (error) { showNotice(error.message || '排序保存失败，请刷新页面后重试。', true); })
-        .finally(function () { saveButton.disabled = false; saveButton.textContent = '保存排序'; });
+        .then(function (result) {
+          if (!result || !result.success) {
+            throw new Error(result && result.data && result.data.message ? result.data.message : (MathCourseOrder.error || '排序保存失败。'));
+          }
+          showNotice(result.data && result.data.message ? result.data.message : (MathCourseOrder.saved || '排序已保存。'), false);
+          if (saveButton) saveButton.classList.remove('button-primary');
+        })
+        .catch(function (error) {
+          showNotice(error.message || '排序保存失败，请刷新页面后重试。', true);
+        })
+        .finally(function () {
+          savePending = false;
+          if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = '保存排序';
+          }
+        });
     }
 
     installHandles();
