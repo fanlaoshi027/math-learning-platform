@@ -167,14 +167,60 @@ class Hls_Converter {
     /**
      * HLS 目录固定为：
      *   {媒体根目录}/{课程全拼}/lesson-{课时ID}/index.m3u8
-     * 例如：/www/wwwroot/fanlaoshishu-media/hls/8shang-dapeiyou-2026/lesson-338/index.m3u8
+     * 课程目录根据课程名称自动生成，不再使用 WordPress 的 post_name/course-ID。
+     * 例如：八年级上册大培优2026 → 8shang-dapeiyou-2026
      */
     private function get_hls_relative_path( $course_id, $lesson_id ) {
         $course = $this->adapter->get_course( $course_id );
         if ( ! $course ) return '';
-        $slug = sanitize_title( $course->post_name ? $course->post_name : $course->post_title );
-        if ( '' === $slug ) $slug = 'course-' . absint( $course_id );
-        return trim( $slug . '/lesson-' . absint( $lesson_id ), '/' );
+        $directory = $this->course_directory_name( $course->post_title );
+        if ( '' === $directory ) $directory = 'course-' . absint( $course_id );
+        return trim( $directory . '/lesson-' . absint( $lesson_id ), '/' );
+    }
+
+    /**
+     * 根据课程名称生成稳定的英文/数字目录名。
+     * 教材课程名称中的「X年级上/下册」按站点目录规则压缩为「Xshang/xia」。
+     * 优先使用 PHP Intl 的 Han-Latin 转换；没有 Intl 时，对常用数学课程词汇提供兜底转换。
+     */
+    private function course_directory_name( $title ) {
+        $title = trim( wp_strip_all_tags( (string) $title ) );
+        if ( '' === $title ) return '';
+
+        $grade_map = array(
+            '一' => '1', '二' => '2', '三' => '3', '四' => '4', '五' => '5',
+            '六' => '6', '七' => '7', '八' => '8', '九' => '9', '十' => '10',
+        );
+        $title = preg_replace_callback( '/([一二三四五六七八九十0-9]+)年级(上册|下册)/u', function ( $m ) use ( $grade_map ) {
+            $grade = $m[1];
+            if ( isset( $grade_map[ $grade ] ) ) $grade = $grade_map[ $grade ];
+            return $grade . ( '上册' === $m[2] ? 'shang' : 'xia' );
+        }, $title );
+
+        $title = str_replace( array( '上册', '下册' ), array( 'shang', 'xia' ), $title );
+
+        if ( class_exists( '\Transliterator' ) ) {
+            $transliterator = \Transliterator::create( 'Han-Latin; Latin-ASCII' );
+            if ( $transliterator ) $title = $transliterator->transliterate( $title );
+        } else {
+            $fallback = array(
+                '大培优' => 'dapeiyou', '培优' => 'peiyou', '数学' => 'shuxue', '系统课' => 'xitongke',
+                '专题' => 'zhuanti', '基础' => 'jichu', '提高' => 'tigao', '入门' => 'rumen',
+                '全等' => 'quandeng', '三角形' => 'sanjiaoxing', '一次函数' => 'yicihanshu',
+                '二次函数' => 'ercihanshu', '一元一次方程' => 'yiyuanyicifangcheng',
+                '一元二次方程' => 'yiyuanercifangcheng', '勾股定理' => 'gougudingli',
+                '因式分解' => 'yinshifenjie', '整式' => 'zhengshi', '分式' => 'fenshi',
+                '实数' => 'shishu', '几何' => 'jihe', '代数' => 'daishu',
+            );
+            uksort( $fallback, function ( $a, $b ) { return mb_strlen( $b, 'UTF-8' ) - mb_strlen( $a, 'UTF-8' ); } );
+            $title = str_replace( array_keys( $fallback ), array_values( $fallback ), $title );
+        }
+
+        $title = strtolower( $title );
+        $title = preg_replace( '/[\x{3000}\s]+/u', '', $title );
+        $title = preg_replace( '/[^a-z0-9]+/i', '-', $title );
+        $title = trim( $title, '-' );
+        return $title;
     }
 
     private function probe( $source ) {
