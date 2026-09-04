@@ -16,7 +16,6 @@ class Menu {
         if (false === strpos((string) $hook, 'mathcourse')) {
             return;
         }
-        wp_enqueue_style('mathcourse-admin-ui', MATHCOURSE_URL . 'assets/admin-ui.css', array(), MATHCOURSE_VERSION);
         if (isset($_GET['page']) && 'mathcourse' === sanitize_key(wp_unslash($_GET['page']))) {
             wp_enqueue_style('mathcourse-admin-dashboard', MATHCOURSE_URL . 'assets/admin-dashboard.css', array('mathcourse-admin-ui'), MATHCOURSE_VERSION);
         }
@@ -74,7 +73,7 @@ class Menu {
                 <div class="mathcourse-dashboard-stat is-blue"><span class="dashicons dashicons-groups"></span><div><small>学员账号</small><strong><?php echo esc_html(number_format_i18n($user_count)); ?></strong><em>当前系统账号</em></div></div>
                 <div class="mathcourse-dashboard-stat is-green"><span class="dashicons dashicons-welcome-learn-more"></span><div><small>上架课程</small><strong><?php echo esc_html(number_format_i18n($published_count)); ?></strong><em>共 <?php echo esc_html(number_format_i18n($course_count)); ?> 门课程</em></div></div>
                 <div class="mathcourse-dashboard-stat is-orange"><span class="dashicons dashicons-video-alt3"></span><div><small>课程课时</small><strong><?php echo esc_html(number_format_i18n($lesson_count)); ?></strong><em>已接入 Tutor LMS</em></div></div>
-                <div class="mathcourse-dashboard-stat is-purple"><span class="dashicons dashicons-shield"></span><div><small>管理功能</small><strong>8</strong><em>授权、激活码、设备等</em></div></div>
+                <div class="mathcourse-dashboard-stat is-purple"><span class="dashicons dashicons-shield"></span><div><small>管理模块</small><strong>6</strong><em>课程、批量、授权、激活码、进度、设置</em></div></div>
             </div>
             <div class="mathcourse-dashboard-main-grid">
                 <section class="mathcourse-dashboard-panel mathcourse-dashboard-quick"><div class="mathcourse-dashboard-panel-head"><div><h2>⚡ 一键录入学员课程权限</h2><p>已有学员账号时，可直接从这里开通课程。</p></div><a href="<?php echo esc_url(admin_url('admin.php?page=mathcourse-access')); ?>">学员管理 →</a></div><form method="post"><input type="hidden" name="mathcourse_dashboard_action" value="grant_access"><?php wp_nonce_field('mathcourse_dashboard_grant', 'mathcourse_dashboard_nonce'); ?><label>学员手机号</label><input type="text" name="student_phone" inputmode="tel" placeholder="输入学员手机号或账号"><label>授权课程</label><select name="course_id"><option value="">请选择课程</option><?php foreach ($published_courses as $course) : ?><option value="<?php echo esc_attr($course->ID); ?>"><?php echo esc_html($course->post_title); ?></option><?php endforeach; ?></select><button type="submit" class="button mathcourse-primary mathcourse-dashboard-full-button">立即开通授权</button></form></section>
