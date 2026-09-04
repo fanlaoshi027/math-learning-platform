@@ -27,11 +27,15 @@ class Menu {
             wp_enqueue_style('mathcourse-admin-course-editor-polish', MATHCOURSE_URL . 'assets/admin-course-editor-polish.css', array('mathcourse-admin-course-editor'), MATHCOURSE_VERSION);
             wp_enqueue_style('mathcourse-admin-video-upload', MATHCOURSE_URL . 'assets/admin-video-upload.css', array('mathcourse-admin-course-editor-polish'), MATHCOURSE_VERSION);
         }
+        if (isset($_GET['page']) && 'mathcourse-course-trash' === sanitize_key(wp_unslash($_GET['page']))) {
+            wp_enqueue_style('mathcourse-admin-course-trash', MATHCOURSE_URL . 'assets/admin-course-trash.css', array('mathcourse-admin-ui'), MATHCOURSE_VERSION);
+        }
     }
 
     public function register_menu() {
         add_menu_page('MathCourse', '数学课程', 'manage_options', 'mathcourse', array($this, 'dashboard'), 'dashicons-welcome-learn-more', 30);
         add_submenu_page('mathcourse', '课程管理', '课程管理', 'manage_options', 'mathcourse-courses', array($this, 'courses_page'));
+        add_submenu_page('mathcourse', '冻结课程', '冻结课程', 'manage_options', 'mathcourse-course-trash', array($this, 'course_trash_page'));
         add_submenu_page('mathcourse', '批量创建课时', '批量创建课时', 'manage_options', 'mathcourse-batch', array($this, 'batch_page'));
         add_submenu_page('mathcourse', '课程授权', '学员授权', 'manage_options', 'mathcourse-access', 'manage_options', 'mathcourse-access', array($this, 'access_page'));
         add_submenu_page('mathcourse', '课程激活码', '激活码管理', 'manage_options', 'mathcourse-activation', 'manage_options', 'mathcourse-activation', array($this, 'activation_page'));
@@ -81,10 +85,11 @@ class Menu {
         <?php
     }
     public function courses_page(){if(class_exists('MathCourse\\Admin\\Course_Page'))(new Course_Page())->render();}
+    public function course_trash_page(){if(class_exists('MathCourse\\Admin\\Course_Trash_Page'))(new Course_Trash_Page())->render();}
     public function batch_page(){if(class_exists('MathCourse\\Admin\\Batch_Manager_V2'))(new Batch_Manager_V2())->render();}
     public function activation_page(){if(class_exists('MathCourse\\Admin\\Activation_Page'))(new Activation_Page())->render();}
     public function course_edit_page(){if(class_exists('MathCourse\\Admin\\Course_Editor'))(new Course_Editor())->render();}
     public function access_page(){if(class_exists('MathCourse\\Admin\\Access_Page'))(new Access_Page())->render();}
     public function progress_page(){if(class_exists('MathCourse\\Admin\\Progress_Page'))(new Progress_Page())->render();}
     public function settings_page(){if(class_exists('MathCourse\\Admin\\Settings'))(new Settings())->render();}
-}
+} 
