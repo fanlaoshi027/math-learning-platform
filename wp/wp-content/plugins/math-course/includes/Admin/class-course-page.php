@@ -18,34 +18,90 @@ class Course_Page {
             'mathcourse_new_course'
         );
         ?>
-        <div class="wrap mathcourse-admin-wrap">
+        <div class="wrap mathcourse-admin-wrap mathcourse-course-page">
             <div class="mathcourse-admin-header">
-                <h1>课程管理</h1>
-                <p>管理课程、专题和课时。课程底层数据由 Tutor LMS 保存，MathCourse 负责课程结构、试看与授权。</p>
+                <div>
+                    <h1>课程管理</h1>
+                    <p>统一管理课程、专题、课时与课程状态。</p>
+                </div>
+                <a class="button mathcourse-primary" href="<?php echo esc_url($new_course_url); ?>">＋ 新增课程</a>
             </div>
+
             <div class="mathcourse-stat-grid">
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">全部课程</div><div class="mathcourse-stat-num"><?php echo esc_html(count($courses)); ?></div></div>
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">已发布课程</div><div class="mathcourse-stat-num"><?php echo esc_html($this->count_status($courses, 'publish')); ?></div></div>
                 <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">全部课时</div><div class="mathcourse-stat-num"><?php echo esc_html($total_lessons); ?></div></div>
-                <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">课程管理</div><div class="mathcourse-stat-num" style="font-size:16px;padding-top:7px;">Course → Topic → Lesson</div></div>
+                <div class="mathcourse-stat-card"><div class="mathcourse-stat-title">课程结构</div><div class="mathcourse-stat-num mathcourse-stat-structure">课程 → 专题 → 课时</div></div>
             </div>
-            <div class="mathcourse-card">
-                <div class="mathcourse-card-title"><h2>专题课程</h2><a class="button mathcourse-primary" href="<?php echo esc_url($new_course_url); ?>">＋ 新增课程</a></div>
-                <table class="mathcourse-table"><thead><tr><th>课程</th><th>封面</th><th>类型</th><th>课时</th><th>状态</th><th>操作</th></tr></thead><tbody>
-                <?php if (!$courses): ?><tr><td colspan="6">暂无课程。点击右上角“新增课程”开始创建。</td></tr><?php endif; ?>
-                <?php foreach ($courses as $course): $id=(int)$course->ID; $cover=get_the_post_thumbnail_url($id,'thumbnail'); if(!$cover)$cover=get_post_meta($id,'_mathcourse_cover',true); $type=get_post_meta($id,'_mathcourse_type',true); ?>
-                    <tr>
-                        <td><strong><?php echo esc_html($course->post_title); ?></strong><div style="color:#6b7280;font-size:12px;margin-top:3px;">ID <?php echo esc_html($id); ?></div></td>
-                        <td><?php if($cover): ?><img class="mathcourse-cover" src="<?php echo esc_url($cover); ?>" alt=""><?php else: ?><span class="mathcourse-badge">暂无封面</span><?php endif; ?></td>
-                        <td><?php echo esc_html('supplementary'===$type?'教辅配套课':'专题课程'); ?></td>
-                        <td><strong><?php echo esc_html($adapter->get_course_lesson_count($id)); ?></strong></td>
-                        <td><span class="mathcourse-badge <?php echo 'publish'===$course->post_status?'is-published':'is-draft'; ?>"><?php echo 'publish'===$course->post_status?'已发布':('private'===$course->post_status?'私密':'草稿'); ?></span></td>
-                        <td style="white-space:nowrap"><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=mathcourse-course-edit&course_id='.$id)); ?>">编辑</a> <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=mathcourse-batch&course_id='.$id)); ?>">批量课时</a></td>
-                    </tr>
-                <?php endforeach; ?></tbody></table>
+
+            <div class="mathcourse-card mathcourse-course-list-card">
+                <div class="mathcourse-card-title">
+                    <div>
+                        <h2>我的课程</h2>
+                        <span class="mathcourse-card-subtitle">共 <?php echo esc_html(count($courses)); ?> 门课程</span>
+                    </div>
+                    <a class="mathcourse-text-action" href="<?php echo esc_url($new_course_url); ?>">新增课程 <span>→</span></a>
+                </div>
+
+                <?php if (!$courses): ?>
+                    <div class="mathcourse-empty-state">
+                        <div class="mathcourse-empty-icon">＋</div>
+                        <strong>还没有课程</strong>
+                        <p>创建第一门课程后，它会显示在这里。</p>
+                        <a class="button mathcourse-primary" href="<?php echo esc_url($new_course_url); ?>">创建课程</a>
+                    </div>
+                <?php else: ?>
+                    <div class="mathcourse-course-grid">
+                    <?php foreach ($courses as $course):
+                        $id = (int)$course->ID;
+                        $cover = get_the_post_thumbnail_url($id, 'medium');
+                        if (!$cover) $cover = get_post_meta($id, '_mathcourse_cover', true);
+                        $type = get_post_meta($id, '_mathcourse_type', true);
+                        $grade = get_post_meta($id, '_mathcourse_grade', true);
+                        $lesson_count = $adapter->get_course_lesson_count($id);
+                        $is_publish = 'publish' === $course->post_status;
+                        $status_text = $is_publish ? '已发布' : ('private' === $course->post_status ? '私密' : '草稿');
+                        $edit_url = admin_url('admin.php?page=mathcourse-course-edit&course_id='.$id);
+                        $batch_url = admin_url('admin.php?page=mathcourse-batch&course_id='.$id);
+                    ?>
+                        <article class="mathcourse-course-item">
+                            <a class="mathcourse-course-cover" href="<?php echo esc_url($edit_url); ?>" aria-label="编辑 <?php echo esc_attr($course->post_title); ?>">
+                                <?php if ($cover): ?>
+                                    <img src="<?php echo esc_url($cover); ?>" alt="">
+                                <?php else: ?>
+                                    <span class="mathcourse-cover-fallback"><b><?php echo esc_html(mb_substr($course->post_title, 0, 2)); ?></b><small>数学课程</small></span>
+                                <?php endif; ?>
+                                <span class="mathcourse-course-status <?php echo $is_publish ? 'is-published' : ('private' === $course->post_status ? 'is-private' : 'is-draft'); ?>"><?php echo esc_html($status_text); ?></span>
+                            </a>
+                            <div class="mathcourse-course-body">
+                                <div class="mathcourse-course-heading">
+                                    <h3><a href="<?php echo esc_url($edit_url); ?>"><?php echo esc_html($course->post_title); ?></a></h3>
+                                    <span class="mathcourse-course-id">ID <?php echo esc_html($id); ?></span>
+                                </div>
+                                <div class="mathcourse-course-tags">
+                                    <span><?php echo esc_html($grade ? $grade . '年级' : '未设置年级'); ?></span>
+                                    <span><?php echo esc_html('supplementary' === $type ? '教辅配套课' : '专题课程'); ?></span>
+                                </div>
+                                <div class="mathcourse-course-footer">
+                                    <div class="mathcourse-lesson-count"><strong><?php echo esc_html($lesson_count); ?></strong><span>个课时</span></div>
+                                    <div class="mathcourse-course-actions">
+                                        <a href="<?php echo esc_url($batch_url); ?>">批量课时</a>
+                                        <a class="mathcourse-edit-link" href="<?php echo esc_url($edit_url); ?>">编辑课程 →</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
         <?php
     }
-    private function count_status($courses,$status) { $n=0; foreach($courses as $course) if($status===$course->post_status)$n++; return $n; }
+
+    private function count_status($courses, $status) {
+        $n = 0;
+        foreach ($courses as $course) if ($status === $course->post_status) $n++;
+        return $n;
+    }
 }
