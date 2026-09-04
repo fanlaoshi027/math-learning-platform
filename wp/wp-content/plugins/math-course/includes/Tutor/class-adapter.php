@@ -25,7 +25,19 @@ class Adapter {
     public function get_lesson_course_id($lesson_id) { $lesson=$this->get_lesson($lesson_id); if(!$lesson)return 0; $topic=$this->get_topic($lesson->post_parent); if(!$topic)return 0; $course=$this->get_course($topic->post_parent); return $course?(int)$course->ID:0; }
     public function get_lesson_page_number($lesson_id) { $value=get_post_meta(absint($lesson_id),'_mathcourse_page_number',true); if($value==='')$value=get_post_meta(absint($lesson_id),'_mathcourse_page',true); return sanitize_text_field($value); }
     public function get_lesson_video_id($lesson_id) { $value=get_post_meta(absint($lesson_id),'_mathcourse_video_id',true); if($value==='')$value=get_post_meta(absint($lesson_id),'_mathcourse_video',true); return sanitize_text_field($value); }
-    public function get_lesson_hls_url($lesson_id) { $value=trim((string)get_post_meta(absint($lesson_id),'_mathcourse_hls_url',true)); if($value==='')return ''; if(preg_match('#^https?://#i',$value))return esc_url_raw($value); if(strpos($value,'//')===0)return esc_url_raw((is_ssl()?'https:':'http:').$value); return esc_url_raw(home_url('/'.ltrim($value,'/'))); }
+    public function get_lesson_hls_url($lesson_id) {
+        $value=trim((string)get_post_meta(absint($lesson_id),'_mathcourse_hls_url',true));
+        if($value==='')return '';
+        if(preg_match('#^https?://#i',$value))return esc_url_raw($value);
+        if(strpos($value,'//')===0)return esc_url_raw((is_ssl()?'https:':'http:').$value);
+        $value=ltrim($value,'/');
+        if(strpos($value,'__mathcourse_hls/')===0)return esc_url_raw(home_url('/'.$value));
+        // 新格式：数据库只保存媒体相对路径，例如：课程拼音/lesson-338/index.m3u8
+        if(strtolower(pathinfo($value,PATHINFO_EXTENSION))==='m3u8' && defined('MATHCOURSE_MEDIA_ROOT') && MATHCOURSE_MEDIA_ROOT) {
+            return esc_url_raw(home_url('/__mathcourse_hls/'.$value));
+        }
+        return esc_url_raw(home_url('/'.$value));
+    }
     public function is_preview_lesson($lesson_id) { $native=get_post_meta(absint($lesson_id),'_is_preview',true); if($native==='yes'||$native==='1')return true; return get_post_meta(absint($lesson_id),'_mathcourse_preview',true)==='yes'; }
     public function set_lesson_preview($lesson_id,$enabled) { $value=$enabled?'yes':'no'; update_post_meta(absint($lesson_id),'_is_preview',$value); update_post_meta(absint($lesson_id),'_mathcourse_preview',$value); return true; }
 
