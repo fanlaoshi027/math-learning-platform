@@ -3,6 +3,7 @@ namespace MathCourse\Admin;
 defined('ABSPATH') || exit;
 
 use MathCourse\Access\Access_Service;
+use MathCourse\Tutor\Adapter;
 
 class Student_Page {
     public function render() {
@@ -22,12 +23,12 @@ class Student_Page {
         ?>
         <div class="wrap mathcourse-admin-wrap mathcourse-student-page">
             <div class="mathcourse-admin-header">
-                <div><div class="mathcourse-eyebrow">MathCourse · 学员管理</div><h1>学员管理</h1><p>新增、编辑学员账号，并查看当前学员的课程授权数量。</p></div>
+                <div><div class="mathcourse-eyebrow">MathCourse · 学员管理</div><h1>学员管理</h1><p>新增、编辑学员账号，并直接设置可访问的课程。</p></div>
                 <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=mathcourse-students&action=new')); ?>">＋ 新增学员</a>
             </div>
             <?php if ($notice) : ?><div class="notice <?php echo esc_attr($notice['type']); ?> is-dismissible"><p><?php echo esc_html($notice['message']); ?></p></div><?php endif; ?>
             <?php if ('new' === ($_GET['action'] ?? '') || $edit_user) : ?>
-                <?php $this->render_form($edit_user); ?>
+                <?php $this->render_form($edit_user, $access); ?>
             <?php endif; ?>
             <div class="mathcourse-access-toolbar">
                 <form method="get"><input type="hidden" name="page" value="mathcourse-students"><input class="mathcourse-search-input" type="text" name="s" value="<?php echo esc_attr($keyword); ?>" placeholder="搜索账号、姓名或邮箱"><button class="button button-primary">搜索学员</button></form>
@@ -45,12 +46,18 @@ class Student_Page {
         <?php
     }
 
-    private function render_form($user) {
+    private function render_form($user, $access) {
         $is_edit = $user instanceof \WP_User;
         $action = $is_edit ? 'edit' : 'create';
+        $adapter = new Adapter();
+        $courses = $adapter->get_courses(false, -1);
+        $selected = array();
+        if ($is_edit) {
+            foreach ($access->get_user_courses($user->ID) as $row) $selected[] = (int) $row->course_id;
+        }
         ?>
         <div class="mathcourse-access-card mathcourse-student-form-card">
-            <div class="mathcourse-card-title"><div><h2><?php echo $is_edit ? '编辑学员' : '新增学员'; ?></h2><span class="mathcourse-card-subtitle"><?php echo $is_edit ? '修改姓名、邮箱或重置登录密码。' : '创建后学员可直接使用账号密码登录前台。'; ?></span></div></div>
+            <div class="mathcourse-card-title"><div><h2><?php echo $is_edit ? '编辑学员' : '新增学员'; ?></h2><span class="mathcourse-card-subtitle"><?php echo $is_edit ? '修改姓名、邮箱、密码，并调整该学员可访问的课程。' : '创建账号时同时设置登录密码和课程授权。'; ?></span></div></div>
             <form method="post" class="mathcourse-student-form">
                 <?php wp_nonce_field('mathcourse_student_' . $action, 'mathcourse_student_nonce'); ?>
                 <input type="hidden" name="mathcourse_student_action" value="<?php echo esc_attr($action); ?>">
@@ -60,6 +67,16 @@ class Student_Page {
                     <p><label>学员姓名</label><input type="text" name="display_name" value="<?php echo esc_attr($is_edit ? $user->display_name : ''); ?>" placeholder="例如：张同学"></p>
                     <p><label>邮箱（可选）</label><input type="email" name="user_email" value="<?php echo esc_attr($is_edit ? $user->user_email : ''); ?>"></p>
                     <p><label><?php echo $is_edit ? '新密码（留空不修改）' : '登录密码'; ?></label><input type="password" name="user_pass" minlength="8" <?php echo $is_edit ? '' : 'required'; ?> autocomplete="new-password"></p>
+                </div>
+                <div class="mathcourse-student-courses">
+                    <div class="mathcourse-student-courses__head"><strong>授权课程</strong><span>勾选后，该学员登录即可访问对应课程</span></div>
+                    <?php if ($courses) : ?>
+                        <div class="mathcourse-student-course-grid">
+                            <?php foreach ($courses as $course) : ?>
+                                <label class="mathcourse-student-course-option"><input type="checkbox" name="course_ids[]" value="<?php echo esc_attr($course->ID); ?>" <?php checked(in_array((int)$course->ID, $selected, true)); ?>><span><?php echo esc_html($course->post_title); ?></span></label>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else : ?><p class="description">目前没有已发布课程可供授权。</p><?php endif; ?>
                 </div>
                 <div class="mathcourse-student-form-actions"><button type="submit" class="button button-primary"><?php echo $is_edit ? '保存学员' : '创建学员'; ?></button><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=mathcourse-students')); ?>">取消</a></div>
             </form>
@@ -76,6 +93,13 @@ class Student_Page {
         $name = sanitize_text_field(wp_unslash($_POST['display_name'] ?? ''));
         $email = sanitize_email(wp_unslash($_POST['user_email'] ?? ''));
         $pass = (string) wp_unslash($_POST['user_pass'] ?? '');
+        $course_ids = isset($_POST['course_ids']) && is_array($_POST['course_ids']) ? array_values(array_unique(array_filter(array_map('absint', wp_unslash($_POST['course_ids']))))) : array();
+        $adapter = new Adapter();
+        $valid_course_ids = array();
+        foreach ($course_ids as $course_id) {
+            $course = $adapter->get_course($course_id);
+            if ($course && 'publish' === $course->post_status) $valid_course_ids[] = $course_id;
+        }
         if ('create' === $action) {
             if ($login === '' || $pass === '') return array('type'=>'notice-error','message'=>'请填写登录账号和密码。');
             if (strlen($pass) < 8) return array('type'=>'notice-error','message'=>'密码至少需要 8 位。');
@@ -83,7 +107,9 @@ class Student_Page {
             if ($email !== '' && email_exists($email)) return array('type'=>'notice-error','message'=>'该邮箱已经被其他账号使用。');
             $id = wp_insert_user(array('user_login'=>$login,'user_pass'=>$pass,'user_email'=>$email,'display_name'=>$name ?: $login,'role'=>'subscriber'));
             if (is_wp_error($id)) return array('type'=>'notice-error','message'=>$id->get_error_message());
-            return array('type'=>'notice-success','message'=>'学员“' . ($name ?: $login) . '”创建成功。');
+            $access = new Access_Service();
+            foreach ($valid_course_ids as $course_id) $access->grant($id, $course_id);
+            return array('type'=>'notice-success','message'=>'学员“' . ($name ?: $login) . '”创建成功，已授权 ' . count($valid_course_ids) . ' 门课程。');
         }
         $id = absint($_POST['student_id'] ?? 0);
         $user = $id ? get_userdata($id) : false;
@@ -93,6 +119,13 @@ class Student_Page {
         if ($pass !== '') { if (strlen($pass) < 8) return array('type'=>'notice-error','message'=>'新密码至少需要 8 位。'); $data['user_pass']=$pass; }
         $result = wp_update_user($data);
         if (is_wp_error($result)) return array('type'=>'notice-error','message'=>$result->get_error_message());
-        return array('type'=>'notice-success','message'=>'学员信息已保存。');
+        $access = new Access_Service();
+        $current = array();
+        foreach ($access->get_user_courses($id) as $row) $current[(int)$row->course_id] = true;
+        foreach (array_keys($current) as $course_id) {
+            if (!in_array((int)$course_id, $valid_course_ids, true)) $access->revoke($id, $course_id);
+        }
+        foreach ($valid_course_ids as $course_id) $access->grant($id, $course_id);
+        return array('type'=>'notice-success','message'=>'学员信息已保存，课程授权已同步。');
     }
 }
