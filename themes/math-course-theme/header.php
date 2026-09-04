@@ -1,5 +1,6 @@
 <?php
 defined( 'ABSPATH' ) || exit;
+if ( is_user_logged_in() && ! current_user_can( 'manage_options' ) ) { show_admin_bar( false ); }
 ?><!doctype html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -15,7 +16,6 @@ defined( 'ABSPATH' ) || exit;
             <span class="mc-brand__mark" aria-hidden="true">□</span>
             <span class="mc-brand__text">樊老师数学课堂<small>跟中考名师 学扎实数学</small></span>
         </a>
-
         <nav class="mc-site-nav" aria-label="主导航">
             <a class="<?php echo is_front_page() ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/' ) ); ?>">首页</a>
             <a class="<?php echo is_page( 'course-center' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">课程中心</a>
@@ -23,7 +23,6 @@ defined( 'ABSPATH' ) || exit;
                 <a class="<?php echo is_page( 'learning-center' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>">樊同学的学习中心</a>
             <?php endif; ?>
         </nav>
-
         <div class="mc-header-actions">
             <?php if ( is_user_logged_in() ) : ?>
                 <?php $current_user = wp_get_current_user(); $student_name = $current_user->display_name ?: $current_user->user_login; $student_initial = function_exists( 'mb_substr' ) ? mb_substr( $student_name, 0, 1 ) : substr( $student_name, 0, 1 ); ?>
