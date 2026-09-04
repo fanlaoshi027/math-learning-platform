@@ -1,44 +1,90 @@
 document.addEventListener('DOMContentLoaded', function () {
-    var input = document.getElementById('lesson_hls_edit');
-    if (input) {
-        input.type = 'text';
-        input.setAttribute('inputmode', 'url');
-        input.removeAttribute('pattern');
-        input.removeAttribute('required');
-    }
-
-    /* 给旧版 PHP 页面补充语义 class，避免改动后台数据/业务逻辑。 */
+    var wrap = document.querySelector('.wrap.mathcourse-editor');
     var params = new URLSearchParams(window.location.search);
     var page = params.get('page');
-    var wrap = document.querySelector('.wrap');
-    if (wrap && page === 'mathcourse-course-edit') {
-        wrap.classList.add('mathcourse-editor');
 
-        /* 课程内容区域：仅补 class，让视觉层不依赖脆弱的 inline style。 */
-        var contentBlocks = wrap.querySelectorAll('form>div[style*="grid-template-columns"]>div:first-child>div[style*="margin-top:28px"]');
-        contentBlocks.forEach(function (block) {
-            block.classList.add('mathcourse-content-workspace');
-            block.querySelectorAll(':scope>div').forEach(function (card) {
-                if (card.querySelector(':scope>div:first-child') && card.querySelector(':scope>div:nth-child(2)')) {
-                    card.classList.add('mathcourse-topic-card');
-                    var header = card.querySelector(':scope>div:first-child');
-                    var body = card.querySelector(':scope>div:nth-child(2)');
-                    header.classList.add('mathcourse-topic-header');
-                    body.classList.add('mathcourse-topic-body');
-                    body.querySelectorAll(':scope>div').forEach(function (row) {
-                        if (row.querySelector('a') && row.querySelector('button')) {
-                            row.classList.add('mathcourse-lesson-row');
-                        }
-                    });
-                }
-            });
-        });
-
-        var lessonEditor = wrap.querySelector('div[style*="border:1px solid #2271b1"]');
-        if (lessonEditor) {
-            lessonEditor.classList.add('mathcourse-lesson-editor');
+    function normalizeHlsInput(root) {
+        var input = (root || document).querySelector('#lesson_hls_edit');
+        if (input) {
+            input.type = 'text';
+            input.setAttribute('inputmode', 'url');
+            input.removeAttribute('pattern');
+            input.removeAttribute('required');
         }
     }
+
+    function setSelectedLesson(lessonId) {
+        if (!wrap) return;
+        wrap.querySelectorAll('.mathcourse-lesson-row').forEach(function (row) {
+            row.classList.toggle('is-selected', String(row.getAttribute('data-lesson-id')) === String(lessonId));
+        });
+    }
+
+    function bindLessonPanel(root) {
+        normalizeHlsInput(root || document);
+        if (!root) return;
+        var close = root.querySelector('.mathcourse-lesson-close');
+        if (close) {
+            close.addEventListener('click', function (event) {
+                event.preventDefault();
+                var side = document.getElementById('mathcourse-lesson-side');
+                if (side) {
+                    side.innerHTML = '<div class="mathcourse-lesson-placeholder"><div class="mathcourse-placeholder-icon">✎</div><strong>选择一个课时</strong><span>点击左侧课时的「编辑」，这里会直接显示课时属性。</span></div>';
+                }
+                wrap.querySelectorAll('.mathcourse-lesson-row').forEach(function (row) { row.classList.remove('is-selected'); });
+                var url = new URL(window.location.href);
+                url.searchParams.delete('lesson_id');
+                window.history.replaceState({}, '', url.toString());
+            });
+        }
+    }
+
+    function openLessonEditor(link) {
+        if (!wrap || !link) return;
+        var side = document.getElementById('mathcourse-lesson-side');
+        if (!side) return;
+        var url = link.href;
+        var lessonId = link.getAttribute('data-lesson-id');
+        side.classList.add('is-loading');
+        side.setAttribute('aria-busy', 'true');
+        side.innerHTML = '<div class="mathcourse-lesson-placeholder"><div class="mathcourse-placeholder-icon">…</div><strong>正在加载课时</strong><span>正在读取课时属性，请稍候。</span></div>';
+        fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.text();
+            })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var editor = doc.querySelector('.mathcourse-lesson-editor');
+                if (!editor) throw new Error('lesson editor not found');
+                side.innerHTML = editor.outerHTML;
+                side.classList.remove('is-loading');
+                side.setAttribute('aria-busy', 'false');
+                setSelectedLesson(lessonId);
+                bindLessonPanel(side);
+                var stateUrl = new URL(url, window.location.href);
+                window.history.replaceState({ lessonId: lessonId }, '', stateUrl.toString());
+                side.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            })
+            .catch(function () {
+                /* JS 加载失败时保留原始链接，确保后台功能仍可用。 */
+                window.location.href = url;
+            });
+    }
+
+    if (wrap && page === 'mathcourse-course-edit') {
+        wrap.querySelectorAll('.mathcourse-lesson-edit').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                openLessonEditor(link);
+            });
+        });
+        var initialEditor = wrap.querySelector('.mathcourse-lesson-editor');
+        if (initialEditor) bindLessonPanel(wrap.querySelector('#mathcourse-lesson-side'));
+        normalizeHlsInput(document);
+    }
+
+    /* 给旧版页面补充 batch class，保持其它后台页面兼容。 */
     if (wrap && page === 'mathcourse-batch') {
         wrap.classList.add('mathcourse-batch-page');
     }
