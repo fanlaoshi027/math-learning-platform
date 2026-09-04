@@ -48,6 +48,7 @@ class Hls_Converter {
             'ffmpeg_executable' => is_executable( $ffmpeg ),
             'ffprobe' => $ffprobe,
             'ffprobe_executable' => is_executable( $ffprobe ),
+            'exec_available' => function_exists( 'exec' ),
         ) );
     }
 
@@ -209,9 +210,14 @@ class Hls_Converter {
     private function probe( $source ) {
         $ffprobe = defined( 'MATHCOURSE_FFPROBE_PATH' ) ? MATHCOURSE_FFPROBE_PATH : '/usr/bin/ffprobe';
         if ( ! is_executable( $ffprobe ) ) return new \WP_Error( 'ffprobe_missing', '找不到 ffprobe：' . $ffprobe );
-        if ( ! function_exists( 'shell_exec' ) ) return new \WP_Error( 'shell_exec_disabled', '服务器禁用了 PHP shell_exec()，无法读取 MP4 视频信息。请在宝塔 PHP 设置中启用 shell_exec。' );
-        $cmd = escapeshellarg( $ffprobe ) . ' -v error -show_entries format=duration:stream=index,codec_type,codec_name,width,height,r_frame_rate -of json ' . escapeshellarg( $source );
-        $data = json_decode( (string) @shell_exec( $cmd ), true );
+        /* 读取 MP4 信息与后续 FFmpeg 转换统一使用 exec()，避免依赖 shell_exec()。 */
+        if ( ! function_exists( 'exec' ) ) return new \WP_Error( 'exec_disabled', '服务器禁用了 PHP exec()，无法读取 MP4 视频信息和执行 HLS 转换。请在宝塔 PHP 设置中启用 exec。' );
+        $cmd = escapeshellarg( $ffprobe ) . ' -v error -show_entries format=duration:stream=index,codec_type,codec_name,width,height,r_frame_rate -of json ' . escapeshellarg( $source ) . ' 2>&1';
+        $output = array();
+        $exit = 0;
+        exec( $cmd, $output, $exit );
+        if ( 0 !== $exit ) return new \WP_Error( 'ffprobe_failed', 'ffprobe 读取 MP4 信息失败：' . trim( implode( "\n", array_slice( $output, -5 ) ) ) );
+        $data = json_decode( trim( implode( "\n", $output ) ), true );
         if ( empty( $data ) || empty( $data['streams'] ) ) return new \WP_Error( 'ffprobe_failed', '无法读取 MP4 视频信息。' );
         $info = array( 'duration' => isset( $data['format']['duration'] ) ? round( (float) $data['format']['duration'], 2 ) : 0, 'video_codec' => '', 'audio_codec' => '', 'width' => 0, 'height' => 0, 'fps' => '' );
         foreach ( $data['streams'] as $stream ) {
