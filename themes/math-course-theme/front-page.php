@@ -3,11 +3,11 @@ defined( 'ABSPATH' ) || exit;
 get_header();
 $course_center_url=home_url('/course-center/'); $learning_url=home_url('/learning-center/');
 $site_settings=class_exists('MathCourse\\Frontend\\Site_Settings');
-$hero_kicker=$site_settings?MathCourse\\Frontend\\Site_Settings::get('hero_kicker'):'两大核心分类：初中系统课 + 教辅配套课';
-$hero_title=$site_settings?MathCourse\\Frontend\\Site_Settings::get('hero_title'):'把初中数学，学成一套体系';
-$hero_description=$site_settings?MathCourse\\Frontend\\Site_Settings::get('hero_description'):'按数学知识体系组织课程，从基础到综合应用，循序渐进，构建扎实的数学基本功。';
-$why_title=$site_settings?MathCourse\\Frontend\\Site_Settings::get('why_title'):'为什么选择樊老师数学课堂';
-$why_subtitle=$site_settings?MathCourse\\Frontend\\Site_Settings::get('why_subtitle'):'专注初中数学知识体系研发，让每一个知识点清晰可见';
+$hero_kicker=$site_settings?\MathCourse\Frontend\Site_Settings::get('hero_kicker'):'两大核心分类：初中系统课 + 教辅配套课';
+$hero_title=$site_settings?\MathCourse\Frontend\Site_Settings::get('hero_title'):'把初中数学，学成一套体系';
+$hero_description=$site_settings?\MathCourse\Frontend\Site_Settings::get('hero_description'):'按数学知识体系组织课程，从基础到综合应用，循序渐进，构建扎实的数学基本功。';
+$why_title=$site_settings?\MathCourse\Frontend\Site_Settings::get('why_title'):'为什么选择樊老师数学课堂';
+$why_subtitle=$site_settings?\MathCourse\Frontend\Site_Settings::get('why_subtitle'):'专注初中数学知识体系研发，让每一个知识点清晰可见';
 ?>
 <main class="mc-home">
 <section class="mc-home-hero"><div class="mc-container mc-home-hero__inner"><div class="mc-home-hero__copy"><div class="mc-kicker"><span></span><?php echo esc_html($hero_kicker); ?></div><h1><?php echo esc_html($hero_title); ?></h1><p><?php echo esc_html($hero_description); ?></p><div class="mc-home-hero__actions"><a class="mc-btn mc-btn--primary" href="<?php echo esc_url($course_center_url); ?>">浏览课程中心 <span>→</span></a><?php if(is_user_logged_in()):?><a class="mc-btn mc-btn--ghost" href="<?php echo esc_url($learning_url); ?>">▶ 开始学习之旅</a><?php else:?><a class="mc-btn mc-btn--ghost" href="<?php echo esc_url(wp_login_url($learning_url)); ?>">▶ 开始学习之旅</a><?php endif;?></div><div class="mc-home-trust"><span>✓ 体系完整</span><span>✓ 内容精讲</span><span>✓ 方法实用</span><span>✓ 持续更新</span></div></div></div></section>
