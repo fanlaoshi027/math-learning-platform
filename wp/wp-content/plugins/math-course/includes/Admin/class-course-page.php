@@ -18,6 +18,13 @@ class Course_Page {
             $total_lessons += $course_stats['total'];
             $total_ready_videos += $course_stats['ready'];
         }
+        $frozen_count = count(get_posts(array(
+            'post_type' => $adapter->get_course_post_type(),
+            'post_status' => 'trash',
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+            'no_found_rows' => true,
+        )));
         $new_course_url = wp_nonce_url(
             admin_url('admin.php?page=mathcourse-courses&action=new'),
             'mathcourse_new_course'
@@ -29,7 +36,10 @@ class Course_Page {
                     <h1>课程管理</h1>
                     <p>统一管理课程、专题、课时与课程状态。</p>
                 </div>
-                <a class="button mathcourse-primary" href="<?php echo esc_url($new_course_url); ?>">＋ 新增课程</a>
+                <div class="mathcourse-course-header-actions">
+                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=mathcourse-course-trash')); ?>">冻结课程<?php echo $frozen_count ? '（' . esc_html($frozen_count) . '）' : ''; ?></a>
+                    <a class="button mathcourse-primary" href="<?php echo esc_url($new_course_url); ?>">＋ 新增课程</a>
+                </div>
             </div>
 
             <div class="mathcourse-stat-grid">
@@ -71,6 +81,7 @@ class Course_Page {
                         $status_text = $is_publish ? '已发布' : ('private' === $course->post_status ? '私密' : '草稿');
                         $edit_url = admin_url('admin.php?page=mathcourse-course-edit&course_id='.$id);
                         $batch_url = admin_url('admin.php?page=mathcourse-batch&course_id='.$id);
+                        $freeze_url = wp_nonce_url(admin_url('admin.php?page=mathcourse-courses&action=trash&course_id='.$id), 'mathcourse_trash_course_'.$id);
                         $title_mark = function_exists('mb_substr') ? mb_substr($course->post_title, 0, 2) : substr($course->post_title, 0, 2);
                     ?>
                         <article class="mathcourse-course-item">
@@ -100,6 +111,7 @@ class Course_Page {
                                     <div class="mathcourse-lesson-count"><strong><?php echo esc_html($lesson_count); ?></strong><span>个课时</span></div>
                                     <div class="mathcourse-course-actions">
                                         <a href="<?php echo esc_url($batch_url); ?>">批量课时</a>
+                                        <a href="<?php echo esc_url($freeze_url); ?>" onclick="return confirm('冻结后课程会从正常课程列表移到“冻结课程”。不会立即删除，之后可恢复或彻底删除。确定冻结吗？');">冻结</a>
                                         <a class="mathcourse-edit-link" href="<?php echo esc_url($edit_url); ?>">编辑课程 →</a>
                                     </div>
                                 </div>
