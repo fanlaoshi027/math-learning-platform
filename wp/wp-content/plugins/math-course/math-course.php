@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MathCourse
  * Description: 樊老师数学网校课程管理与学员授权系统。
- * Version: 1.0.9
+ * Version: 1.0.10
  * Author: 樊老师
  */
 defined('ABSPATH') || exit;
 
-define('MATHCOURSE_VERSION','1.0.9');
+define('MATHCOURSE_VERSION','1.0.10');
 define('MATHCOURSE_FILE',__FILE__);
 define('MATHCOURSE_DIR',plugin_dir_path(__FILE__));
 define('MATHCOURSE_URL',plugin_dir_url(__FILE__));
