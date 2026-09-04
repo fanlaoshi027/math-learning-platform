@@ -29,47 +29,31 @@ class Adapter {
     public function is_preview_lesson($lesson_id) { $native=get_post_meta(absint($lesson_id),'_is_preview',true); if($native==='yes'||$native==='1')return true; return get_post_meta(absint($lesson_id),'_mathcourse_preview',true)==='yes'; }
     public function set_lesson_preview($lesson_id,$enabled) { $value=$enabled?'yes':'no'; update_post_meta(absint($lesson_id),'_is_preview',$value); update_post_meta(absint($lesson_id),'_mathcourse_preview',$value); return true; }
 
-    /**
-     * 后台课程编辑器需要的基础 CRUD。
-     * 直接使用 WordPress 原生文章 API，让 Tutor 的 topics / lesson 作为普通层级内容保存。
-     */
+    /** 后台课程编辑器 CRUD：使用 WordPress 原生 Post API，避免依赖不存在的 Tutor API。 */
     public function create_topic($course_id,$title) {
         $course=$this->get_course($course_id);
-        if(!$course || '' === trim((string)$title)) return 0;
-        $topics=$this->get_topics($course_id,true);
+        $title=sanitize_text_field($title);
+        if(!$course || ''===$title) return 0;
         $order=0;
-        foreach($topics as $topic) $order=max($order,(int)$topic->menu_order+1);
-        $topic_id=wp_insert_post(array(
-            'post_title'=>sanitize_text_field($title),
-            'post_type'=>$this->get_topic_post_type(),
-            'post_status'=>'publish',
-            'post_author'=>get_current_user_id(),
-            'post_parent'=>(int)$course_id,
-            'menu_order'=>$order,
-        ),true);
-        return is_wp_error($topic_id)?0:(int)$topic_id;
+        foreach($this->get_topics($course_id,true) as $topic) $order=max($order,(int)$topic->menu_order+1);
+        $id=wp_insert_post(array('post_title'=>$title,'post_type'=>$this->get_topic_post_type(),'post_status'=>'publish','post_author'=>get_current_user_id(),'post_parent'=>(int)$course_id,'menu_order'=>$order),true);
+        return is_wp_error($id)?0:(int)$id;
     }
 
     public function create_lesson($topic_id,$title) {
         $topic=$this->get_topic($topic_id);
-        if(!$topic || '' === trim((string)$title)) return 0;
-        $lessons=$this->get_lessons($topic_id,true);
+        $title=sanitize_text_field($title);
+        if(!$topic || ''===$title) return 0;
         $order=0;
-        foreach($lessons as $lesson) $order=max($order,(int)$lesson->menu_order+1);
-        $lesson_id=wp_insert_post(array(
-            'post_title'=>sanitize_text_field($title),
-            'post_type'=>$this->get_lesson_post_type(),
-            'post_status'=>'publish',
-            'post_author'=>get_current_user_id(),
-            'post_parent'=>(int)$topic_id,
-            'menu_order'=>$order,
-        ),true);
-        return is_wp_error($lesson_id)?0:(int)$lesson_id;
+        foreach($this->get_lessons($topic_id,true) as $lesson) $order=max($order,(int)$lesson->menu_order+1);
+        $id=wp_insert_post(array('post_title'=>$title,'post_type'=>$this->get_lesson_post_type(),'post_status'=>'publish','post_author'=>get_current_user_id(),'post_parent'=>(int)$topic_id,'menu_order'=>$order),true);
+        return is_wp_error($id)?0:(int)$id;
     }
 
     public function delete_topic($topic_id) {
         $topic=$this->get_topic($topic_id);
         if(!$topic) return false;
+        foreach($this->get_lessons($topic->ID,true) as $lesson) wp_delete_post((int)$lesson->ID,true);
         return (bool)wp_delete_post((int)$topic->ID,true);
     }
 
@@ -82,9 +66,7 @@ class Adapter {
     public function render_lesson_video($lesson_id) { $lesson=$this->get_lesson($lesson_id); if(!$lesson||!function_exists('tutor_lesson_video')||!function_exists('tutor_utils'))return ''; if(get_post_meta($lesson->ID,'_video',true)==='')return ''; global $post; $previous_post=$post; $post=$lesson; setup_postdata($lesson); try{$html=tutor_lesson_video(false);}finally{wp_reset_postdata();$post=$previous_post;} return is_string($html)?$html:''; }
     public function get_course_progress($course_id,$user_id=0) { $user_id=$user_id?absint($user_id):get_current_user_id(); $total=0;$completed=0; foreach($this->get_course_lessons($course_id,false) as $lesson){$total++;if($this->is_lesson_completed($lesson->ID,$user_id))$completed++;} return array('completed'=>$completed,'total'=>$total,'percent'=>$total?round(($completed/$total)*100):0); }
 
-    /**
-     * 统一完成状态：MathCourse 自己的完成记录与 Tutor LMS 原生完成记录取并集。
-     */
+    /** 统一完成状态：MathCourse 自己的完成记录与 Tutor LMS 原生完成记录取并集。 */
     public function is_lesson_completed($lesson_id,$user_id=0) {
         $user_id=$user_id?absint($user_id):get_current_user_id();
         $lesson_id=absint($lesson_id);
