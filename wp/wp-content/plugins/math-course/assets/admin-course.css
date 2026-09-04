@@ -1,9 +1,0 @@
-/* Course management visual layer. */
-.mathcourse-stat-suffix{font-size:14px;font-weight:600;color:#98a2b3}
-.mathcourse-video-readiness{margin:0 0 14px;padding:10px 11px;border:1px solid #edf0f4;border-radius:9px;background:#fafbfc}
-.mathcourse-video-readiness-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#667085}
-.mathcourse-video-readiness-head strong{color:#344054;font-size:11px}
-.mathcourse-video-readiness-track{height:5px;margin-top:7px;overflow:hidden;border-radius:999px;background:#e9edf2}
-.mathcourse-video-readiness-track i{display:block;height:100%;border-radius:999px;background:#12b76a;transition:width .2s ease}
-.mathcourse-video-readiness small{display:block;margin-top:6px;color:#98a2b3;font-size:10px}
-@media(max-width:900px){.mathcourse-video-readiness{margin-bottom:12px}}
