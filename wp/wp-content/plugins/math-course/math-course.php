@@ -28,7 +28,6 @@ $mathcourse_files=array(
  'includes/Admin/class-course-page.php',
  'includes/Admin/class-course-editor.php',
  'includes/Admin/class-course-sort.php',
- 'includes/Admin/class-batch-manager.php',
  'includes/Admin/class-batch-manager-v2.php',
  'includes/Admin/class-demo-importer.php',
  'includes/Course/class-meta.php',
