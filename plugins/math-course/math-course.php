@@ -15,6 +15,9 @@ define('MATHCOURSE_URL',plugin_dir_url(__FILE__));
 /* MP4 临时上传目录与 WordPress 网站目录分离，避免原始视频落到公开 uploads。 */
 define('MATHCOURSE_VIDEO_UPLOAD_ROOT','/www/wwwroot/fanlaoshishu-media/uploads');
 
+/* HLS 成品统一写入独立媒体目录；播放器仍通过 /__mathcourse_hls/ 逻辑路径访问。 */
+define('MATHCOURSE_MEDIA_ROOT','/www/wwwroot/fanlaoshishu-media/hls');
+
 /* 某些服务器未安装 mbstring；课程目录命名不应因此导致后台上传 500。 */
 if (!function_exists('mb_strlen')) {
     function mb_strlen($string, $encoding = null) {
