@@ -7,17 +7,15 @@ use MathCourse\Tutor\Adapter;
 
 /**
  * 后台 MP4 → HLS 转换器。
- *
- * 采用 FFmpeg 无重新编码切片（-c copy），上传完成后由 WP-Cron 在后台处理。
+ * 上传 MP4 后保存到临时源目录，FFmpeg 无重新编码切成 HLS，
+ * HLS 按「课程 slug / p页码」写入独立媒体目录，与播放器的媒体路由保持一致。
  */
 class Hls_Converter {
-
     const META_STATUS = '_mathcourse_video_status';
     const META_SOURCE = '_mathcourse_video_source';
     const META_HLS = '_mathcourse_hls_url';
     const META_ERROR = '_mathcourse_video_error';
     const META_INFO = '_mathcourse_video_info';
-
     private $adapter;
 
     public function __construct() {
@@ -68,7 +66,6 @@ class Hls_Converter {
             if ( $upload_error ) wp_send_json_error( array( 'message' => '文件上传失败，错误代码：' . $upload_error . '。当前 PHP upload_max_filesize=' . ini_get( 'upload_max_filesize' ) . '，post_max_size=' . ini_get( 'post_max_size' ) . '。' ), 400 );
             wp_send_json_error( array( 'message' => '请选择 MP4 视频文件。' ), 400 );
         }
-
         $file = $_FILES['video'];
         if ( ! empty( $file['error'] ) ) wp_send_json_error( array( 'message' => '文件上传失败，错误代码：' . absint( $file['error'] ) . '。PHP upload_max_filesize=' . ini_get( 'upload_max_filesize' ) . '，post_max_size=' . ini_get( 'post_max_size' ) . '。' ), 400 );
         if ( ! is_uploaded_file( $file['tmp_name'] ) ) wp_send_json_error( array( 'message' => '上传文件无效。' ), 400 );
@@ -83,7 +80,6 @@ class Hls_Converter {
 
         $info = $this->probe( $source );
         if ( is_wp_error( $info ) ) { @unlink( $source ); wp_send_json_error( array( 'message' => $info->get_error_message() ), 400 ); }
-
         update_post_meta( $lesson_id, self::META_STATUS, 'pending' );
         update_post_meta( $lesson_id, self::META_SOURCE, $source );
         update_post_meta( $lesson_id, self::META_INFO, $info );
@@ -97,11 +93,9 @@ class Hls_Converter {
             $this->fail( $lesson_id, '无法创建 HLS 输出目录。' );
             wp_send_json_error( array( 'message' => '无法创建 HLS 输出目录。' ), 500 );
         }
-
         wp_clear_scheduled_hook( 'mathcourse_convert_video', array( $lesson_id ) );
         wp_schedule_single_event( time() + 2, 'mathcourse_convert_video', array( $lesson_id ) );
         if ( function_exists( 'spawn_cron' ) ) spawn_cron( time() );
-
         wp_send_json_success( array( 'status' => 'pending', 'message' => 'MP4 已上传，服务器开始准备 HLS 转换。', 'info' => $info ) );
     }
 
@@ -118,12 +112,7 @@ class Hls_Converter {
             status_header( 500 );
             nocache_headers();
             header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
-            echo wp_json_encode( array(
-                'success' => false,
-                'data' => array(
-                    'message' => 'PHP 在处理视频上传时发生致命错误：' . sanitize_text_field( $error['message'] ) . '（文件：' . wp_basename( $error['file'] ) . '，第 ' . absint( $error['line'] ) . ' 行）',
-                ),
-            ) );
+            echo wp_json_encode( array( 'success' => false, 'data' => array( 'message' => 'PHP 在处理视频上传时发生致命错误：' . sanitize_text_field( $error['message'] ) . '（文件：' . wp_basename( $error['file'] ) . '，第 ' . absint( $error['line'] ) . ' 行）' ) ) );
         } );
     }
 
@@ -142,12 +131,10 @@ class Hls_Converter {
         $source = get_post_meta( $lesson_id, self::META_SOURCE, true );
         $course_id = $this->adapter->get_lesson_course_id( $lesson_id );
         if ( ! $source || ! $course_id || ! is_file( $source ) ) { $this->fail( $lesson_id, '找不到上传的 MP4 文件。' ); return; }
-
         update_post_meta( $lesson_id, self::META_STATUS, 'processing' );
         $info = $this->probe( $source );
         if ( is_wp_error( $info ) ) { $this->fail( $lesson_id, $info->get_error_message() ); return; }
         update_post_meta( $lesson_id, self::META_INFO, $info );
-
         $video_codec = strtolower( (string) ( $info['video_codec'] ?? '' ) );
         $audio_codec = strtolower( (string) ( $info['audio_codec'] ?? '' ) );
         if ( 'h264' !== $video_codec ) { $this->fail( $lesson_id, '该 MP4 的视频编码为 ' . ( $video_codec ?: '未知' ) . '。请使用 H.264 视频编码后再上传。' ); return; }
@@ -159,23 +146,16 @@ class Hls_Converter {
         $pattern = trailingslashit( $hls_dir ) . 'segment-%05d.ts';
         $ffmpeg = defined( 'MATHCOURSE_FFMPEG_PATH' ) ? MATHCOURSE_FFMPEG_PATH : '/usr/bin/ffmpeg';
         if ( ! is_executable( $ffmpeg ) ) { $this->fail( $lesson_id, '找不到可执行的 FFmpeg：' . $ffmpeg ); return; }
-
         $cmd = escapeshellarg( $ffmpeg ) . ' -hide_banner -loglevel error -y -i ' . escapeshellarg( $source ) . ' -map 0:v:0 -map 0:a? -c copy -start_number 0 -hls_time 8 -hls_list_size 0 -hls_segment_type mpegts -hls_segment_filename ' . escapeshellarg( $pattern ) . ' -f hls ' . escapeshellarg( $playlist ) . ' 2>&1';
-        $output = array(); $exit = 0;
-        @set_time_limit( 0 );
-        exec( $cmd, $output, $exit );
-
-        if ( 0 !== $exit || ! is_file( $playlist ) || filesize( $playlist ) < 20 ) {
-            $this->fail( $lesson_id, 'FFmpeg HLS 转换失败：' . trim( implode( "\n", array_slice( $output, -8 ) ) ) );
-            return;
-        }
-
-        $has_segment = false;
-        $files = glob( trailingslashit( $hls_dir ) . 'segment-*.ts' );
+        $output = array(); $exit = 0; @set_time_limit( 0 ); exec( $cmd, $output, $exit );
+        if ( 0 !== $exit || ! is_file( $playlist ) || filesize( $playlist ) < 20 ) { $this->fail( $lesson_id, 'FFmpeg HLS 转换失败：' . trim( implode( "\n", array_slice( $output, -8 ) ) ) ); return; }
+        $has_segment = false; $files = glob( trailingslashit( $hls_dir ) . 'segment-*.ts' );
         if ( is_array( $files ) ) foreach ( $files as $segment ) { if ( is_file( $segment ) && filesize( $segment ) > 0 ) { $has_segment = true; break; } }
         if ( ! $has_segment ) { $this->fail( $lesson_id, 'HLS 播放列表已生成，但没有找到有效视频分片。' ); return; }
 
-        update_post_meta( $lesson_id, self::META_HLS, '/__mathcourse_hls/course-' . $course_id . '/lesson-' . $lesson_id . '/index.m3u8' );
+        $relative = $this->get_hls_relative_path( $course_id, $lesson_id );
+        if ( ! $relative ) { $this->fail( $lesson_id, '无法确定课程的视频目录。请检查课程名称/课时页码。' ); return; }
+        update_post_meta( $lesson_id, self::META_HLS, '/__mathcourse_hls/' . $relative . '/index.m3u8' );
         update_post_meta( $lesson_id, self::META_STATUS, 'ready' );
         delete_post_meta( $lesson_id, self::META_ERROR );
         @unlink( $source );
@@ -183,6 +163,27 @@ class Hls_Converter {
     }
 
     private function fail( $lesson_id, $message ) { update_post_meta( $lesson_id, self::META_STATUS, 'failed' ); update_post_meta( $lesson_id, self::META_ERROR, sanitize_textarea_field( (string) $message ) ); }
+
+    /**
+     * HLS 目录必须与 Local_Hls_Source / Hls_Accelerator 使用的逻辑 URL 一致：
+     *   {媒体根目录}/{课程 slug}/p{教材页码}/index.m3u8
+     * 例如：/fanlaoshishu-media/hls/8shang-dapeiyou-2026/p1/index.m3u8
+     */
+    private function get_hls_relative_path( $course_id, $lesson_id ) {
+        $course = $this->adapter->get_course( $course_id );
+        if ( ! $course ) return '';
+        $slug = sanitize_title( $course->post_name ? $course->post_name : $course->post_title );
+        if ( '' === $slug ) $slug = 'course-' . absint( $course_id );
+        $page = $this->adapter->get_lesson_page_number( $lesson_id );
+        $page = trim( (string) $page );
+        if ( '' !== $page ) {
+            $page = preg_replace( '/[^A-Za-z0-9_-]+/', '-', $page );
+            $page = trim( (string) $page, '-' );
+        }
+        $page = '' !== $page ? 'p' . $page : 'lesson-' . absint( $lesson_id );
+        return trim( $slug . '/' . $page, '/' );
+    }
+
     private function probe( $source ) {
         $ffprobe = defined( 'MATHCOURSE_FFPROBE_PATH' ) ? MATHCOURSE_FFPROBE_PATH : '/usr/bin/ffprobe';
         if ( ! is_executable( $ffprobe ) ) return new \WP_Error( 'ffprobe_missing', '找不到 ffprobe：' . $ffprobe );
@@ -191,13 +192,13 @@ class Hls_Converter {
         if ( empty( $data ) || empty( $data['streams'] ) ) return new \WP_Error( 'ffprobe_failed', '无法读取 MP4 视频信息。' );
         $info = array( 'duration' => isset( $data['format']['duration'] ) ? round( (float) $data['format']['duration'], 2 ) : 0, 'video_codec' => '', 'audio_codec' => '', 'width' => 0, 'height' => 0, 'fps' => '' );
         foreach ( $data['streams'] as $stream ) {
-            if ( 'video' === ( $stream['codec_type'] ?? '' ) && ! $info['video_codec'] ) { $info['video_codec'] = sanitize_key( $stream['codec_name'] ?? '' ); $info['width'] = absint( $stream['width'] ?? 0 ); $info['height'] = absint( $stream['height'] ?? 0 ); $info['fps'] = sanitize_text_field( $stream['r_frame_rate'] ?? '' ); }
-            if ( 'audio' === ( $stream['codec_type'] ?? '' ) && ! $info['audio_codec'] ) $info['audio_codec'] = sanitize_key( $stream['codec_name'] ?? '' );
+            if ( 'video' === ( $stream['codec_type'] ?? '' ) && ! $info['video_codec'] ) { $info['video_codec'] = $stream['codec_name'] ?? ''; $info['width'] = absint( $stream['width'] ?? 0 ); $info['height'] = absint( $stream['height'] ?? 0 ); $info['fps'] = $this->fps( $stream['r_frame_rate'] ?? '' ); }
+            if ( 'audio' === ( $stream['codec_type'] ?? '' ) && ! $info['audio_codec'] ) $info['audio_codec'] = $stream['codec_name'] ?? '';
         }
         return $info;
     }
-
-    private function get_upload_root() { if ( defined( 'MATHCOURSE_VIDEO_UPLOAD_ROOT' ) && MATHCOURSE_VIDEO_UPLOAD_ROOT ) return untrailingslashit( MATHCOURSE_VIDEO_UPLOAD_ROOT ); if ( defined( 'MATHCOURSE_MEDIA_ROOT' ) && MATHCOURSE_MEDIA_ROOT ) return dirname( untrailingslashit( MATHCOURSE_MEDIA_ROOT ) ) . '/uploads'; return WP_CONTENT_DIR . '/uploads/mathcourse-video-source'; }
-    private function get_hls_dir( $course_id, $lesson_id ) { $root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls'; return trailingslashit( $root ) . 'course-' . absint( $course_id ) . '/lesson-' . absint( $lesson_id ); }
-    private function remove_dir( $dir ) { if ( ! is_dir( $dir ) ) return; $items = scandir( $dir ); if ( is_array( $items ) ) foreach ( $items as $item ) { if ( '.' === $item || '..' === $item ) continue; $path = trailingslashit( $dir ) . $item; if ( is_dir( $path ) ) $this->remove_dir( $path ); else @unlink( $path ); } @rmdir( $dir ); }
+    private function fps( $rate ) { if ( ! $rate || strpos( $rate, '/' ) === false ) return $rate; list( $n, $d ) = array_map( 'floatval', explode( '/', $rate, 2 ) ); return $d > 0 ? rtrim( rtrim( number_format( $n / $d, 2, '.', '' ), '0' ), '.' ) : ''; }
+    private function get_upload_root() { return defined( 'MATHCOURSE_VIDEO_UPLOAD_ROOT' ) ? untrailingslashit( MATHCOURSE_VIDEO_UPLOAD_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-source'; }
+    private function get_hls_dir( $course_id, $lesson_id ) { $root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls'; $relative = $this->get_hls_relative_path( $course_id, $lesson_id ); return trailingslashit( $root ) . $relative; }
+    private function remove_dir( $dir ) { if ( ! is_dir( $dir ) ) return; $items = scandir( $dir ); if ( ! is_array( $items ) ) return; foreach ( $items as $item ) { if ( '.' === $item || '..' === $item ) continue; $path = trailingslashit( $dir ) . $item; if ( is_dir( $path ) ) $this->remove_dir( $path ); else @unlink( $path ); } @rmdir( $dir ); }
 }
