@@ -1,0 +1,93 @@
+.mc-course-player{max-width:1180px;margin:18px auto 50px;color:#162235}.mc-course-player__top{display:flex;align-items:flex-end;justify-content:space-between;gap:30px;margin-bottom:18px}.mc-course-player__eyebrow{margin-bottom:6px;color:#ff9418;font-size:11px;font-weight:800;letter-spacing:.12em}.mc-course-player__top h1{margin:0;font-size:30px;line-height:1.3;letter-spacing:-.03em;color:#0d2942}.mc-course-player__progress{width:300px;flex:0 0 300px}.mc-course-player__progress span{display:block;margin-bottom:4px;color:#748094;font-size:12px}.mc-course-player__progress strong{display:block;margin-bottom:7px;font-size:13px;color:#162235}.mc-course-player__progress>div{height:7px;overflow:hidden;border-radius:999px;background:#e9eef3}.mc-course-player__progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#1769e0,#ff9418)}.mc-course-player__layout{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:18px;align-items:start}.mc-course-player__main{min-width:0}.mc-course-player__video{overflow:hidden;border-radius:18px;background:#091522;box-shadow:0 14px 40px rgba(13,41,66,.12)}.mc-course-player__lesson-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 2px 3px}.mc-course-player__lesson-head span{display:block;margin-bottom:4px;color:#748094;font-size:11px}.mc-course-player__lesson-head h2{margin:0;font-size:20px;line-height:1.45;color:#0d2942}.mc-course-player__lesson-head em{padding:5px 9px;border-radius:7px;background:#fff3e3;color:#c96b08;font-size:11px;font-style:normal;font-weight:750;white-space:nowrap}.mc-course-player__navigation{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}.mc-course-player__nav-button{display:flex;align-items:center;gap:9px;min-width:0;min-height:60px;padding:10px 13px;border:1px solid #e5eaf0;border-radius:12px;background:#fff;color:#162235;text-decoration:none;transition:background .15s,border-color .15s,transform .15s,box-shadow .15s}.mc-course-player__nav-button:hover{border-color:#cfdbe7;background:#f8fbfe;transform:translateY(-1px);box-shadow:0 5px 14px rgba(13,41,66,.05)}.mc-course-player__nav-button small{display:block;color:#8a96a7;font-size:10px;white-space:nowrap}.mc-course-player__nav-button strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:750}.mc-course-player__nav-button>span{display:grid;place-items:center;width:30px;height:30px;flex:0 0 30px;border-radius:9px;background:#edf5ff;color:#1769e0;font-size:21px;line-height:1}.mc-course-player__nav-button.is-next{justify-content:flex-end;text-align:right}.mc-course-player__nav-button.is-next>span{order:3}.mc-course-player__nav-button.is-disabled{color:#a1aab7;background:#f8fafc;cursor:default;box-shadow:none}.mc-course-player__nav-button.is-disabled:hover{transform:none}.mc-course-player__nav-button.is-disabled>span{background:#f1f4f7;color:#a1aab7}.mc-course-player__completion{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-top:10px;padding:11px 13px;border:1px solid #dcefe6;border-radius:11px;background:#f5fbf7;color:#17623f;font-size:12px}.mc-course-player__completion>div{display:flex;align-items:center;gap:8px;min-width:0}.mc-course-player__completion strong{font-size:12px;white-space:nowrap}.mc-course-player__completion-text{color:#6b8c7d}.mc-course-player__completion-next{display:inline-flex;align-items:center;gap:5px;color:#1769e0;font-weight:750;text-decoration:none;white-space:nowrap}.mc-course-player__completion-next span{font-size:16px}.mc-course-player__topics{max-height:650px;overflow:auto;background:#fff}.mc-course-player__topic{border-bottom:1px solid #f1f5f9}.mc-course-player__topic:last-child{border-bottom:0}.mc-course-player__topic h3{position:relative;display:flex;align-items:center;gap:8px;margin:0;padding:12px 16px;background:rgba(248,250,252,.58);font-size:12px;line-height:1.5;color:#1e293b;font-weight:700;cursor:pointer;user-select:none}.mc-course-player__topic h3:after{content:'›';margin-left:auto;color:#94a3b8;font-size:18px;line-height:1;transform:rotate(0deg);transition:transform .16s ease,color .16s ease}.mc-course-player__topic.is-open h3:after{transform:rotate(90deg);color:#1769e0}.mc-course-player__topic-chevron{display:none}.mc-course-player__lessons{padding:7px 8px;background:#fff}.mc-course-player__lessons[hidden]{display:none!important}.mc-course-player__item{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;margin:2px 0;padding:10px 11px;border:0;border-radius:8px;background:#fff;color:#475569;text-align:left;text-decoration:none;font:inherit;transition:background .12s,color .12s}.mc-course-player__item:hover{background:#f1f5f9;color:#334155}.mc-course-player__item.is-active{position:relative;background:#2563eb;color:#fff;font-weight:500;box-shadow:inset 3px 0 0 #ff9418}.mc-course-player__item.is-complete{color:#64748b}.mc-course-player__item.is-complete:hover{background:#f8fafc}.mc-course-player__item.is-locked{color:#94a3b8;background:#fafafa}.mc-course-player__check{width:20px;text-align:center;flex:0 0 20px;color:#94a3b8;font-size:12px}.mc-course-player__item.is-complete .mc-course-player__check{color:#16a36d;font-weight:800}.mc-course-player__item.is-active .mc-course-player__check{color:#dbeafe}.mc-course-player__item>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.mc-course-player__item small{margin-left:auto;padding:3px 6px;border-radius:5px;background:#fff3e3;color:#c96b08;font-size:9px;white-space:nowrap;font-weight:700}.mc-course-player__item.is-active small{background:rgba(255,255,255,.16);color:#fff}.mc-course-player__topics::-webkit-scrollbar{width:5px}.mc-course-player__topics::-webkit-scrollbar-thumb{border-radius:999px;background:#cbd5e1}.mc-course-player__topics::-webkit-scrollbar-track{background:transparent}@media(min-width:1100px){.mc-course-player__sidebar{position:sticky;top:18px}}@media(max-width:900px){.mc-course-player{margin:10px auto 35px}.mc-course-player__layout{grid-template-columns:1fr}.mc-course-player__sidebar{order:2}.mc-course-player__topics{max-height:420px}.mc-course-player__top{align-items:flex-start;flex-direction:column;gap:14px}.mc-course-player__progress{width:100%;max-width:420px;flex-basis:auto}.mc-course-player__top h1{font-size:25px}}@media(max-width:600px){.mc-course-player{margin:0 auto 25px;padding:0 12px}.mc-course-player__top{padding:12px 0 0;margin-bottom:10px}.mc-course-player__eyebrow{margin-bottom:4px;font-size:10px}.mc-course-player__top h1{font-size:20px;line-height:1.35}.mc-course-player__progress{max-width:none}.mc-course-player__progress span{font-size:11px}.mc-course-player__progress strong{font-size:12px}.mc-course-player__progress>div{height:6px}.mc-course-player__video{border-radius:12px;box-shadow:0 6px 22px rgba(13,41,66,.1);margin-left:0;margin-right:0}.mc-course-player__lesson-head{padding:14px 0 1px;align-items:flex-start}.mc-course-player__lesson-head h2{font-size:17px;line-height:1.4}.mc-course-player__lesson-head em{padding:4px 8px;font-size:10px}.mc-course-player__navigation{grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.mc-course-player__nav-button{min-height:52px;padding:7px 9px;border-radius:10px;gap:6px}.mc-course-player__nav-button small{font-size:9px}.mc-course-player__nav-button strong{font-size:11px}.mc-course-player__nav-button>span{width:26px;height:26px;flex-basis:26px;border-radius:7px;font-size:18px}.mc-course-player__sidebar{margin-top:16px;border-radius:12px}.mc-course-player__topics{max-height:none;overflow:visible}.mc-course-player__topic h3{padding:13px 13px;font-size:12px}.mc-course-player__lessons{padding:5px}.mc-course-player__item{padding:9px 8px;min-height:42px}.mc-course-player__item>span:nth-child(2){font-size:12px}.mc-course-player__completion{align-items:flex-start;flex-direction:column;gap:7px;padding:10px 12px}}
+
+/* Tutor-native learning layout override. The shortcode enqueues this stylesheet during render, so the authoritative learning geometry lives here. */
+@media (min-width: 1051px) {
+  body.mathcourse-site .mc-course-player {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 0 48px !important;
+    box-sizing: border-box;
+  }
+  body.mathcourse-site .mc-course-player__topbar {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+  body.mathcourse-site .mc-course-player__workspace {
+    width: min(1240px, calc(100% - 56px)) !important;
+    max-width: 1240px !important;
+    margin: 16px auto 0 !important;
+    display: grid !important;
+    grid-template-columns: 280px minmax(0, 1fr) !important;
+    gap: 28px !important;
+    align-items: start !important;
+    box-sizing: border-box;
+  }
+  body.mathcourse-site .mc-course-player__sidebar {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+  body.mathcourse-site .mc-course-player__main {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+  body.mathcourse-site .mc-course-player__video,
+  body.mathcourse-site .mc-course-player__video .mathcourse-artplayer {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 1050px) {
+  body.mathcourse-site .mc-course-player__workspace {
+    width: 100% !important;
+    max-width: 900px !important;
+    margin: 0 auto !important;
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Learning page: no top information bar. Progress is a single compact line above the lesson list. */
+body.mathcourse-site .mc-course-player__topbar,
+body.mathcourse-site .mc-course-player__top {
+  display: none !important;
+}
+body.mathcourse-site .mc-course-player__progress-card {
+  display: none !important;
+}
+body.mathcourse-site .mc-course-player__progress-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid #2a323d;
+  background: #1b212a;
+  color: #9faab7;
+  font-size: 13px;
+  line-height: 1;
+}
+body.mathcourse-site .mc-course-player__progress-line strong {
+  color: #eef3f8;
+  font-size: 13px;
+  font-weight: 750;
+}
+@media (min-width: 1051px) {
+  body.mathcourse-site .mc-course-player__workspace {
+    margin-top: 0 !important;
+  }
+}
+@media (max-width: 1050px) {
+  body.mathcourse-site .mc-course-player__progress-line {
+    display: none;
+  }
+}

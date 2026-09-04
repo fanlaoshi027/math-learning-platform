@@ -1,0 +1,129 @@
+.mathcourse-artplayer {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    height: auto;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.mathcourse-artplayer .art-video-player {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.mathcourse-artplayer video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 进度条与控制按钮拉开距离，避免拖动时误触右侧按钮。 */
+.mathcourse-artplayer .art-bottom {
+    padding-bottom: 3px;
+}
+
+.mathcourse-artplayer .art-progress {
+    height: 4px;
+    margin-bottom: 10px;
+}
+
+.mathcourse-artplayer .art-control-bar {
+    min-height: 48px;
+    padding-bottom: 2px;
+}
+
+/* 倍速按钮使用自定义直接显示的 1.0x / 1.25x 等文字。 */
+.mathcourse-artplayer .art-control-mathcourse-speed {
+    white-space: nowrap;
+    min-width: 48px;
+}
+
+.mathcourse-artplayer .mathcourse-speed-menu {
+    position: absolute;
+    right: 12px;
+    bottom: 62px;
+    z-index: 10050;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 72px;
+    padding: 6px;
+    border-radius: 8px;
+    background: rgba(20, 24, 30, .96);
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+}
+
+.mathcourse-artplayer .mathcourse-speed-menu[hidden] {
+    display: none;
+}
+
+.mathcourse-artplayer .mathcourse-speed-option {
+    border: 0;
+    border-radius: 6px;
+    padding: 7px 10px;
+    background: transparent;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+}
+
+.mathcourse-artplayer .mathcourse-speed-option:hover,
+.mathcourse-artplayer .mathcourse-speed-option.is-active {
+    background: rgba(255,255,255,.14);
+}
+
+/* 浏览器真正进入 fullscreen 后，反色必须跟随 video 一起保留。 */
+.mathcourse-artplayer.mathcourse-inverted video,
+.mathcourse-artplayer:fullscreen video,
+.mathcourse-artplayer:-webkit-full-screen video,
+.mathcourse-artplayer.art-fullscreen video {
+    filter: brightness(.9) invert(1) hue-rotate(180deg) !important;
+}
+
+@media (min-width: 1051px) {
+    .mathcourse-artplayer {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        aspect-ratio: 16 / 9 !important;
+        height: auto !important;
+    }
+
+    .mathcourse-artplayer .art-video-player {
+        width: 100% !important;
+        max-width: none !important;
+        height: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+    }
+
+    .mathcourse-artplayer .art-control-bar {
+        min-height: 50px;
+    }
+}
+
+@media (max-width: 767px) {
+    .mathcourse-artplayer {
+        min-height: 0;
+        border-radius: 8px;
+    }
+
+    .mathcourse-artplayer .art-progress {
+        margin-bottom: 8px;
+    }
+
+    .mathcourse-artplayer .art-control-bar {
+        min-height: 42px;
+    }
+}
