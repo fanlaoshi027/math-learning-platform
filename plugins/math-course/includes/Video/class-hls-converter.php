@@ -146,6 +146,7 @@ class Hls_Converter {
         $pattern = trailingslashit( $hls_dir ) . 'segment-%05d.ts';
         $ffmpeg = defined( 'MATHCOURSE_FFMPEG_PATH' ) ? MATHCOURSE_FFMPEG_PATH : '/usr/bin/ffmpeg';
         if ( ! is_executable( $ffmpeg ) ) { $this->fail( $lesson_id, '找不到可执行的 FFmpeg：' . $ffmpeg ); return; }
+        if ( ! function_exists( 'exec' ) ) { $this->fail( $lesson_id, '服务器禁用了 PHP exec()，无法执行 FFmpeg HLS 转换。请在宝塔 PHP 设置中启用 exec。' ); return; }
         $cmd = escapeshellarg( $ffmpeg ) . ' -hide_banner -loglevel error -y -i ' . escapeshellarg( $source ) . ' -map 0:v:0 -map 0:a? -c copy -start_number 0 -hls_time 8 -hls_list_size 0 -hls_segment_type mpegts -hls_segment_filename ' . escapeshellarg( $pattern ) . ' -f hls ' . escapeshellarg( $playlist ) . ' 2>&1';
         $output = array(); $exit = 0; @set_time_limit( 0 ); exec( $cmd, $output, $exit );
         if ( 0 !== $exit || ! is_file( $playlist ) || filesize( $playlist ) < 20 ) { $this->fail( $lesson_id, 'FFmpeg HLS 转换失败：' . trim( implode( "\n", array_slice( $output, -8 ) ) ) ); return; }
@@ -164,12 +165,6 @@ class Hls_Converter {
 
     private function fail( $lesson_id, $message ) { update_post_meta( $lesson_id, self::META_STATUS, 'failed' ); update_post_meta( $lesson_id, self::META_ERROR, sanitize_textarea_field( (string) $message ) ); }
 
-    /**
-     * HLS 目录固定为：
-     *   {媒体根目录}/{课程全拼}/lesson-{课时ID}/index.m3u8
-     * 课程目录根据课程名称自动生成，不再使用 WordPress 的 post_name/course-ID。
-     * 例如：八年级上册大培优2026 → 8shang-dapeiyou-2026
-     */
     private function get_hls_relative_path( $course_id, $lesson_id ) {
         $course = $this->adapter->get_course( $course_id );
         if ( ! $course ) return '';
@@ -178,54 +173,43 @@ class Hls_Converter {
         return trim( $directory . '/lesson-' . absint( $lesson_id ), '/' );
     }
 
-    /**
-     * 根据课程名称生成稳定的英文/数字目录名。
-     * 教材课程名称中的「X年级上/下册」按站点目录规则压缩为「Xshang/xia」。
-     * 优先使用 PHP Intl 的 Han-Latin 转换；没有 Intl 时，对常用数学课程词汇提供兜底转换。
-     */
     private function course_directory_name( $title ) {
         $title = trim( wp_strip_all_tags( (string) $title ) );
         if ( '' === $title ) return '';
 
-        $grade_map = array(
-            '一' => '1', '二' => '2', '三' => '3', '四' => '4', '五' => '5',
-            '六' => '6', '七' => '7', '八' => '8', '九' => '9', '十' => '10',
-        );
+        $grade_map = array( '一' => '1', '二' => '2', '三' => '3', '四' => '4', '五' => '5', '六' => '6', '七' => '7', '八' => '8', '九' => '9', '十' => '10' );
         $title = preg_replace_callback( '/([一二三四五六七八九十0-9]+)年级(上册|下册)/u', function ( $m ) use ( $grade_map ) {
             $grade = $m[1];
             if ( isset( $grade_map[ $grade ] ) ) $grade = $grade_map[ $grade ];
             return $grade . ( '上册' === $m[2] ? 'shang' : 'xia' );
         }, $title );
-
         $title = str_replace( array( '上册', '下册' ), array( 'shang', 'xia' ), $title );
+
+        $fallback = array(
+            '一元二次方程' => 'yiyuanercifangcheng', '一元一次方程' => 'yiyuanyicifangcheng', '二次函数' => 'ercihanshu', '一次函数' => 'yicihanshu',
+            '三角形' => 'sanjiaoxing', '勾股定理' => 'gougudingli', '因式分解' => 'yinshifenjie', '大培优' => 'dapeiyou', '全等' => 'quandeng',
+            '培优' => 'peiyou', '系统课' => 'xitongke', '数学' => 'shuxue', '专题' => 'zhuanti', '基础' => 'jichu', '提高' => 'tigao', '入门' => 'rumen',
+            '整式' => 'zhengshi', '分式' => 'fenshi', '实数' => 'shishu', '几何' => 'jihe', '代数' => 'daishu',
+        );
+        uksort( $fallback, function ( $a, $b ) { return strlen( $b ) - strlen( $a ); } );
+        $title = str_replace( array_keys( $fallback ), array_values( $fallback ), $title );
 
         if ( class_exists( '\Transliterator' ) ) {
             $transliterator = \Transliterator::create( 'Han-Latin; Latin-ASCII' );
             if ( $transliterator ) $title = $transliterator->transliterate( $title );
-        } else {
-            $fallback = array(
-                '大培优' => 'dapeiyou', '培优' => 'peiyou', '数学' => 'shuxue', '系统课' => 'xitongke',
-                '专题' => 'zhuanti', '基础' => 'jichu', '提高' => 'tigao', '入门' => 'rumen',
-                '全等' => 'quandeng', '三角形' => 'sanjiaoxing', '一次函数' => 'yicihanshu',
-                '二次函数' => 'ercihanshu', '一元一次方程' => 'yiyuanyicifangcheng',
-                '一元二次方程' => 'yiyuanercifangcheng', '勾股定理' => 'gougudingli',
-                '因式分解' => 'yinshifenjie', '整式' => 'zhengshi', '分式' => 'fenshi',
-                '实数' => 'shishu', '几何' => 'jihe', '代数' => 'daishu',
-            );
-            uksort( $fallback, function ( $a, $b ) { return strlen( $b ) - strlen( $a ); } );
-            $title = str_replace( array_keys( $fallback ), array_values( $fallback ), $title );
         }
-
         $title = strtolower( $title );
-        $title = preg_replace( '/[\x{3000}\s]+/u', '', $title );
         $title = preg_replace( '/[^a-z0-9]+/i', '-', $title );
         $title = trim( $title, '-' );
-        return $title;
+        $title = preg_replace( '/^(\d+(?:shang|xia))([a-z]+)/', '$1-$2', $title );
+        $title = preg_replace( '/([a-z])(\d{4})$/', '$1-$2', $title );
+        return trim( $title, '-' );
     }
 
     private function probe( $source ) {
         $ffprobe = defined( 'MATHCOURSE_FFPROBE_PATH' ) ? MATHCOURSE_FFPROBE_PATH : '/usr/bin/ffprobe';
         if ( ! is_executable( $ffprobe ) ) return new \WP_Error( 'ffprobe_missing', '找不到 ffprobe：' . $ffprobe );
+        if ( ! function_exists( 'shell_exec' ) ) return new \WP_Error( 'shell_exec_disabled', '服务器禁用了 PHP shell_exec()，无法读取 MP4 视频信息。请在宝塔 PHP 设置中启用 shell_exec。' );
         $cmd = escapeshellarg( $ffprobe ) . ' -v error -show_entries format=duration:stream=index,codec_type,codec_name,width,height,r_frame_rate -of json ' . escapeshellarg( $source );
         $data = json_decode( (string) @shell_exec( $cmd ), true );
         if ( empty( $data ) || empty( $data['streams'] ) ) return new \WP_Error( 'ffprobe_failed', '无法读取 MP4 视频信息。' );
