@@ -32,11 +32,17 @@ class Course_Sort {
             return;
         }
 
+        $script_path = MATHCOURSE_DIR . 'assets/admin-course-sort.js';
+        $script_version = defined( 'MATHCOURSE_VERSION' ) ? MATHCOURSE_VERSION : '1.0.0';
+        if ( file_exists( $script_path ) ) {
+            $script_version .= '.' . filemtime( $script_path );
+        }
+
         wp_enqueue_script(
             'mathcourse-admin-course-sort',
             MATHCOURSE_URL . 'assets/admin-course-sort.js',
             array(),
-            MATHCOURSE_VERSION,
+            $script_version,
             true
         );
 
@@ -93,12 +99,16 @@ class Course_Sort {
                 continue;
             }
 
-            wp_update_post(
+            $updated = wp_update_post(
                 array(
                     'ID'         => $topic_id,
                     'menu_order' => $position,
-                )
+                ),
+                true
             );
+            if ( is_wp_error( $updated ) ) {
+                wp_send_json_error( array( 'message' => '专题排序保存失败：' . $updated->get_error_message() ), 500 );
+            }
             $position++;
         }
 
@@ -121,12 +131,16 @@ class Course_Sort {
                     continue;
                 }
 
-                wp_update_post(
+                $updated = wp_update_post(
                     array(
                         'ID'         => $lesson_id,
                         'menu_order' => $position,
-                    )
+                    ),
+                    true
                 );
+                if ( is_wp_error( $updated ) ) {
+                    wp_send_json_error( array( 'message' => '课时排序保存失败：' . $updated->get_error_message() ), 500 );
+                }
                 $position++;
             }
         }
