@@ -20,6 +20,60 @@ document.addEventListener('DOMContentLoaded', function () {
         return ({none:'未上传',pending:'等待转换',processing:'正在转换',ready:'转换完成',failed:'转换失败'})[status] || status || '未上传';
     }
 
+    function statusClass(status) {
+        return ({none:'is-none',pending:'is-pending',processing:'is-processing',ready:'is-ready',failed:'is-failed'})[status] || 'is-none';
+    }
+
+    function requestStatus(lessonId) {
+        var data = new URLSearchParams();
+        data.set('action', 'mathcourse_video_status');
+        data.set('nonce', mathcourseVideoAdmin.nonce);
+        data.set('lesson_id', lessonId);
+        return fetch(mathcourseVideoAdmin.ajax_url, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+            body:data.toString()
+        }).then(function(r){ return r.json(); }).then(function(result){
+            return result && result.success ? (result.data || {}) : null;
+        }).catch(function(){ return null; });
+    }
+
+    function refreshLessonRows() {
+        var rows = wrap.querySelectorAll('.mathcourse-lesson-row[data-lesson-id]');
+        if (!rows.length) return;
+        rows.forEach(function(row){
+            var lessonId = row.getAttribute('data-lesson-id');
+            if (!lessonId || row.dataset.videoStatusLoading === '1') return;
+            row.dataset.videoStatusLoading = '1';
+            requestStatus(lessonId).then(function(data){
+                row.dataset.videoStatusLoading = '0';
+                if (!data) return;
+                var badge = row.querySelector('.mathcourse-video-status-badge');
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'mathcourse-video-status-badge';
+                    var main = row.querySelector('.mathcourse-lesson-main');
+                    if (main) main.appendChild(badge);
+                }
+                badge.textContent = statusText(data.status);
+                badge.className = 'mathcourse-video-status-badge ' + statusClass(data.status);
+                if (data.status === 'failed' && data.error) {
+                    badge.title = data.error;
+                } else if (data.info) {
+                    var info = data.info;
+                    var parts = [];
+                    if (info.width && info.height) parts.push(info.width + ' × ' + info.height);
+                    if (info.fps) parts.push(info.fps + ' fps');
+                    if (info.duration) parts.push(formatDuration(info.duration));
+                    badge.title = parts.join(' · ');
+                } else {
+                    badge.removeAttribute('title');
+                }
+            });
+        });
+    }
+
     function install(root) {
         if (!root || root.dataset.videoUploadBound === '1') return;
         var lessonId = root.getAttribute('data-lesson-editor-id');
@@ -50,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function setStatus(value) {
             status.textContent = statusText(value);
-            status.className = 'mathcourse-video-status is-' + (value || 'none');
+            status.className = 'mathcourse-video-status ' + statusClass(value);
             if (value === 'processing' || value === 'pending') {
                 progress.hidden = false;
                 progress.classList.add('is-indeterminate');
@@ -70,34 +124,29 @@ document.addEventListener('DOMContentLoaded', function () {
             meta.textContent = parts.join('  ·  ');
         }
         function poll() {
-            var data = new URLSearchParams();
-            data.set('action', 'mathcourse_video_status');
-            data.set('nonce', mathcourseVideoAdmin.nonce);
-            data.set('lesson_id', lessonId);
-            fetch(mathcourseVideoAdmin.ajax_url, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'}, body:data.toString()})
-                .then(function(r){return r.json();})
-                .then(function(result){
-                    if (!result.success) return;
-                    var d = result.data || {};
-                    setStatus(d.status);
-                    showInfo(d.info);
-                    if (d.status === 'ready' && d.hls_url) {
-                        hlsInput.value = d.hls_url;
-                        message.textContent = 'HLS 已生成并自动填入播放地址。保存课程即可生效。';
-                        button.disabled = false;
-                        button.textContent = '重新上传 MP4';
-                        if (timer) { clearInterval(timer); timer = null; }
-                    } else if (d.status === 'failed') {
-                        message.textContent = d.error || '转换失败，请检查服务器日志。';
-                        button.disabled = false;
-                        button.textContent = '重新上传 MP4';
-                        if (timer) { clearInterval(timer); timer = null; }
-                    } else if (d.status === 'processing') {
-                        message.textContent = '服务器正在切片，视频不会重新编码，请耐心等待。';
-                    } else if (d.status === 'pending') {
-                        message.textContent = 'MP4 已保存，正在等待服务器开始处理。';
-                    }
-                }).catch(function(){});
+            requestStatus(lessonId).then(function(d){
+                if (!d) return;
+                setStatus(d.status);
+                showInfo(d.info);
+                if (d.status === 'ready' && d.hls_url) {
+                    hlsInput.value = d.hls_url;
+                    message.textContent = 'HLS 已生成并自动填入播放地址。保存课程即可生效。';
+                    button.disabled = false;
+                    button.textContent = '重新上传 MP4';
+                    refreshLessonRows();
+                    if (timer) { clearInterval(timer); timer = null; }
+                } else if (d.status === 'failed') {
+                    message.textContent = d.error || '转换失败，请检查服务器日志。';
+                    button.disabled = false;
+                    button.textContent = '重新上传 MP4';
+                    refreshLessonRows();
+                    if (timer) { clearInterval(timer); timer = null; }
+                } else if (d.status === 'processing') {
+                    message.textContent = '服务器正在切片，视频不会重新编码，请耐心等待。';
+                } else if (d.status === 'pending') {
+                    message.textContent = 'MP4 已保存，正在等待服务器开始处理。';
+                }
+            });
         }
 
         button.addEventListener('click', function () {
@@ -146,6 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 message.textContent = result.data.message || '已上传，服务器开始转换。';
                 button.textContent = '转换中…';
                 fileInput.disabled = false;
+                refreshLessonRows();
                 poll();
                 if (timer) clearInterval(timer);
                 timer = setInterval(poll, 3000);
@@ -164,7 +214,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function scan() {
         install(wrap.querySelector('.mathcourse-lesson-editor'));
+        refreshLessonRows();
     }
     scan();
     new MutationObserver(scan).observe(wrap, {childList:true, subtree:true});
+    window.setInterval(refreshLessonRows, 5000);
 });
