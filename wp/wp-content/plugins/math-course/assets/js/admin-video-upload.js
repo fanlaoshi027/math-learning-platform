@@ -58,18 +58,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 badge.textContent = statusText(data.status);
                 badge.className = 'mathcourse-video-status-badge ' + statusClass(data.status);
-                if (data.status === 'failed' && data.error) {
-                    badge.title = data.error;
-                } else if (data.info) {
-                    var info = data.info;
-                    var parts = [];
+                if (data.status === 'failed' && data.error) badge.title = data.error;
+                else if (data.info) {
+                    var info = data.info, parts = [];
                     if (info.width && info.height) parts.push(info.width + ' × ' + info.height);
                     if (info.fps) parts.push(info.fps + ' fps');
                     if (info.duration) parts.push(formatDuration(info.duration));
                     badge.title = parts.join(' · ');
-                } else {
-                    badge.removeAttribute('title');
-                }
+                } else badge.removeAttribute('title');
             });
         });
     }
@@ -133,11 +129,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     message.textContent = 'HLS 已生成并自动填入播放地址。保存课程即可生效。';
                     button.disabled = false;
                     button.textContent = '重新上传 MP4';
-                    refreshLessonRows();
+                    fileInput.disabled = false;
                     if (timer) { clearInterval(timer); timer = null; }
                 } else if (d.status === 'failed') {
                     message.textContent = d.error || '转换失败，请检查服务器日志。';
                     button.disabled = false;
+                    fileInput.disabled = false;
                     button.textContent = '重新上传 MP4';
                     refreshLessonRows();
                     if (timer) { clearInterval(timer); timer = null; }
@@ -170,6 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var xhr = new XMLHttpRequest();
             xhr.open('POST', mathcourseVideoAdmin.ajax_url, true);
             xhr.withCredentials = true;
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.upload.addEventListener('progress', function (event) {
                 if (!event.lengthComputable) return;
                 var percent = Math.max(0, Math.min(100, Math.round(event.loaded / event.total * 100)));
@@ -180,7 +178,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 var result = null;
                 try { result = JSON.parse(xhr.responseText); } catch (e) {}
                 if (!result || !result.success) {
-                    var err = result && result.data && result.data.message ? result.data.message : '上传失败。';
+                    var err = result && result.data && result.data.message ? result.data.message : '';
+                    if (!err && xhr.status === 413) err = '视频文件太大，服务器拒绝了上传。请提高 Nginx client_max_body_size 与 PHP upload_max_filesize / post_max_size。';
+                    if (!err && xhr.status >= 500) err = '服务器处理上传时发生错误（HTTP ' + xhr.status + '），请检查 PHP 错误日志。';
+                    if (!err && xhr.status === 0) err = '上传连接被服务器中断，请检查 Nginx / PHP 上传限制。';
+                    if (!err && xhr.responseText) err = '服务器返回了无法识别的错误：' + xhr.responseText.slice(0, 180);
+                    if (!err) err = '上传失败（HTTP ' + xhr.status + '）。';
                     message.textContent = err;
                     button.disabled = false;
                     fileInput.disabled = false;
@@ -201,12 +204,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 timer = setInterval(poll, 3000);
             };
             xhr.onerror = function () {
-                message.textContent = '上传连接中断，请检查服务器或重新上传。';
+                message.textContent = '上传连接中断，请检查服务器上传大小限制、Nginx 配置或 PHP 错误日志。';
                 button.disabled = false;
                 fileInput.disabled = false;
                 button.textContent = '上传并转换';
                 progress.hidden = true;
             };
+            xhr.ontimeout = function () {
+                message.textContent = '上传超时，请检查服务器上传超时设置。';
+                button.disabled = false;
+                fileInput.disabled = false;
+                button.textContent = '上传并转换';
+                progress.hidden = true;
+            };
+            xhr.timeout = 0;
             xhr.send(data);
         });
         poll();
