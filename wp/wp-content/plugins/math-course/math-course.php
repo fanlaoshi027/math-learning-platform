@@ -40,6 +40,7 @@ $mathcourse_files=array(
  'includes/Video/class-player.php',
  'includes/Video/class-video-router.php',
  'includes/Video/class-hls-accelerator.php',
+ 'includes/Video/class-local-hls-source.php',
  'includes/Frontend/class-activation.php',
  'includes/Frontend/class-student-auth.php',
  'includes/Frontend/class-course-directory.php',
