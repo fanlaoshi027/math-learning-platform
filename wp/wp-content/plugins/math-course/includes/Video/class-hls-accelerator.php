@@ -61,6 +61,14 @@ class Hls_Accelerator {
         return '/'.implode('/', $segments);
     }
 
+    private function same_site_host($a, $b) {
+        $a = strtolower(ltrim((string) $a, '.'));
+        $b = strtolower(ltrim((string) $b, '.'));
+        if (strpos($a, 'www.') === 0) $a = substr($a, 4);
+        if (strpos($b, 'www.') === 0) $b = substr($b, 4);
+        return $a !== '' && $a === $b;
+    }
+
     private function normalize_file_reference($uri, $source_url) {
         $uri = trim((string)$uri);
         if ($uri === '') return '';
@@ -70,7 +78,7 @@ class Hls_Accelerator {
         if (preg_match('#^https?://#i', $uri)) {
             $target = wp_parse_url($uri);
             if (!$target || empty($target['scheme']) || empty($target['host'])) return false;
-            if (strtolower($target['scheme']) !== strtolower($source['scheme']) || strtolower($target['host']) !== strtolower($source['host'])) return false;
+            if (strtolower($target['scheme']) !== strtolower($source['scheme']) || !$this->same_site_host($target['host'], $source['host'])) return false;
             $source_port = (int)($source['port'] ?? 0);
             $target_port = (int)($target['port'] ?? 0);
             $source_effective = $source_port ?: ('https' === strtolower($source['scheme']) ? 443 : 80);
@@ -110,7 +118,7 @@ class Hls_Accelerator {
         $source_parts = wp_parse_url($source);
         $site_parts = wp_parse_url(home_url('/'));
         if (!$source_parts || !$site_parts) return;
-        if (strtolower($source_parts['scheme'] ?? '') !== strtolower($site_parts['scheme'] ?? '') || strtolower($source_parts['host'] ?? '') !== strtolower($site_parts['host'] ?? '')) return;
+        if (strtolower($source_parts['scheme'] ?? '') !== strtolower($site_parts['scheme'] ?? '') || !$this->same_site_host($source_parts['host'] ?? '', $site_parts['host'] ?? '')) return;
 
         $normalized = $this->normalize_file_reference($file, $source);
         if (false === $normalized || '' === $normalized) return;
