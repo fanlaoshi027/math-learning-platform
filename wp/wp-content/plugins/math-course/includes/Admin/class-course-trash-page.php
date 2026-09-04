@@ -222,6 +222,20 @@ class Course_Trash_Page {
         return $found === $table;
     }
 
+    private function get_course_media_slug($course_id) {
+        $course_id = absint($course_id);
+        $title = $course_id ? get_the_title($course_id) : '';
+        $slug = '';
+        if ( $title && class_exists('\\Transliterator') ) {
+            $transliterator = \\Transliterator::create('Han-Latin; Latin-ASCII; Lower()');
+            if ( $transliterator ) $slug = $transliterator->transliterate($title);
+        }
+        $slug = sanitize_title($slug);
+        if ( ! $slug && $course_id ) $slug = sanitize_title(get_post_field('post_name', $course_id));
+        if ( ! $slug ) $slug = 'course-' . $course_id;
+        return $slug;
+    }
+
     private function remove_course_media($course_id) {
         $course_id = absint($course_id);
         $roots = array();
@@ -240,8 +254,14 @@ class Course_Trash_Page {
         foreach ( $roots as $root ) {
             $root = untrailingslashit($root);
             if ( ! $root || ! is_dir($root) ) continue;
-            $course_dir = $root . '/course-' . $course_id;
-            $this->remove_dir($course_dir, $root);
+            // 新格式：课程名称全拼目录；同时兼容旧版 course-{ID} 目录。
+            $media_dirs = array_unique(array(
+                $root . '/' . $this->get_course_media_slug($course_id),
+                $root . '/course-' . $course_id,
+            ));
+            foreach ( $media_dirs as $course_dir ) {
+                $this->remove_dir($course_dir, $root);
+            }
         }
 
         // 转换成功后原 MP4 会自动删除；如果课程在转换前被冻结，这里清理遗留源文件。
