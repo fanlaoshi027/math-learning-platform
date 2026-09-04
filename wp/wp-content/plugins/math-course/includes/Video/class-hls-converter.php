@@ -24,7 +24,33 @@ class Hls_Converter {
         $this->adapter = new Adapter();
         add_action( 'wp_ajax_mathcourse_upload_video', array( $this, 'ajax_upload' ) );
         add_action( 'wp_ajax_mathcourse_video_status', array( $this, 'ajax_status' ) );
+        add_action( 'wp_ajax_mathcourse_video_upload_config', array( $this, 'ajax_upload_config' ) );
         add_action( 'mathcourse_convert_video', array( $this, 'convert' ), 10, 1 );
+    }
+
+    public function ajax_upload_config() {
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( array( 'message' => '没有查看权限。' ), 403 );
+        check_ajax_referer( 'mathcourse_video_upload', 'nonce' );
+        $root = $this->get_upload_root();
+        $hls_root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls';
+        $ffmpeg = defined( 'MATHCOURSE_FFMPEG_PATH' ) ? MATHCOURSE_FFMPEG_PATH : '/usr/bin/ffmpeg';
+        $ffprobe = defined( 'MATHCOURSE_FFPROBE_PATH' ) ? MATHCOURSE_FFPROBE_PATH : '/usr/bin/ffprobe';
+        wp_send_json_success( array(
+            'upload_max_filesize' => ini_get( 'upload_max_filesize' ),
+            'post_max_size' => ini_get( 'post_max_size' ),
+            'max_file_uploads' => ini_get( 'max_file_uploads' ),
+            'max_input_time' => ini_get( 'max_input_time' ),
+            'max_execution_time' => ini_get( 'max_execution_time' ),
+            'memory_limit' => ini_get( 'memory_limit' ),
+            'upload_root' => $root,
+            'upload_root_writable' => is_dir( $root ) ? is_writable( $root ) : wp_mkdir_p( $root ) && is_writable( $root ),
+            'hls_root' => $hls_root,
+            'hls_root_writable' => is_dir( $hls_root ) ? is_writable( $hls_root ) : wp_mkdir_p( $hls_root ) && is_writable( $hls_root ),
+            'ffmpeg' => $ffmpeg,
+            'ffmpeg_executable' => is_executable( $ffmpeg ),
+            'ffprobe' => $ffprobe,
+            'ffprobe_executable' => is_executable( $ffprobe ),
+        ) );
     }
 
     public function ajax_upload() {
@@ -36,10 +62,14 @@ class Hls_Converter {
         if ( ! $lesson_id || ! $course_id || ! $lesson ) wp_send_json_error( array( 'message' => '课时信息无效。' ), 400 );
         if ( $course_id !== $this->adapter->get_lesson_course_id( $lesson_id ) ) wp_send_json_error( array( 'message' => '课时不属于当前课程。' ), 400 );
         if ( ! current_user_can( 'edit_post', $lesson_id ) ) wp_send_json_error( array( 'message' => '没有编辑该课时的权限。' ), 403 );
-        if ( empty( $_FILES['video'] ) || empty( $_FILES['video']['tmp_name'] ) ) wp_send_json_error( array( 'message' => '请选择 MP4 视频文件。' ), 400 );
+        if ( empty( $_FILES['video'] ) || empty( $_FILES['video']['tmp_name'] ) ) {
+            $upload_error = isset( $_FILES['video']['error'] ) ? absint( $_FILES['video']['error'] ) : 0;
+            if ( $upload_error ) wp_send_json_error( array( 'message' => '文件上传失败，错误代码：' . $upload_error . '。当前 PHP upload_max_filesize=' . ini_get( 'upload_max_filesize' ) . '，post_max_size=' . ini_get( 'post_max_size' ) . '。' ), 400 );
+            wp_send_json_error( array( 'message' => '请选择 MP4 视频文件。' ), 400 );
+        }
 
         $file = $_FILES['video'];
-        if ( ! empty( $file['error'] ) ) wp_send_json_error( array( 'message' => '文件上传失败，错误代码：' . absint( $file['error'] ) ), 400 );
+        if ( ! empty( $file['error'] ) ) wp_send_json_error( array( 'message' => '文件上传失败，错误代码：' . absint( $file['error'] ) . '。PHP upload_max_filesize=' . ini_get( 'upload_max_filesize' ) . '，post_max_size=' . ini_get( 'post_max_size' ) . '。' ), 400 );
         if ( ! is_uploaded_file( $file['tmp_name'] ) ) wp_send_json_error( array( 'message' => '上传文件无效。' ), 400 );
         if ( strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) ) !== 'mp4' ) wp_send_json_error( array( 'message' => '这里只接受 MP4 文件。' ), 400 );
 
@@ -97,7 +127,6 @@ class Hls_Converter {
 
         $video_codec = strtolower( (string) ( $info['video_codec'] ?? '' ) );
         $audio_codec = strtolower( (string) ( $info['audio_codec'] ?? '' ) );
-        // 面向 Chrome / Edge / Safari / iPhone 的稳定播放，只接受 H.264 + AAC。
         if ( 'h264' !== $video_codec ) { $this->fail( $lesson_id, '该 MP4 的视频编码为 ' . ( $video_codec ?: '未知' ) . '。请使用 H.264 视频编码后再上传。' ); return; }
         if ( $audio_codec && 'aac' !== $audio_codec ) { $this->fail( $lesson_id, '该 MP4 的音频编码为 ' . $audio_codec . '。请使用 AAC 音频后再上传。' ); return; }
 
@@ -126,7 +155,6 @@ class Hls_Converter {
         update_post_meta( $lesson_id, self::META_HLS, '/__mathcourse_hls/course-' . $course_id . '/lesson-' . $lesson_id . '/index.m3u8' );
         update_post_meta( $lesson_id, self::META_STATUS, 'ready' );
         delete_post_meta( $lesson_id, self::META_ERROR );
-        // 转换成功后删除原始 MP4，避免服务器同时保存两份完整视频。
         @unlink( $source );
         delete_post_meta( $lesson_id, self::META_SOURCE );
     }
