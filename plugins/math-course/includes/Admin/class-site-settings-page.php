@@ -25,11 +25,12 @@ class Site_Settings_Page {
                     </table>
                 </section>
                 <section class="mathcourse-settings-card">
-                    <div class="mathcourse-settings-card-head"><div class="mathcourse-settings-icon"><span class="dashicons dashicons-edit"></span></div><div><h2>首页文字</h2><p>首页大标题及“为什么选择”区域。</p></div></div>
+                    <div class="mathcourse-settings-card-head"><div class="mathcourse-settings-icon"><span class="dashicons dashicons-edit"></span></div><div><h2>首页设置</h2><p>控制首页 Banner 文案和首页首次打开时显示的课程分类。</p></div></div>
                     <table class="form-table" role="presentation">
                         <tr><th><label>首页顶部引导语</label></th><td><input class="regular-text" name="mathcourse_site_settings[hero_kicker]" value="<?php echo esc_attr($settings['hero_kicker']); ?>"></td></tr>
                         <tr><th><label>首页主标题</label></th><td><input class="regular-text" name="mathcourse_site_settings[hero_title]" value="<?php echo esc_attr($settings['hero_title']); ?>"></td></tr>
                         <tr><th><label>首页主标题说明</label></th><td><textarea class="large-text" rows="2" name="mathcourse_site_settings[hero_description]"><?php echo esc_textarea($settings['hero_description']); ?></textarea></td></tr>
+                        <tr><th><label>首页默认课程分类</label></th><td><select name="mathcourse_site_settings[home_default_tab]"><option value="topic" <?php selected($settings['home_default_tab'],'topic'); ?>>初中系统课</option><option value="supplementary" <?php selected($settings['home_default_tab'],'supplementary'); ?>>教辅配套课</option></select><p class="description">首页打开时默认展示哪个 Tab。课程内容不足或暂未上传时，可先选择“教辅配套课”。点击另一个 Tab 仍可在首页原地切换，不进入课程中心。</p></td></tr>
                         <tr><th><label>“为什么选择”标题</label></th><td><input class="regular-text" name="mathcourse_site_settings[why_title]" value="<?php echo esc_attr($settings['why_title']); ?>"></td></tr>
                         <tr><th><label>“为什么选择”说明</label></th><td><input class="large-text" name="mathcourse_site_settings[why_subtitle]" value="<?php echo esc_attr($settings['why_subtitle']); ?>"></td></tr>
                     </table>
