@@ -1,21 +1,90 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 get_header();
-$course_center_url=home_url('/course-center/'); $learning_url=home_url('/learning-center/');
-$site_settings=class_exists('MathCourse\\Frontend\\Site_Settings');
-$hero_kicker=$site_settings?\MathCourse\Frontend\Site_Settings::get('hero_kicker'):'两大核心分类：初中系统课 + 教辅配套课';
-$hero_title=$site_settings?\MathCourse\Frontend\Site_Settings::get('hero_title'):'把初中数学，学成一套体系';
-$hero_description=$site_settings?\MathCourse\Frontend\Site_Settings::get('hero_description'):'按数学知识体系组织课程，从基础到综合应用，循序渐进，构建扎实的数学基本功。';
-$why_title=$site_settings?\MathCourse\Frontend\Site_Settings::get('why_title'):'为什么选择樊老师数学课堂';
-$why_subtitle=$site_settings?\MathCourse\Frontend\Site_Settings::get('why_subtitle'):'专注初中数学知识体系研发，让每一个知识点清晰可见';
+$course_center_url = home_url('/course-center/');
+$learning_url = home_url('/learning-center/');
+$site_settings = class_exists('MathCourse\Frontend\Site_Settings');
+$hero_kicker = $site_settings ? MathCourse\Frontend\Site_Settings::get('hero_kicker') : '两大核心分类：初中系统课 + 教辅配套课';
+$hero_title = $site_settings ? MathCourse\Frontend\Site_Settings::get('hero_title') : '把初中数学，学成一套体系';
+$hero_description = $site_settings ? MathCourse\Frontend\Site_Settings::get('hero_description') : '按数学知识体系组织课程，从基础到综合应用，循序渐进，构建扎实的数学基本功。';
+$why_title = $site_settings ? MathCourse\Frontend\Site_Settings::get('why_title') : '为什么选择樊老师数学课堂';
+$why_subtitle = $site_settings ? MathCourse\Frontend\Site_Settings::get('why_subtitle') : '专注初中数学知识体系研发，让每一个知识点清晰可见';
+$home_default_tab = $site_settings ? MathCourse\Frontend\Site_Settings::get('home_default_tab', 'topic') : 'topic';
+if (!in_array($home_default_tab, array('topic', 'supplementary'), true)) $home_default_tab = 'topic';
+$algebra_url = add_query_arg(array('course_type'=>'topic','course_grade'=>'7'), $course_center_url);
+$geometry_url = add_query_arg(array('course_type'=>'topic','course_grade'=>'8'), $course_center_url);
+$function_url = add_query_arg(array('course_type'=>'topic','course_grade'=>'9'), $course_center_url);
+$supplementary_url = add_query_arg('course_type', 'supplementary', $course_center_url);
 ?>
 <main class="mc-home">
-<section class="mc-home-hero"><div class="mc-container mc-home-hero__inner"><div class="mc-home-hero__copy"><div class="mc-kicker"><span></span><?php echo esc_html($hero_kicker); ?></div><h1><?php echo esc_html($hero_title); ?></h1><p><?php echo esc_html($hero_description); ?></p><div class="mc-home-hero__actions"><a class="mc-btn mc-btn--primary" href="<?php echo esc_url($course_center_url); ?>">浏览课程中心 <span>→</span></a><?php if(is_user_logged_in()):?><a class="mc-btn mc-btn--ghost" href="<?php echo esc_url($learning_url); ?>">▶ 开始学习之旅</a><?php else:?><a class="mc-btn mc-btn--ghost" href="<?php echo esc_url(wp_login_url($learning_url)); ?>">▶ 开始学习之旅</a><?php endif;?></div><div class="mc-home-trust"><span>✓ 体系完整</span><span>✓ 内容精讲</span><span>✓ 方法实用</span><span>✓ 持续更新</span></div></div></div></section>
-<section class="mc-home-system"><div class="mc-container"><div class="mc-home-section-title"><h2><span></span>课程体系分类</h2><p>选择课程分类，直接在首页浏览对应课程</p></div><div class="mc-home-category-tabs"><button type="button" class="is-active" data-home-tab="topic">▱ 初中系统课 <small>系统学习</small></button><button type="button" data-home-tab="supplementary">▤ 教辅配套课 <small>专项强化</small></button></div><div class="mc-home-course-display" data-home-courses><?php if(shortcode_exists('mathcourse_course_directory')){echo do_shortcode('[mathcourse_course_directory show_filters="0"]');}elseif(shortcode_exists('mathcourse_course_center')){echo do_shortcode('[mathcourse_course_center show_filters="0"]');}?></div></div></section>
-<section class="mc-home-why"><div class="mc-container"><div class="mc-home-centered-title"><h2><?php echo esc_html($why_title); ?></h2><p><?php echo esc_html($why_subtitle); ?></p></div><div class="mc-home-benefits"><article><b>☆</b><h3>教学经验丰富</h3><p>多年初中数学一线教学经验，深谙中考命题规律与学生易错瓶颈。</p></article><article><b>▦</b><h3>两大课程分类清晰</h3><p>系统专题课体系基础，教辅配套课紧扣练习与逐题精讲。</p></article><article><b>▷</b><h3>讲解深入浅出</h3><p>黑板板书直观，注重辅助线作法与通法总结，学会举一反三。</p></article><article><b>♡</b><h3>持续更新迭代</h3><p>紧跟新课标与各地中考改革动态，定期更新补充最新真题与例题。</p></article></div></div></section>
-<section class="mc-home-teacher"><div class="mc-container"><div class="mc-home-teacher__inner"><div class="mc-home-teacher__avatar">樊</div><div><h2>主讲名师介绍 · 执教理念</h2><p>樊老师深耕初中数学培优与中考命题研究多年，独创“模型化归纳与知识体系图谱”教学法。善于严谨推导演绎数学逻辑，帮助学生告别盲目刷题，将零碎考点串联为清晰的代数、几何与函数思维网络。</p><div class="mc-home-teacher__tags"><span><strong>两大分类体系</strong><small>初中系统课 + 教辅配套课</small></span><span><strong>体系化模型精讲</strong><small>推演逻辑 · 典型例题 · 解法规律</small></span></div></div></div></div></section>
+<section class="mc-home-hero">
+  <div class="mc-container mc-home-hero__inner">
+    <div class="mc-home-hero__copy">
+      <div class="mc-kicker"><span></span><?php echo esc_html($hero_kicker); ?></div>
+      <h1><?php echo esc_html($hero_title); ?></h1>
+      <p><?php echo esc_html($hero_description); ?></p>
+      <div class="mc-home-hero__actions">
+        <a class="mc-btn mc-btn--primary" href="<?php echo esc_url($course_center_url); ?>">浏览课程中心 <span>→</span></a>
+        <?php if (is_user_logged_in()) : ?>
+          <a class="mc-btn mc-btn--ghost" href="<?php echo esc_url($learning_url); ?>">▶ 开始学习之旅</a>
+        <?php else : ?>
+          <a class="mc-btn mc-btn--ghost" href="<?php echo esc_url(wp_login_url($learning_url)); ?>">▶ 开始学习之旅</a>
+        <?php endif; ?>
+      </div>
+      <div class="mc-home-trust"><span>✓ 体系完整</span><span>✓ 内容精讲</span><span>✓ 方法实用</span><span>✓ 持续更新</span></div>
+    </div>
+    <div class="mc-home-hero__visual" aria-label="课程体系入口">
+      <a class="mc-hero-subject mc-hero-subject--algebra" href="<?php echo esc_url($algebra_url); ?>"><strong>x²</strong><small>代数</small><em>方程 · 不等式</em></a>
+      <a class="mc-hero-subject mc-hero-subject--geometry" href="<?php echo esc_url($geometry_url); ?>"><strong>△</strong><small>几何</small><em>图形 · 证明</em></a>
+      <a class="mc-hero-subject mc-hero-subject--function" href="<?php echo esc_url($function_url); ?>"><strong>ƒ</strong><small>函数</small><em>一次 · 二次</em></a>
+      <a class="mc-hero-subject mc-hero-subject--supplementary" href="<?php echo esc_url($supplementary_url); ?>"><strong>▤</strong><small>教辅配套</small><em>大培优 · 中考</em></a>
+    </div>
+  </div>
+</section>
+<section class="mc-home-system">
+  <div class="mc-container">
+    <div class="mc-home-section-title"><h2><span></span>课程体系分类</h2><p>选择课程分类，直接在首页浏览对应课程</p></div>
+    <div class="mc-home-category-tabs">
+      <button type="button" class="<?php echo 'topic' === $home_default_tab ? 'is-active' : ''; ?>" data-home-tab="topic">▱ 初中系统课 <small>系统学习</small></button>
+      <button type="button" class="<?php echo 'supplementary' === $home_default_tab ? 'is-active' : ''; ?>" data-home-tab="supplementary">▤ 教辅配套课 <small>专项强化</small></button>
+    </div>
+    <div class="mc-home-course-display" data-home-courses>
+      <?php
+      if (shortcode_exists('mathcourse_course_directory')) {
+          echo do_shortcode('[mathcourse_course_directory show_filters="0"]');
+      } elseif (shortcode_exists('mathcourse_course_center')) {
+          echo do_shortcode('[mathcourse_course_center show_filters="0"]');
+      }
+      ?>
+    </div>
+  </div>
+</section>
+<section class="mc-home-why">
+  <div class="mc-container">
+    <div class="mc-home-centered-title"><h2><?php echo esc_html($why_title); ?></h2><p><?php echo esc_html($why_subtitle); ?></p></div>
+    <div class="mc-home-benefits">
+      <article><b>☆</b><h3>教学经验丰富</h3><p>多年初中数学一线教学经验，深谙中考命题规律与学生易错瓶颈。</p></article>
+      <article><b>▦</b><h3>两大课程分类清晰</h3><p>系统专题课体系基础，教辅配套课紧扣练习与逐题精讲。</p></article>
+      <article><b>▷</b><h3>讲解深入浅出</h3><p>黑板板书直观，注重辅助线作法与通法总结，学会举一反三。</p></article>
+      <article><b>♡</b><h3>持续更新迭代</h3><p>紧跟新课标与各地中考改革动态，定期更新补充最新真题与例题。</p></article>
+    </div>
+  </div>
+</section>
+<section class="mc-home-teacher">
+  <div class="mc-container">
+    <div class="mc-home-teacher__inner">
+      <div class="mc-home-teacher__avatar">樊</div>
+      <div><h2>主讲名师介绍 · 执教理念</h2><p>樊老师深耕初中数学培优与中考命题研究多年，独创“模型化归纳与知识体系图谱”教学法。善于严谨推导演绎数学逻辑，帮助学生告别盲目刷题，将零碎考点串联为清晰的代数、几何与函数思维网络。</p><div class="mc-home-teacher__tags"><span><strong>两大分类体系</strong><small>初中系统课 + 教辅配套课</small></span><span><strong>体系化模型精讲</strong><small>推演逻辑 · 典型例题 · 解法规律</small></span></div></div>
+    </div>
+  </div>
+</section>
 </main>
 <script>
-document.addEventListener('DOMContentLoaded',function(){var tabs=document.querySelectorAll('[data-home-tab]'),cards=document.querySelectorAll('[data-home-courses] .mathcourse-center__card');function apply(type){tabs.forEach(function(t){t.classList.toggle('is-active',t.getAttribute('data-home-tab')===type)});cards.forEach(function(card){card.style.display=card.getAttribute('data-course-type')===type?'':'none'});}apply('topic');tabs.forEach(function(tab){tab.addEventListener('click',function(){apply(tab.getAttribute('data-home-tab'));});});});
+document.addEventListener('DOMContentLoaded',function(){
+  var tabs=document.querySelectorAll('[data-home-tab]'),cards=document.querySelectorAll('[data-home-courses] .mathcourse-center__card'),defaultType=<?php echo wp_json_encode($home_default_tab); ?>;
+  function apply(type){tabs.forEach(function(t){t.classList.toggle('is-active',t.getAttribute('data-home-tab')===type);});cards.forEach(function(card){card.style.display=card.getAttribute('data-course-type')===type?'':'none';});}
+  apply(defaultType);
+  tabs.forEach(function(tab){tab.addEventListener('click',function(){apply(tab.getAttribute('data-home-tab'));});});
+});
 </script>
 <?php get_footer(); ?>
