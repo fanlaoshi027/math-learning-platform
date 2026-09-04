@@ -82,6 +82,24 @@ class Video_Router {
         }
         return '/' . implode('/', $segments);
     }
+    private function local_media_path($url) {
+        if (!defined('MATHCOURSE_MEDIA_ROOT') || !MATHCOURSE_MEDIA_ROOT) return '';
+        $parts = wp_parse_url((string) $url);
+        $path = is_array($parts) && isset($parts['path']) ? (string) $parts['path'] : '';
+        $prefix = '/__mathcourse_hls/';
+        if (strpos($path, $prefix) !== 0) return '';
+        $relative = ltrim(substr($path, strlen($prefix)), '/');
+        if ($relative === '' || preg_match('#(^|/)\.\.?(/|$)#', $relative) || preg_match('#[^A-Za-z0-9._/ -]#', $relative)) return '';
+        $root = untrailingslashit((string) MATHCOURSE_MEDIA_ROOT);
+        if (!is_dir($root)) return '';
+        $real_root = realpath($root);
+        $candidate = $root . '/' . $relative;
+        $real_file = realpath($candidate);
+        if ($real_root === false || $real_file === false) return '';
+        $prefix_root = rtrim($real_root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        if (strpos($real_file, $prefix_root) !== 0 || !is_file($real_file) || !is_readable($real_file)) return '';
+        return $real_file;
+    }
     private function normalize_file_reference($uri, $source_url) {
         $uri = trim((string) $uri);
         if ($uri === '') return '';
@@ -138,15 +156,23 @@ class Video_Router {
         }
     }
     private function serve_playlist($lesson_id, $expires, $source) {
-        $response = wp_remote_get($source, array('timeout' => 10, 'redirection' => 1, 'sslverify' => true));
-        if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) { status_header(502); exit('视频源暂时无法访问。'); }
-        $body = wp_remote_retrieve_body($response);
+        $local = $this->local_media_path($source);
+        if ($local) {
+            $body = file_get_contents($local);
+            if ($body === false) { status_header(502); exit('视频源暂时无法访问。'); }
+        } else {
+            $response = wp_remote_get($source, array('timeout' => 10, 'redirection' => 1, 'sslverify' => true));
+            if (is_wp_error($response) || 200 !== (int) wp_remote_retrieve_response_code($response)) { status_header(502); exit('视频源暂时无法访问。'); }
+            $body = wp_remote_retrieve_body($response);
+        }
         $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $source);
         if ($rewritten === false) { status_header(403); exit('视频播放列表包含无效来源。'); }
         $this->send_hls_headers('application/vnd.apple.mpegurl', 3);
         echo $rewritten;
     }
     private function resolve_source_file($source, $file_ref) {
+        $local = $this->local_media_path($file_ref);
+        if ($local) return $local;
         $source_parts = wp_parse_url($source);
         $file_parts = wp_parse_url($file_ref);
         if (!$source_parts || !$file_parts || empty($source_parts['scheme']) || empty($source_parts['host'])) return '';
@@ -159,8 +185,18 @@ class Video_Router {
     private function serve_media($lesson_id, $expires, $file_ref, $source) {
         $file = $this->resolve_source_file($source, $file_ref);
         if (!$file) { status_header(403); exit('视频片段地址无效。'); }
-        $ext = strtolower(pathinfo((string) wp_parse_url($file, PHP_URL_PATH), PATHINFO_EXTENSION));
+        $ext = strtolower(pathinfo((string) (wp_parse_url($file, PHP_URL_PATH) ?: $file), PATHINFO_EXTENSION));
         if ($ext === 'm3u8') {
+            $local = $this->local_media_path($file_ref);
+            if ($local) {
+                $body = file_get_contents($local);
+                if ($body === false) { status_header(502); exit('视频片段暂时无法访问。'); }
+                $rewritten = $this->rewrite_playlist($lesson_id, $expires, $body, $file_ref);
+                if ($rewritten === false) { status_header(403); exit('视频子播放列表包含无效来源。'); }
+                $this->send_hls_headers('application/vnd.apple.mpegurl', 3);
+                echo $rewritten;
+                return;
+            }
             $response = wp_remote_get($file, array('timeout' => 10, 'redirection' => 1, 'sslverify' => true));
             if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
             $code = (int) wp_remote_retrieve_response_code($response);
@@ -175,6 +211,48 @@ class Video_Router {
         $this->stream_media($file, $type);
     }
     private function stream_media($file, $type) {
+        if (is_file($file) && is_readable($file)) {
+            $size = filesize($file);
+            $range = isset($_SERVER['HTTP_RANGE']) ? trim((string) wp_unslash($_SERVER['HTTP_RANGE'])) : '';
+            $start = 0;
+            $end = $size > 0 ? $size - 1 : 0;
+            $status = 200;
+            if ($range !== '' && preg_match('/^bytes=(\d*)-(\d*)$/i', $range, $m)) {
+                if ($m[1] === '' && $m[2] === '') { status_header(416); exit; }
+                if ($m[1] === '') {
+                    $length = min((int) $m[2], $size);
+                    $start = max(0, $size - $length);
+                } else {
+                    $start = (int) $m[1];
+                    if ($start >= $size) { status_header(416); exit; }
+                    $end = ($m[2] !== '') ? min((int) $m[2], $size - 1) : $end;
+                }
+                if ($end < $start) { status_header(416); exit; }
+                $status = 206;
+            }
+            $length = $size > 0 ? ($end - $start + 1) : 0;
+            while (ob_get_level()) { @ob_end_clean(); }
+            status_header($status);
+            header('Content-Type: ' . $type);
+            header('Accept-Ranges: bytes');
+            header('Content-Length: ' . $length);
+            if ($status === 206) header('Content-Range: bytes ' . $start . '-' . $end . '/' . $size);
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, max-age=3600, immutable');
+            $handle = fopen($file, 'rb');
+            if (!$handle) { status_header(500); exit('视频片段暂时无法访问。'); }
+            if ($start > 0) fseek($handle, $start);
+            $remaining = $length;
+            while ($remaining > 0 && !feof($handle)) {
+                $chunk = fread($handle, min(1048576, $remaining));
+                if ($chunk === false || $chunk === '') break;
+                echo $chunk;
+                $remaining -= strlen($chunk);
+                if (function_exists('flush')) @flush();
+            }
+            fclose($handle);
+            return;
+        }
         if (!function_exists('curl_init')) {
             $response = wp_remote_get($file, array('timeout' => 20, 'redirection' => 1, 'sslverify' => true, 'stream' => true));
             if (is_wp_error($response)) { status_header(502); exit('视频片段暂时无法访问。'); }
