@@ -12,11 +12,12 @@ class Access_Page {
         $service = new Access_Service();
         $this->handle_action($service);
 
-        echo '<div class="wrap"><h1>学员授权管理</h1>';
-        echo '<form method="get">';
+        echo '<div class="wrap mathcourse-admin-wrap mathcourse-access-page">';
+        echo '<div class="mathcourse-admin-header"><div><div class="mathcourse-eyebrow">MathCourse · 学员管理</div><h1>学员授权管理</h1><p>为学员开通或取消课程访问权限，授权状态与课程内容保持实时同步。</p></div></div>';
+        echo '<div class="mathcourse-access-toolbar"><form method="get">';
         echo '<input type="hidden" name="page" value="mathcourse-access">';
-        echo '<input type="text" name="s" value="' . esc_attr(sanitize_text_field(wp_unslash($_GET['s'] ?? ''))) . '" placeholder="搜索用户名/邮箱"> ';
-        echo '<button class="button">搜索</button></form><hr>';
+        echo '<input class="mathcourse-search-input" type="text" name="s" value="' . esc_attr(sanitize_text_field(wp_unslash($_GET['s'] ?? ''))) . '" placeholder="搜索用户名、姓名或邮箱">';
+        echo '<button class="button button-primary">搜索学员</button></form></div>';
         $this->render_table($service);
         echo '</div>';
     }
@@ -53,7 +54,9 @@ class Access_Page {
         $adapter = new Adapter();
         $courses = $adapter->get_courses(20);
 
-        echo '<table class="widefat striped"><thead><tr><th>学员</th><th>课程</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+        echo '<div class="mathcourse-access-card">';
+        echo '<div class="mathcourse-card-title"><div><h2>课程授权列表</h2><span class="mathcourse-card-subtitle">显示当前学员与课程的授权关系</span></div></div>';
+        echo '<div class="mathcourse-access-table-wrap"><table class="mathcourse-access-table"><thead><tr><th>学员</th><th>课程</th><th>状态</th><th>操作</th></tr></thead><tbody>';
         foreach ($users as $user) {
             foreach ($courses as $course) {
                 $info = $service->get_access_info($user->ID, $course->ID);
@@ -66,13 +69,14 @@ class Access_Page {
                     '_wpnonce' => $nonce,
                 ), admin_url('admin.php'));
 
-                echo '<tr><td>' . esc_html($user->display_name) . '<br><small>' . esc_html($user->user_email) . '</small></td>';
-                echo '<td>' . esc_html($course->post_title) . '</td>';
-                echo '<td>' . esc_html($info['status']) . '</td><td>';
-                echo '<a class="button ' . ($info['access'] ? '' : 'button-primary') . '" href="' . esc_url($url) . '">' . ($info['access'] ? '取消授权' : '授权') . '</a>';
+                $status_class = $info['access'] ? 'is-active' : 'is-inactive';
+                echo '<tr><td><div class="mathcourse-user-cell"><span class="mathcourse-user-avatar">' . esc_html(mb_strtoupper(mb_substr($user->display_name, 0, 1))) . '</span><div><strong>' . esc_html($user->display_name) . '</strong><small>' . esc_html($user->user_email) . '</small></div></div></td>';
+                echo '<td><strong class="mathcourse-course-name">' . esc_html($course->post_title) . '</strong></td>';
+                echo '<td><span class="mathcourse-access-status ' . esc_attr($status_class) . '"><i></i>' . esc_html($info['status']) . '</span></td><td>';
+                echo '<a class="button ' . ($info['access'] ? 'mathcourse-revoke-button' : 'button-primary') . '" href="' . esc_url($url) . '">' . ($info['access'] ? '取消授权' : '授权') . '</a>';
                 echo '</td></tr>';
             }
         }
-        echo '</tbody></table>';
+        echo '</tbody></table></div></div>';
     }
 }
