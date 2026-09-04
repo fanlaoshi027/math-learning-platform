@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     var input = document.getElementById('lesson_hls_edit');
     if (input) {
-        // HLS 支持相对路径，例如 /wp-content/uploads/.../index.m3u8。
-        // 不要改成 type=url，否则浏览器会阻止相对地址提交。
         input.type = 'text';
         input.setAttribute('inputmode', 'url');
         input.removeAttribute('pattern');
@@ -15,6 +13,31 @@ document.addEventListener('DOMContentLoaded', function () {
     var wrap = document.querySelector('.wrap');
     if (wrap && page === 'mathcourse-course-edit') {
         wrap.classList.add('mathcourse-editor');
+
+        /* 课程内容区域：仅补 class，让视觉层不依赖脆弱的 inline style。 */
+        var contentBlocks = wrap.querySelectorAll('form>div[style*="grid-template-columns"]>div:first-child>div[style*="margin-top:28px"]');
+        contentBlocks.forEach(function (block) {
+            block.classList.add('mathcourse-content-workspace');
+            block.querySelectorAll(':scope>div').forEach(function (card) {
+                if (card.querySelector(':scope>div:first-child') && card.querySelector(':scope>div:nth-child(2)')) {
+                    card.classList.add('mathcourse-topic-card');
+                    var header = card.querySelector(':scope>div:first-child');
+                    var body = card.querySelector(':scope>div:nth-child(2)');
+                    header.classList.add('mathcourse-topic-header');
+                    body.classList.add('mathcourse-topic-body');
+                    body.querySelectorAll(':scope>div').forEach(function (row) {
+                        if (row.querySelector('a') && row.querySelector('button')) {
+                            row.classList.add('mathcourse-lesson-row');
+                        }
+                    });
+                }
+            });
+        });
+
+        var lessonEditor = wrap.querySelector('div[style*="border:1px solid #2271b1"]');
+        if (lessonEditor) {
+            lessonEditor.classList.add('mathcourse-lesson-editor');
+        }
     }
     if (wrap && page === 'mathcourse-batch') {
         wrap.classList.add('mathcourse-batch-page');
@@ -52,22 +75,15 @@ document.addEventListener('DOMContentLoaded', function () {
             img.alt = '课程封面预览';
             img.loading = 'lazy';
             img.src = url;
-            img.addEventListener('error', function () {
-                preview.classList.remove('has-image');
-            });
-            img.addEventListener('load', function () {
-                preview.classList.add('has-image');
-            });
+            img.addEventListener('error', function () { preview.classList.remove('has-image'); });
+            img.addEventListener('load', function () { preview.classList.add('has-image'); });
             preview.appendChild(img);
         };
 
         var frame = null;
         chooseButton.addEventListener('click', function (event) {
             event.preventDefault();
-            if (frame) {
-                frame.open();
-                return;
-            }
+            if (frame) { frame.open(); return; }
             frame = wp.media({
                 title: '选择课程封面',
                 button: { text: '使用此封面' },
@@ -116,9 +132,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.setTimeout(function () { copyButton.textContent = '复制全部激活码'; }, 1800);
             };
             if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(done).catch(function () {
-                    codeBox.focus(); codeBox.select(); document.execCommand('copy'); done();
-                });
+                navigator.clipboard.writeText(text).then(done).catch(function () { codeBox.focus(); codeBox.select(); document.execCommand('copy'); done(); });
             } else {
                 codeBox.focus(); codeBox.select(); document.execCommand('copy'); done();
             }
