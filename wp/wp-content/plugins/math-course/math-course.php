@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MathCourse
  * Description: 樊老师数学网校课程管理与学员授权系统。
- * Version: 1.0.8
+ * Version: 1.0.9
  * Author: 樊老师
  */
 defined('ABSPATH') || exit;
 
-define('MATHCOURSE_VERSION','1.0.8');
+define('MATHCOURSE_VERSION','1.0.9');
 define('MATHCOURSE_FILE',__FILE__);
 define('MATHCOURSE_DIR',plugin_dir_path(__FILE__));
 define('MATHCOURSE_URL',plugin_dir_url(__FILE__));
@@ -31,6 +31,7 @@ $mathcourse_files=array(
  'includes/Admin/class-course-sort.php',
  'includes/Admin/class-batch-manager-v2.php',
  'includes/Admin/class-demo-importer.php',
+ 'includes/Admin/class-student-page.php',
  'includes/Course/class-meta.php',
  'includes/Course/class-lesson-meta.php',
  'includes/Course/class-course-service.php',
