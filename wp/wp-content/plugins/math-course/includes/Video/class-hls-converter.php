@@ -178,7 +178,8 @@ class Hls_Converter {
         if ( is_array( $files ) ) foreach ( $files as $segment ) { if ( is_file( $segment ) && filesize( $segment ) > 0 ) { $has_segment = true; break; } }
         if ( ! $has_segment ) { $this->fail( $lesson_id, 'HLS 播放列表已生成，但没有找到有效视频分片。' ); return; }
 
-        update_post_meta( $lesson_id, self::META_HLS, '/__mathcourse_hls/course-' . $course_id . '/lesson-' . $lesson_id . '/index.m3u8' );
+        $media_slug = $this->get_course_media_slug( $course_id );
+        update_post_meta( $lesson_id, self::META_HLS, '/__mathcourse_hls/' . $media_slug . '/lesson-' . $lesson_id . '/index.m3u8' );
         update_post_meta( $lesson_id, self::META_STATUS, 'ready' );
         delete_post_meta( $lesson_id, self::META_ERROR );
         @unlink( $source );
@@ -205,7 +206,23 @@ class Hls_Converter {
         return $info;
     }
 
+    private function get_course_media_slug( $course_id ) {
+        $course_id = absint( $course_id );
+        $title = $course_id ? get_the_title( $course_id ) : '';
+        $slug = '';
+        if ( $title && class_exists( '\Transliterator' ) ) {
+            $transliterator = \Transliterator::create( 'Han-Latin; Latin-ASCII; Lower()' );
+            if ( $transliterator ) $slug = $transliterator->transliterate( $title );
+        }
+        $slug = sanitize_title( $slug );
+        if ( ! $slug && $course_id ) {
+            $slug = sanitize_title( get_post_field( 'post_name', $course_id ) );
+        }
+        if ( ! $slug ) $slug = 'course-' . $course_id;
+        return $slug;
+    }
+
     private function get_upload_root() { if ( defined( 'MATHCOURSE_VIDEO_UPLOAD_ROOT' ) && MATHCOURSE_VIDEO_UPLOAD_ROOT ) return untrailingslashit( MATHCOURSE_VIDEO_UPLOAD_ROOT ); if ( defined( 'MATHCOURSE_MEDIA_ROOT' ) && MATHCOURSE_MEDIA_ROOT ) return dirname( untrailingslashit( MATHCOURSE_MEDIA_ROOT ) ) . '/uploads'; return WP_CONTENT_DIR . '/uploads/mathcourse-video-source'; }
-    private function get_hls_dir( $course_id, $lesson_id ) { $root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls'; return trailingslashit( $root ) . 'course-' . absint( $course_id ) . '/lesson-' . absint( $lesson_id ); }
+    private function get_hls_dir( $course_id, $lesson_id ) { $root = defined( 'MATHCOURSE_MEDIA_ROOT' ) ? untrailingslashit( MATHCOURSE_MEDIA_ROOT ) : WP_CONTENT_DIR . '/uploads/mathcourse-hls'; $media_slug = $this->get_course_media_slug( $course_id ); return trailingslashit( $root ) . $media_slug . '/lesson-' . absint( $lesson_id ); }
     private function remove_dir( $dir ) { if ( ! is_dir( $dir ) ) return; $items = scandir( $dir ); if ( is_array( $items ) ) foreach ( $items as $item ) { if ( '.' === $item || '..' === $item ) continue; $path = trailingslashit( $dir ) . $item; if ( is_dir( $path ) ) $this->remove_dir( $path ); else @unlink( $path ); } @rmdir( $dir ); }
 }
