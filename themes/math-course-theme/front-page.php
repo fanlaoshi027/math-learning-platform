@@ -2,11 +2,11 @@
 defined('ABSPATH') || exit;
 get_header();
 $course_center_url=home_url('/course-center/'); $learning_url=home_url('/learning-center/');
-$site_settings=class_exists('MathCourse\\Frontend\\Site_Settings');
-$hero_kicker=$site_settings?MathCourse\\Frontend\\Site_Settings::get('hero_kicker'):'两大核心分类：初中系统课 + 教辅配套课';
-$hero_title=$site_settings?MathCourse\\Frontend\\Site_Settings::get('hero_title'):'把初中数学，学成一套体系';
-$hero_description=$site_settings?MathCourse\\Frontend\\Site_Settings::get('hero_description'):'按数学知识体系组织课程，从基础到综合应用，循序渐进，构建扎实的数学基本功。';
-$home_default_tab=$site_settings?MathCourse\\Frontend\\Site_Settings::get('home_default_tab','topic'):'topic';
+$site_settings=class_exists('MathCourse\Frontend\Site_Settings');
+$hero_kicker=$site_settings?MathCourse\Frontend\Site_Settings::get('hero_kicker'):'两大核心分类：初中系统课 + 教辅配套课';
+$hero_title=$site_settings?MathCourse\Frontend\Site_Settings::get('hero_title'):'把初中数学，学成一套体系';
+$hero_description=$site_settings?MathCourse\Frontend\Site_Settings::get('hero_description'):'按数学知识体系组织课程，从基础到综合应用，循序渐进，构建扎实的数学基本功。';
+$home_default_tab=$site_settings?MathCourse\Frontend\Site_Settings::get('home_default_tab','topic'):'topic';
 if(!in_array($home_default_tab,array('topic','supplementary'),true)) $home_default_tab='topic';
 $algebra_url=add_query_arg(array('course_type'=>'topic','course_grade'=>'7'),$course_center_url);
 $geometry_url=add_query_arg(array('course_type'=>'topic','course_grade'=>'8'),$course_center_url);
