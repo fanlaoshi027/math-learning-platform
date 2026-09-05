@@ -1,6 +1,6 @@
 /* Homepage V3 final visual polish. Frontend only. Keeps the reference composition while using CSS/solid blocks instead of background photos. */
 
-/* Remove theme/admin chrome from the reference-style homepage. */
+/* True edge-to-edge homepage: remove theme chrome and inherited wrappers. */
 body.home,
 body.front-page{margin:0!important;background:#fff!important;overflow-x:hidden}
 body.home .mc-site-header,
@@ -9,25 +9,26 @@ body.front-page .mc-site-header,
 body.front-page .mc-site-footer,
 body.home #wpadminbar,
 body.front-page #wpadminbar{display:none!important}
-
-/* The homepage is intentionally edge-to-edge like the reference. */
 body.home .site-main,
 body.front-page .site-main,
 body.home #primary,
 body.front-page #primary,
 body.home .content-area,
-body.front-page .content-area{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+body.front-page .content-area,
+body.home .entry-content,
+body.front-page .entry-content{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
 body.home .mc-home-v3,
 body.front-page .mc-home-v3{width:100vw!important;max-width:none!important;margin:0!important;padding:0!important}
 
-/* Desktop reference proportions: wide hero, narrow white divider, two equal cards. */
+/* Desktop: match the reference's 2048×682 visual rhythm. */
 .mc-home-v3__hero{height:min(18.22vw,395px);min-height:300px}
 .mc-home-v3__hero-content{max-width:none}
-.mc-home-v3__hero-copy{padding-left:max(12.85%,calc((100% - 2048px)/2 + 12.85%));margin-top:-1.2%}
+.mc-home-v3__hero-copy{padding-left:12.85%;margin-top:-1.2%}
 .mc-home-v3__hero-copy h1{font-size:clamp(42px,4.02vw,82px);line-height:1.065;letter-spacing:0}
 .mc-home-v3__hero-copy p{margin:17px 0 20px;font-size:clamp(15px,1.25vw,25px);letter-spacing:.045em}
 .mc-home-v3__hero-button{padding:13px 29px;font-size:clamp(14px,1.02vw,21px)}
 
+/* Reference cards: 2 equal columns, thin white separation and compact bottom margin. */
 .mc-home-v3__types{padding:13px 1.75% 28px;background:#fff}
 .mc-home-v3__type-grid{gap:18px}
 .mc-home-v3__type-card{height:clamp(220px,11.55vw,253px);border-radius:13px;box-shadow:none}
@@ -37,13 +38,17 @@ body.front-page .mc-home-v3{width:100vw!important;max-width:none!important;margi
 .mc-home-v3__type-copy p{font-size:clamp(13px,1.03vw,21px);line-height:1.42}
 .mc-home-v3__type-copy span{margin-top:14px;padding:10px 24px;font-size:clamp(13px,1vw,19px)}
 
-/* Keep the solid-block artwork subtle so it reads as a clean substitute for the source photography. */
+/* Solid-color substitute for the reference photography. */
 .mc-home-v3__chalkboard{background:#075487;border-color:rgba(5,42,73,.58)}
 .mc-home-v3__desk{background:linear-gradient(90deg,#557e95,#7699a8 55%,#a88968);opacity:.7}
 .mc-home-v3__hero-art:after{content:"";position:absolute;left:0;bottom:0;width:52%;height:100%;background:linear-gradient(90deg,rgba(3,50,91,.16),transparent);pointer-events:none}
 
+/* Prevent tap/hover movement from changing the reference composition on touch screens. */
+.mc-home-v3__type-card{transition:box-shadow .18s ease,transform .18s ease}
+@media(hover:hover){.mc-home-v3__type-card:hover{transform:translateY(-1px)}}
+
 @media(max-width:900px){
- body.home .site-main,body.front-page .site-main,body.home #primary,body.front-page #primary,body.home .content-area,body.front-page .content-area{width:100%!important}
+ body.home .site-main,body.front-page .site-main,body.home #primary,body.front-page #primary,body.home .content-area,body.front-page .content-area,body.home .entry-content,body.front-page .entry-content{width:100%!important}
  .mc-home-v3__hero{height:61.5vw;min-height:228px;max-height:430px}
  .mc-home-v3__hero-copy{padding-left:7.5%;margin-top:-1%}
  .mc-home-v3__hero-copy h1{font-size:clamp(28px,7.35vw,50px);line-height:1.065}
