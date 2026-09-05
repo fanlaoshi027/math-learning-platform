@@ -10,6 +10,19 @@ if ( is_user_logged_in() && ! current_user_can( 'manage_options' ) ) { show_admi
 </head>
 <body <?php body_class( 'mathcourse-site' ); ?>>
 <?php wp_body_open(); ?>
+<style id="mc-site-logo-v2">
+.mc-site-header .mc-brand__mark{position:relative;display:block;flex:0 0 40px;width:40px;height:34px;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:transparent!important;font-size:0!important}
+.mc-site-header .mc-brand__mark:before,.mc-site-header .mc-brand__mark:after{content:"";position:absolute;display:block;box-sizing:border-box}
+.mc-site-header .mc-brand__mark:before{left:2px;top:5px;width:36px;height:25px;border:3px solid #1769d8;border-top-color:#1769d8;border-radius:5px 16px 5px 16px;transform:skewY(-4deg)}
+.mc-site-header .mc-brand__mark:after{left:18px;top:4px;width:4px;height:27px;border-radius:99px;background:#ff9418;transform:rotate(7deg)}
+.mc-site-header .mc-brand__mark i{position:absolute;left:7px;top:9px;width:14px;height:17px;border-left:3px solid #1769d8;border-bottom:3px solid #1769d8;border-radius:2px 0 4px 8px;transform:skewY(-4deg);background:transparent}
+.mc-site-header .mc-brand__mark i:after{content:"";position:absolute;right:-18px;top:0;width:14px;height:17px;border-right:3px solid #1769d8;border-bottom:3px solid #1769d8;border-radius:0 2px 8px 4px}
+@media(max-width:700px){.mc-site-header .mc-brand__mark{flex-basis:36px;width:36px;height:31px}}
+.mc-site-footer .mc-footer-brand>span:first-child{position:relative;width:40px;height:34px;display:block;flex:0 0 40px;font-size:0;color:transparent;border:0;border-radius:0;background:transparent}
+.mc-site-footer .mc-footer-brand>span:first-child:before,.mc-site-footer .mc-footer-brand>span:first-child:after{content:"";position:absolute;display:block;box-sizing:border-box}
+.mc-site-footer .mc-footer-brand>span:first-child:before{left:2px;top:5px;width:36px;height:25px;border:3px solid rgba(255,255,255,.9);border-radius:5px 16px 5px 16px;transform:skewY(-4deg)}
+.mc-site-footer .mc-footer-brand>span:first-child:after{left:18px;top:4px;width:4px;height:27px;border-radius:99px;background:#ff9418;transform:rotate(7deg)}
+</style>
 <header class="mc-site-header">
     <div class="mc-container mc-site-header__inner">
         <a class="mc-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="樊老师数学首页">
