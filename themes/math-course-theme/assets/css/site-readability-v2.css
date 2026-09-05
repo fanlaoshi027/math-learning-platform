@@ -11,6 +11,19 @@ body.mathcourse-site .mc-course-grade-filter a{font-size:15px}
 body.mathcourse-site .mc-course-grade-filter>span{font-size:14px}
 body.mathcourse-site .mathcourse-course-detail,body.mathcourse-site .mc-learning{font-size:17px}
 body.mathcourse-site .mathcourse-course-detail p,body.mathcourse-site .mc-learning p{font-size:17px}
+
+/* Unified symmetric book logo: two equal blue pages and a clean white center. */
+body.mathcourse-site .mc-brand__mark{position:relative!important;width:44px!important;height:38px!important;flex:0 0 44px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:transparent!important;font-size:0!important}
+body.mathcourse-site .mc-brand__mark:before,body.mathcourse-site .mc-brand__mark:after{content:"";position:absolute;top:5px;width:18px;height:27px;box-sizing:border-box;background:#1769d8}
+body.mathcourse-site .mc-brand__mark:before{left:3px;border-radius:4px 2px 2px 8px;clip-path:polygon(0 5%,88% 0,100% 100%,10% 90%)}
+body.mathcourse-site .mc-brand__mark:after{right:3px;border-radius:2px 4px 8px 2px;clip-path:polygon(12% 0,100% 5%,90% 90%,0 100%)}
+body.mathcourse-site .mc-brand__mark i{position:absolute!important;z-index:3;left:20px!important;top:5px!important;width:4px!important;height:30px!important;border:0!important;border-radius:99px!important;background:#fff!important;transform:none!important;box-shadow:0 0 0 1px rgba(23,105,216,.12)!important}
+body.mathcourse-site .mc-brand__mark i:after{content:"";position:absolute;left:-3px;bottom:-2px;width:10px;height:5px;background:#1769d8;border-radius:0 0 3px 3px}
+body.mathcourse-site .mc-footer-brand>span:first-child{position:relative!important;width:44px!important;height:36px!important;display:block!important;flex:0 0 44px!important;border:0!important;border-radius:0!important;background:transparent!important;font-size:0!important;color:transparent!important}
+body.mathcourse-site .mc-footer-brand>span:first-child:before,body.mathcourse-site .mc-footer-brand>span:first-child:after{content:"";position:absolute;top:5px;width:18px;height:27px;box-sizing:border-box;background:#fff}
+body.mathcourse-site .mc-footer-brand>span:first-child:before{left:3px;border-radius:4px 2px 2px 8px;clip-path:polygon(0 5%,88% 0,100% 100%,10% 90%)}
+body.mathcourse-site .mc-footer-brand>span:first-child:after{right:3px;border-radius:2px 4px 8px 2px;clip-path:polygon(12% 0,100% 5%,90% 90%,0 100%)}
+
 @media(max-width:700px){
   body.mathcourse-site{font-size:16px}
   body.mathcourse-site .mc-brand__text{font-size:17px}
@@ -22,4 +35,5 @@ body.mathcourse-site .mathcourse-course-detail p,body.mathcourse-site .mc-learni
   body.mathcourse-site .mc-course-grade-filter a{font-size:15px}
   body.mathcourse-site .mathcourse-course-detail,body.mathcourse-site .mc-learning{font-size:16px}
   body.mathcourse-site .mathcourse-course-detail p,body.mathcourse-site .mc-learning p{font-size:16px}
+  body.mathcourse-site .mc-brand__mark{width:40px!important;height:35px!important;flex-basis:40px!important}
 }
