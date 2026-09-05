@@ -1,0 +1,118 @@
+/* Homepage reference refinement — mobile-first visual calibration. Frontend only. */
+
+/* Keep the custom homepage header visible; only the old theme chrome stays hidden. */
+@media (max-width:900px){
+  body.home .mc-site-header,body.front-page .mc-site-header,body.home .mc-site-footer,body.front-page .mc-site-footer{display:none!important}
+  .mc-home-v3{width:100%;max-width:none;overflow:hidden}
+
+  /* Header: match the compact white mobile navigation in the reference. */
+  .mc-home-v3__header{height:58px;border-bottom:1px solid #e6ebf2}
+  .mc-home-v3__header-inner{height:58px;padding:0 14px}
+  .mc-home-v3__brand-mark{width:34px;height:34px;flex-basis:34px}
+  .mc-home-v3__brand-copy strong{font-size:16px}
+  .mc-home-v3__brand-copy small{font-size:6px;letter-spacing:.12em;margin-top:3px}
+  .mc-home-v3__menu{width:38px;height:38px;padding:8px}
+  .mc-home-v3__menu span{width:21px;height:2px}
+
+  /* Hero: blue visual area + white feature strip, matching the reference hierarchy. */
+  .mc-home-v3__hero{height:350px;min-height:0;background:#07548f}
+  .mc-home-v3__hero-inner{height:258px;padding:0 7%;padding-top:31px;align-items:flex-start}
+  .mc-home-v3__hero-copy{width:72%;position:relative;z-index:10}
+  .mc-home-v3__hero-copy h1{font-size:clamp(29px,8.4vw,39px);line-height:1.04;letter-spacing:0}
+  .mc-home-v3__hero-copy p{font-size:10px;line-height:1.5;margin:11px 0 13px;white-space:nowrap;letter-spacing:.015em}
+  .mc-home-v3__hero-button{padding:9px 16px;font-size:11px;gap:5px}
+  .mc-home-v3__hero-button b{font-size:13px}
+
+  .mc-home-v3__chalkboard{right:-18%;top:30px;width:55%;height:185px;border-width:6px;opacity:.48}
+  .mc-home-v3__chalkboard span{font-size:11px!important}
+  .mc-home-v3__teacher{right:-2%;bottom:79px;transform:scale(.57);transform-origin:bottom right;z-index:7}
+
+  .mc-home-v3__hero-features{left:0;bottom:0;transform:none;width:100%;height:92px;padding:12px 13px 8px;background:#fff;color:#26354b;grid-template-columns:repeat(4,1fr);gap:2px;align-items:center}
+  .mc-home-v3__hero-features>div{display:grid;justify-items:center;align-content:center;gap:4px;color:#26354b;text-align:center}
+  .mc-home-v3__hero-features i{width:34px;height:34px;font-size:16px;box-shadow:none}
+  .mc-home-v3__hero-features b{font-size:8px;line-height:1.15;color:#26354b}
+  .mc-home-v3__hero-features small{display:block;font-size:6px;line-height:1.2;color:#7b8797;white-space:nowrap}
+
+  /* Section rhythm: compact white page like the phone mockup. */
+  .mc-home-v3__section{width:100%;padding:12px 12px 5px}
+  .mc-home-v3__section-heading{margin-bottom:8px;align-items:center}
+  .mc-home-v3__section-heading>div{gap:7px}
+  .mc-home-v3__section-heading .accent{width:3px;height:18px}
+  .mc-home-v3__section-heading h2{font-size:17px;line-height:1.2}
+  .mc-home-v3__section-heading p{font-size:8px;margin-left:10px;margin-top:1px}
+  .mc-home-v3__section-heading>a{font-size:8px}
+
+  /* Category cards: short horizontal cards with artwork left and copy right. */
+  .mc-home-v3__types{padding-top:8px;padding-bottom:7px}
+  .mc-home-v3__type-grid{grid-template-columns:1fr;gap:7px}
+  .mc-home-v3__type-card{height:86px;min-height:86px;border-radius:7px}
+  .mc-home-v3__type-copy{left:39%;right:3.5%;top:12px;transform:none}
+  .mc-home-v3__type-copy h3{font-size:21px;margin-bottom:4px}
+  .mc-home-v3__type-copy p{font-size:9px;line-height:1.28;margin:1px 0}
+  .mc-home-v3__type-copy span{margin-top:5px;padding:5px 11px;font-size:8px}
+  .mc-home-v3__book-stack,.mc-home-v3__open-book{left:3%;bottom:5px;width:32%;height:75px}
+  .mc-home-v3__book-stack i{height:18px;border-width:1px}
+  .mc-home-v3__book-stack i:nth-child(1){bottom:1px}
+  .mc-home-v3__book-stack i:nth-child(2){bottom:18px}
+  .mc-home-v3__book-stack i:nth-child(3){bottom:35px}
+  .mc-home-v3__book-stack b{bottom:49px;height:18px;border-width:1px}
+  .mc-home-v3__open-book:before,.mc-home-v3__open-book:after{bottom:10px;height:45px;border-width:2px}
+  .mc-home-v3__open-book i{height:55px;width:8px}
+  .mc-home-v3__open-book b{height:42px;width:8px}
+  .mc-home-v3__open-book em{width:20px;height:10px}
+
+  /* Popular courses: one compact list per row, as in the reference phone. */
+  .mc-home-v3__popular{padding-top:8px}
+  .mc-home-v3__course-grid{grid-template-columns:1fr;gap:6px}
+  .mc-home-v3__course-card{height:102px;display:grid;grid-template-columns:38% 1fr;border-radius:6px}
+  .mc-home-v3__course-cover{height:100%;min-height:102px}
+  .mc-home-v3__cover-copy{top:13px;gap:3px}
+  .mc-home-v3__cover-copy b{font-size:16px}
+  .mc-home-v3__cover-copy small{font-size:9px}
+  .mc-home-v3__cover-copy em{font-size:7px;padding:3px 7px}
+  .mc-home-v3__course-body{padding:9px 9px 8px;display:flex;flex-direction:column;min-width:0}
+  .mc-home-v3__course-body h3{height:31px;font-size:10px;line-height:1.45}
+  .mc-home-v3__tags{margin:3px 0;gap:3px}
+  .mc-home-v3__tags span{font-size:7px;padding:2px 4px}
+  .mc-home-v3__course-button{margin-top:auto;padding:5px;font-size:8px;border-radius:4px}
+
+  /* Benefits: two columns with generous touch targets. */
+  .mc-home-v3__reasons{padding-top:9px;padding-bottom:8px}
+  .mc-home-v3__reason-grid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .mc-home-v3__reason-grid>div{height:51px;grid-template-columns:34px 1fr;padding:0 7px;border-radius:6px}
+  .mc-home-v3__reason-grid i{width:25px;height:25px;font-size:16px}
+  .mc-home-v3__reason-grid b{font-size:9px}
+  .mc-home-v3__reason-grid span{font-size:7px}
+
+  /* CTA and footer remain visible and compact on small screens. */
+  .mc-home-v3__cta{margin:0 12px 6px;min-height:64px;padding:8px 9px;gap:6px;border-radius:6px}
+  .mc-home-v3__cta-art{display:none}
+  .mc-home-v3__cta>div:nth-child(2){gap:2px}
+  .mc-home-v3__cta strong{font-size:10px}
+  .mc-home-v3__cta span{font-size:7px}
+  .mc-home-v3__cta>a{padding:7px 9px;font-size:8px}
+  .mc-home-v3__footer-inner{min-height:51px;padding:8px 12px}
+  .mc-home-v3__footer-brand{min-width:0}
+  .mc-home-v3__footer-brand>i{width:26px;height:26px;font-size:14px}
+  .mc-home-v3__footer-brand b{font-size:10px}
+  .mc-home-v3__footer-brand small{font-size:6px}
+  .mc-home-v3__copyright{padding:6px 8px 9px;font-size:6px}
+}
+
+@media(max-width:380px){
+  .mc-home-v3__hero{height:340px}
+  .mc-home-v3__hero-inner{height:248px;padding-top:29px}
+  .mc-home-v3__hero-copy h1{font-size:28px}
+  .mc-home-v3__hero-copy p{font-size:9px}
+  .mc-home-v3__teacher{transform:scale(.53);bottom:78px}
+  .mc-home-v3__hero-features{height:92px;padding-left:9px;padding-right:9px}
+  .mc-home-v3__hero-features i{width:31px;height:31px}
+  .mc-home-v3__hero-features b{font-size:7px}
+  .mc-home-v3__hero-features small{font-size:5px}
+  .mc-home-v3__type-card{height:82px;min-height:82px}
+  .mc-home-v3__type-copy h3{font-size:19px}
+  .mc-home-v3__type-copy p{font-size:8px}
+  .mc-home-v3__type-copy span{font-size:7px;padding:4px 9px}
+  .mc-home-v3__course-card{height:96px}
+  .mc-home-v3__course-cover{min-height:96px}
+}
