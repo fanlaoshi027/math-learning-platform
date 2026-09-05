@@ -12,11 +12,12 @@ if ( is_user_logged_in() && ! current_user_can( 'manage_options' ) ) { show_admi
 <?php wp_body_open(); ?>
 <header class="mc-site-header">
     <div class="mc-container mc-site-header__inner">
-        <a class="mc-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="樊老师数学课堂首页">
-            <span class="mc-brand__mark" aria-hidden="true">□</span>
-            <span class="mc-brand__text">樊老师数学课堂<small>跟中考名师 学扎实数学</small></span>
+        <a class="mc-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="樊老师数学首页">
+            <span class="mc-brand__mark" aria-hidden="true"><i></i></span>
+            <span class="mc-brand__text">樊老师数学<small>好方法 · 学得更轻松</small></span>
         </a>
-        <nav class="mc-site-nav" aria-label="主导航">
+        <button class="mc-mobile-menu" type="button" aria-expanded="false" aria-controls="mc-mobile-nav"><span></span><span></span><span></span><b>菜单</b></button>
+        <nav id="mc-mobile-nav" class="mc-site-nav" aria-label="主导航">
             <a class="<?php echo is_front_page() ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/' ) ); ?>">首页</a>
             <a class="<?php echo is_page( 'course-center' ) ? 'is-active' : ''; ?>" href="<?php echo esc_url( home_url( '/course-center/' ) ); ?>">课程中心</a>
             <?php if ( is_user_logged_in() ) : ?>
@@ -28,9 +29,15 @@ if ( is_user_logged_in() && ! current_user_can( 'manage_options' ) ) { show_admi
                 <?php $current_user = wp_get_current_user(); $student_name = $current_user->display_name ?: $current_user->user_login; $student_initial = function_exists( 'mb_substr' ) ? mb_substr( $student_name, 0, 1 ) : substr( $student_name, 0, 1 ); ?>
                 <a class="mc-user-pill" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>"><b><?php echo esc_html( $student_initial ); ?></b><span><?php echo esc_html( $student_name ); ?></span><i>|</i><span>退出</span></a>
             <?php else : ?>
-                <?php $login_url = wp_login_url( home_url( '/learning-center/' ) ); ?>
-                <a class="mc-header-login" href="<?php echo esc_url( $login_url ); ?>">学生登录</a>
+                <a class="mc-header-login" href="<?php echo esc_url( wp_login_url( home_url( '/learning-center/' ) ) ); ?>">学生登录</a>
             <?php endif; ?>
         </div>
     </div>
 </header>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+    var btn=document.querySelector('.mc-mobile-menu'),nav=document.getElementById('mc-mobile-nav');
+    if(!btn||!nav)return;
+    btn.addEventListener('click',function(){var open=btn.getAttribute('aria-expanded')==='true';btn.setAttribute('aria-expanded',String(!open));nav.classList.toggle('is-open',!open);});
+});
+</script>
