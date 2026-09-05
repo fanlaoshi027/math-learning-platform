@@ -5,114 +5,125 @@
   body.home .mc-site-header,body.front-page .mc-site-header,body.home .mc-site-footer,body.front-page .mc-site-footer{display:none!important}
   .mc-home-v3{width:100%;max-width:none;overflow:hidden}
 
-  /* Header: match the compact white mobile navigation in the reference. */
-  .mc-home-v3__header{height:58px;border-bottom:1px solid #e6ebf2}
-  .mc-home-v3__header-inner{height:58px;padding:0 14px}
-  .mc-home-v3__brand-mark{width:34px;height:34px;flex-basis:34px}
-  .mc-home-v3__brand-copy strong{font-size:16px}
-  .mc-home-v3__brand-copy small{font-size:6px;letter-spacing:.12em;margin-top:3px}
-  .mc-home-v3__menu{width:38px;height:38px;padding:8px}
-  .mc-home-v3__menu span{width:21px;height:2px}
+  /* Header: compact but readable. */
+  .mc-home-v3__header{height:64px;border-bottom:1px solid #e6ebf2}
+  .mc-home-v3__header-inner{height:64px;padding:0 16px}
+  .mc-home-v3__brand{gap:9px;min-width:0}
+  .mc-home-v3__brand-mark{width:38px;height:38px;flex-basis:38px}
+  .mc-home-v3__brand-copy strong{font-size:18px}
+  .mc-home-v3__brand-copy small{font-size:7px;letter-spacing:.12em;margin-top:3px}
+  .mc-home-v3__menu{width:42px;height:42px;padding:8px}
+  .mc-home-v3__menu span{width:24px;height:2.5px}
 
-  /* Hero: blue visual area + white feature strip, matching the reference hierarchy. */
-  .mc-home-v3__hero{height:350px;min-height:0;background:#07548f}
-  .mc-home-v3__hero-inner{height:258px;padding:0 7%;padding-top:31px;align-items:flex-start}
-  .mc-home-v3__hero-copy{width:72%;position:relative;z-index:10}
-  .mc-home-v3__hero-copy h1{font-size:clamp(29px,8.4vw,39px);line-height:1.04;letter-spacing:0}
-  .mc-home-v3__hero-copy p{font-size:10px;line-height:1.5;margin:11px 0 13px;white-space:nowrap;letter-spacing:.015em}
-  .mc-home-v3__hero-button{padding:9px 16px;font-size:11px;gap:5px}
-  .mc-home-v3__hero-button b{font-size:13px}
-
-  .mc-home-v3__chalkboard{right:-18%;top:30px;width:55%;height:185px;border-width:6px;opacity:.48}
-  .mc-home-v3__chalkboard span{font-size:11px!important}
-  .mc-home-v3__teacher{right:-2%;bottom:79px;transform:scale(.57);transform-origin:bottom right;z-index:7}
-
-  .mc-home-v3__hero-features{left:0;bottom:0;transform:none;width:100%;height:92px;padding:12px 13px 8px;background:#fff;color:#26354b;grid-template-columns:repeat(4,1fr);gap:2px;align-items:center}
+  /* Hero: no portrait; keep the mathematical board as a quiet background accent. */
+  .mc-home-v3__hero{height:365px;min-height:0;background:#07548f}
+  .mc-home-v3__hero-inner{height:273px;padding:0 6.5%;padding-top:32px;align-items:flex-start}
+  .mc-home-v3__hero-copy{width:100%;position:relative;z-index:10}
+  .mc-home-v3__hero-copy h1{font-size:clamp(32px,9.1vw,40px);line-height:1.08;letter-spacing:0;max-width:100%}
+  .mc-home-v3__hero-copy p{font-size:12px;line-height:1.5;margin:14px 0 17px;white-space:nowrap;letter-spacing:.015em}
+  .mc-home-v3__hero-button{padding:11px 20px;font-size:14px;gap:6px}
+  .mc-home-v3__hero-button b{font-size:16px}
+  .mc-home-v3__teacher{display:none!important}
+  .mc-home-v3__chalkboard{right:-24%;top:34px;width:63%;height:190px;border-width:5px;opacity:.22}
+  .mc-home-v3__hero-features{left:0;bottom:0;transform:none;width:100%;height:92px;padding:10px 10px 8px;background:#fff;color:#26354b;grid-template-columns:repeat(4,1fr);gap:2px;align-items:center}
   .mc-home-v3__hero-features>div{display:grid;justify-items:center;align-content:center;gap:4px;color:#26354b;text-align:center}
-  .mc-home-v3__hero-features i{width:34px;height:34px;font-size:16px;box-shadow:none}
-  .mc-home-v3__hero-features b{font-size:8px;line-height:1.15;color:#26354b}
-  .mc-home-v3__hero-features small{display:block;font-size:6px;line-height:1.2;color:#7b8797;white-space:nowrap}
+  .mc-home-v3__hero-features i{width:34px;height:34px;font-size:15px;background:#f7fbff;border:2px solid #2779d5;color:#2779d5;box-shadow:none}
+  .mc-home-v3__hero-features b{font-size:10px;line-height:1.15;color:#26354b}
+  .mc-home-v3__hero-features small{display:block;font-size:7px;line-height:1.2;color:#7b8797;white-space:nowrap}
 
-  /* Section rhythm: compact white page like the phone mockup. */
-  .mc-home-v3__section{width:100%;padding:12px 12px 5px}
-  .mc-home-v3__section-heading{margin-bottom:8px;align-items:center}
-  .mc-home-v3__section-heading>div{gap:7px}
-  .mc-home-v3__section-heading .accent{width:3px;height:18px}
-  .mc-home-v3__section-heading h2{font-size:17px;line-height:1.2}
-  .mc-home-v3__section-heading p{font-size:8px;margin-left:10px;margin-top:1px}
-  .mc-home-v3__section-heading>a{font-size:8px}
+  /* Section rhythm and larger mobile typography. */
+  .mc-home-v3__section{width:100%;padding:16px 14px 7px}
+  .mc-home-v3__section-heading{margin-bottom:10px;align-items:center}
+  .mc-home-v3__section-heading>div{gap:8px}
+  .mc-home-v3__section-heading .accent{width:4px;height:21px}
+  .mc-home-v3__section-heading h2{font-size:20px;line-height:1.25}
+  .mc-home-v3__section-heading p{font-size:10px;margin-left:12px;margin-top:2px}
+  .mc-home-v3__section-heading>a{font-size:10px;white-space:nowrap}
 
-  /* Category cards: short horizontal cards with artwork left and copy right. */
-  .mc-home-v3__types{padding-top:8px;padding-bottom:7px}
-  .mc-home-v3__type-grid{grid-template-columns:1fr;gap:7px}
-  .mc-home-v3__type-card{height:86px;min-height:86px;border-radius:7px}
-  .mc-home-v3__type-copy{left:39%;right:3.5%;top:12px;transform:none}
-  .mc-home-v3__type-copy h3{font-size:21px;margin-bottom:4px}
-  .mc-home-v3__type-copy p{font-size:9px;line-height:1.28;margin:1px 0}
-  .mc-home-v3__type-copy span{margin-top:5px;padding:5px 11px;font-size:8px}
-  .mc-home-v3__book-stack,.mc-home-v3__open-book{left:3%;bottom:5px;width:32%;height:75px}
-  .mc-home-v3__book-stack i{height:18px;border-width:1px}
+  /* Category cards: clean horizontal cards with restrained book artwork. */
+  .mc-home-v3__types{padding-top:10px;padding-bottom:8px}
+  .mc-home-v3__type-grid{grid-template-columns:1fr;gap:9px}
+  .mc-home-v3__type-card{height:104px;min-height:104px;border-radius:8px}
+  .mc-home-v3__type-copy{left:40%;right:3.5%;top:13px;transform:none}
+  .mc-home-v3__type-copy h3{font-size:23px;margin-bottom:5px}
+  .mc-home-v3__type-copy p{font-size:10px;line-height:1.35;margin:1px 0}
+  .mc-home-v3__type-copy span{margin-top:7px;padding:7px 13px;font-size:10px}
+  .mc-home-v3__book-stack,.mc-home-v3__open-book{left:4%;bottom:5px;width:32%;height:88px}
+  .mc-home-v3__book-stack i{height:20px;border-width:1px;border-color:#d8e4ef;background:linear-gradient(90deg,#176fd1 0 15%,#fff 15% 100%);box-shadow:0 3px 5px rgba(24,83,140,.12)}
   .mc-home-v3__book-stack i:nth-child(1){bottom:1px}
-  .mc-home-v3__book-stack i:nth-child(2){bottom:18px}
-  .mc-home-v3__book-stack i:nth-child(3){bottom:35px}
-  .mc-home-v3__book-stack b{bottom:49px;height:18px;border-width:1px}
-  .mc-home-v3__open-book:before,.mc-home-v3__open-book:after{bottom:10px;height:45px;border-width:2px}
-  .mc-home-v3__open-book i{height:55px;width:8px}
-  .mc-home-v3__open-book b{height:42px;width:8px}
-  .mc-home-v3__open-book em{width:20px;height:10px}
+  .mc-home-v3__book-stack i:nth-child(2){bottom:20px}
+  .mc-home-v3__book-stack i:nth-child(3){bottom:39px}
+  .mc-home-v3__book-stack b{left:23%;bottom:57px;width:52%;height:20px;border-width:1px;border-color:#d8e4ef;box-shadow:0 3px 5px rgba(24,83,140,.10)}
+  .mc-home-v3__open-book{height:84px}
+  .mc-home-v3__open-book:before,.mc-home-v3__open-book:after{bottom:12px;height:51px;background:#fffaf1;border:2px solid #f28b2c;box-shadow:0 3px 5px rgba(153,83,30,.08)}
+  .mc-home-v3__open-book:before{left:7%;transform:skewY(7deg) rotate(-3deg);border-radius:6px 2px 2px 6px}
+  .mc-home-v3__open-book:after{right:7%;transform:skewY(-7deg) rotate(3deg);border-radius:2px 6px 6px 2px}
+  .mc-home-v3__open-book i{left:47%;bottom:4px;width:7px;height:61px;background:#2773b9;transform:rotate(30deg)}
+  .mc-home-v3__open-book b{display:none}
+  .mc-home-v3__open-book em{left:42%;bottom:4px;width:20px;height:8px;background:#f18a28;transform:none}
 
-  /* Popular courses: one compact list per row, as in the reference phone. */
-  .mc-home-v3__popular{padding-top:8px}
-  .mc-home-v3__course-grid{grid-template-columns:1fr;gap:6px}
-  .mc-home-v3__course-card{height:102px;display:grid;grid-template-columns:38% 1fr;border-radius:6px}
-  .mc-home-v3__course-cover{height:100%;min-height:102px}
-  .mc-home-v3__cover-copy{top:13px;gap:3px}
-  .mc-home-v3__cover-copy b{font-size:16px}
-  .mc-home-v3__cover-copy small{font-size:9px}
-  .mc-home-v3__cover-copy em{font-size:7px;padding:3px 7px}
-  .mc-home-v3__course-body{padding:9px 9px 8px;display:flex;flex-direction:column;min-width:0}
-  .mc-home-v3__course-body h3{height:31px;font-size:10px;line-height:1.45}
-  .mc-home-v3__tags{margin:3px 0;gap:3px}
-  .mc-home-v3__tags span{font-size:7px;padding:2px 4px}
-  .mc-home-v3__course-button{margin-top:auto;padding:5px;font-size:8px;border-radius:4px}
+  /* Popular courses: one readable list row per course. */
+  .mc-home-v3__popular{padding-top:10px}
+  .mc-home-v3__course-grid{grid-template-columns:1fr;gap:8px}
+  .mc-home-v3__course-card{height:112px;display:grid;grid-template-columns:38% 1fr;border-radius:7px}
+  .mc-home-v3__course-cover{height:100%;min-height:112px}
+  .mc-home-v3__cover-copy{top:14px;gap:4px}
+  .mc-home-v3__cover-copy b{font-size:17px}
+  .mc-home-v3__cover-copy small{font-size:10px}
+  .mc-home-v3__cover-copy em{font-size:8px;padding:3px 8px}
+  .mc-home-v3__course-body{padding:10px 10px 9px;display:flex;flex-direction:column;min-width:0}
+  .mc-home-v3__course-body h3{height:36px;font-size:12px;line-height:1.45}
+  .mc-home-v3__tags{margin:4px 0;gap:4px}
+  .mc-home-v3__tags span{font-size:8px;padding:3px 5px}
+  .mc-home-v3__course-button{margin-top:auto;padding:7px 6px;font-size:10px;border-radius:5px}
 
-  /* Benefits: two columns with generous touch targets. */
-  .mc-home-v3__reasons{padding-top:9px;padding-bottom:8px}
-  .mc-home-v3__reason-grid{grid-template-columns:repeat(2,1fr);gap:6px}
-  .mc-home-v3__reason-grid>div{height:51px;grid-template-columns:34px 1fr;padding:0 7px;border-radius:6px}
-  .mc-home-v3__reason-grid i{width:25px;height:25px;font-size:16px}
-  .mc-home-v3__reason-grid b{font-size:9px}
-  .mc-home-v3__reason-grid span{font-size:7px}
+  /* Benefits: larger text and touch areas. */
+  .mc-home-v3__reasons{padding-top:10px;padding-bottom:9px}
+  .mc-home-v3__reason-grid{grid-template-columns:repeat(2,1fr);gap:7px}
+  .mc-home-v3__reason-grid>div{height:58px;grid-template-columns:36px 1fr;padding:0 8px;border-radius:7px}
+  .mc-home-v3__reason-grid i{width:27px;height:27px;font-size:16px}
+  .mc-home-v3__reason-grid b{font-size:10px}
+  .mc-home-v3__reason-grid span{font-size:8px}
 
-  /* CTA and footer remain visible and compact on small screens. */
-  .mc-home-v3__cta{margin:0 12px 6px;min-height:64px;padding:8px 9px;gap:6px;border-radius:6px}
+  /* CTA and footer remain compact but readable. */
+  .mc-home-v3__cta{margin:0 14px 7px;min-height:70px;padding:9px 10px;gap:7px;border-radius:7px}
   .mc-home-v3__cta-art{display:none}
-  .mc-home-v3__cta>div:nth-child(2){gap:2px}
-  .mc-home-v3__cta strong{font-size:10px}
-  .mc-home-v3__cta span{font-size:7px}
-  .mc-home-v3__cta>a{padding:7px 9px;font-size:8px}
-  .mc-home-v3__footer-inner{min-height:51px;padding:8px 12px}
+  .mc-home-v3__cta>div:nth-child(2){gap:3px}
+  .mc-home-v3__cta strong{font-size:12px}
+  .mc-home-v3__cta span{font-size:8px}
+  .mc-home-v3__cta>a{padding:8px 10px;font-size:10px;white-space:nowrap}
+  .mc-home-v3__footer-inner{min-height:58px;padding:9px 14px}
   .mc-home-v3__footer-brand{min-width:0}
-  .mc-home-v3__footer-brand>i{width:26px;height:26px;font-size:14px}
-  .mc-home-v3__footer-brand b{font-size:10px}
-  .mc-home-v3__footer-brand small{font-size:6px}
-  .mc-home-v3__copyright{padding:6px 8px 9px;font-size:6px}
+  .mc-home-v3__footer-brand>i{width:30px;height:30px;font-size:14px}
+  .mc-home-v3__footer-brand b{font-size:11px}
+  .mc-home-v3__footer-brand small{font-size:7px}
+  .mc-home-v3__copyright{padding:7px 9px 10px;font-size:7px}
 }
 
 @media(max-width:380px){
-  .mc-home-v3__hero{height:340px}
-  .mc-home-v3__hero-inner{height:248px;padding-top:29px}
-  .mc-home-v3__hero-copy h1{font-size:28px}
-  .mc-home-v3__hero-copy p{font-size:9px}
-  .mc-home-v3__teacher{transform:scale(.53);bottom:78px}
-  .mc-home-v3__hero-features{height:92px;padding-left:9px;padding-right:9px}
-  .mc-home-v3__hero-features i{width:31px;height:31px}
-  .mc-home-v3__hero-features b{font-size:7px}
-  .mc-home-v3__hero-features small{font-size:5px}
-  .mc-home-v3__type-card{height:82px;min-height:82px}
-  .mc-home-v3__type-copy h3{font-size:19px}
-  .mc-home-v3__type-copy p{font-size:8px}
-  .mc-home-v3__type-copy span{font-size:7px;padding:4px 9px}
-  .mc-home-v3__course-card{height:96px}
-  .mc-home-v3__course-cover{min-height:96px}
+  .mc-home-v3__header{height:62px}
+  .mc-home-v3__header-inner{height:62px;padding:0 14px}
+  .mc-home-v3__hero{height:360px}
+  .mc-home-v3__hero-inner{height:268px;padding-top:30px}
+  .mc-home-v3__hero-copy h1{font-size:31px}
+  .mc-home-v3__hero-copy p{font-size:11px}
+  .mc-home-v3__hero-button{font-size:13px;padding:10px 18px}
+  .mc-home-v3__hero-features{height:92px;padding-left:8px;padding-right:8px}
+  .mc-home-v3__hero-features i{width:32px;height:32px}
+  .mc-home-v3__hero-features b{font-size:9px}
+  .mc-home-v3__hero-features small{font-size:6px}
+  .mc-home-v3__type-card{height:98px;min-height:98px}
+  .mc-home-v3__type-copy h3{font-size:21px}
+  .mc-home-v3__type-copy p{font-size:9px}
+  .mc-home-v3__type-copy span{font-size:9px;padding:6px 11px}
+  .mc-home-v3__course-card{height:106px}
+  .mc-home-v3__course-cover{min-height:106px}
+}
+
+/* Final visual corrections: portrait removed, feature circles outlined, and book art simplified. */
+@media (max-width:900px){
+  .mc-home-v3__teacher{display:none!important}
+  .mc-home-v3__hero-copy{width:100%!important}
+  .mc-home-v3__hero-features i{background:#f7fbff!important;border:2px solid #2779d5!important;box-shadow:none!important;color:#2779d5!important}
+  .mc-home-v3__type-copy span{font-size:11px!important;padding:7px 14px!important}
 }
