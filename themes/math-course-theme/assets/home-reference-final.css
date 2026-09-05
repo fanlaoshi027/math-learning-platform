@@ -37,13 +37,11 @@
 .mc-home-v3__course-cover{width:100%;height:150px!important}
 .mc-home-v3__course-body{display:none!important}
 .mc-home-v3__cover-copy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px 18px;box-sizing:border-box;color:#073f91}
-.mc-home-v3__cover-copy b{display:block;width:100%;max-width:92%;font-size:23px;line-height:1.28;font-weight:900;letter-spacing:.01em}
+.mc-home-v3__cover-copy b{display:block;width:100%;max-width:92%;font-size:23px;line-height:1.28;font-weight:900;letter-spacing:.01em;overflow-wrap:normal;word-break:keep-all}
 .mc-home-v3__cover-copy small,.mc-home-v3__cover-copy em{display:none!important}
 .mc-home-v3__course-cover--2 .mc-home-v3__cover-copy{color:#0c3d91}
 .mc-home-v3__course-cover--3 .mc-home-v3__cover-copy{color:#07545c}
 .mc-home-v3__course-cover--4 .mc-home-v3__cover-copy{color:#bd4a16}
-
-/* Course action button retained for any legacy markup but hidden because cards now show title only. */
 .mc-home-v3__course-button,.mc-home-v3__course-button:visited{display:none!important}
 
 /* Larger homepage typography. */
@@ -60,7 +58,7 @@
 .mc-home-v3__reason-grid b{font-size:14px}
 .mc-home-v3__reason-grid span{font-size:10px}
 
-/* Symmetric open-book logo matching the approved reference: two equal blue pages + clean white center. */
+/* Symmetric open-book logo. */
 .mc-home-v3__brand-mark{position:relative;width:44px;height:38px;flex:0 0 44px}
 .mc-home-v3__brand-mark:before,.mc-home-v3__brand-mark:after{content:"";position:absolute;top:5px;width:18px;height:27px;box-sizing:border-box;background:#1769d8}
 .mc-home-v3__brand-mark:before{left:3px;border-radius:4px 2px 2px 8px;clip-path:polygon(0 5%,88% 0,100% 100%,10% 90%)}
@@ -73,48 +71,63 @@
 .mc-home-v3__footer-brand>i:before{left:3px;border-radius:4px 2px 2px 8px;clip-path:polygon(0 5%,88% 0,100% 100%,10% 90%)}
 .mc-home-v3__footer-brand>i:after{right:3px;border-radius:2px 4px 8px 2px;clip-path:polygon(12% 0,100% 5%,90% 90%,0 100%)}
 
+/* Desktop final spacing: keep the hero compact and remove any gap before sections. */
+.mc-home-v3__types{margin-top:0!important}
+.mc-home-v3__hero + .mc-home-v3__types{padding-top:26px}
+
 @media(max-width:900px){
-  .mc-home-v3__hero{height:365px!important}
-  .mc-home-v3__hero-inner{height:365px!important}
+  /* Mobile hero ends immediately before the course-system section. */
+  .mc-home-v3__hero{height:300px!important;min-height:300px!important;margin-bottom:0!important}
+  .mc-home-v3__hero-inner{height:300px!important;min-height:300px!important;padding-top:30px}
   .mc-home-v3__hero-copy{width:100%!important}
-  .mc-home-v3__chalkboard{right:-24%;width:63%;height:190px;opacity:.16}
+  .mc-home-v3__chalkboard{right:-24%;width:63%;height:175px;opacity:.12}
   .mc-home-v3__hero-features{display:none!important}
   .mc-home-v3__hero-button{font-size:15px;padding:12px 21px}
-  .mc-home-v3__section-heading h2{font-size:21px}
+
+  /* Section heading: title gets its own full row; action sits below/right. */
+  .mc-home-v3__section-heading{display:block!important;margin-bottom:10px}
+  .mc-home-v3__section-heading>div{display:flex!important;align-items:center;gap:8px;width:100%}
+  .mc-home-v3__section-heading h2{font-size:21px;line-height:1.3;white-space:normal;word-break:keep-all;flex:1;min-width:0}
+  .mc-home-v3__section-heading p{font-size:10px}
+  .mc-home-v3__section-heading>a{display:block;float:none;text-align:right;margin-top:6px;font-size:11px}
+
+  /* Category cards: give copy room while retaining the simple book art. */
+  .mc-home-v3__type-card{height:104px;min-height:104px}
+  .mc-home-v3__type-copy{left:36%!important;right:3%!important;top:12px;transform:none}
   .mc-home-v3__type-copy h3{font-size:24px}
-  .mc-home-v3__type-copy p{font-size:11px}
+  .mc-home-v3__type-copy p{font-size:10px}
   .mc-home-v3__type-copy span{font-size:13px;padding:8px 15px}
-  .mc-home-v3__course-cover--1{background:#bfe6fa!important}
-  .mc-home-v3__course-cover--2{background:#f8cbd2!important}
-  .mc-home-v3__course-cover--3{background:#bfeee3!important}
-  .mc-home-v3__course-cover--4{background:#ffe0ae!important}
-  .mc-home-v3__cover-copy b{font-size:19px}
-  .mc-home-v3__course-body h3{font-size:13px}
-  .mc-home-v3__course-button{font-size:11px;padding:8px}
+  .mc-home-v3__book-stack,.mc-home-v3__open-book{left:3%;bottom:6px;width:29%;height:82px}
+
+  /* Mobile popular cards: a single full-width color block, title only. */
+  .mc-home-v3__course-grid{grid-template-columns:1fr!important;gap:8px}
+  .mc-home-v3__course-card{display:block!important;width:100%;height:126px!important;min-height:126px!important;border-radius:7px}
+  .mc-home-v3__course-cover{display:flex!important;width:100%!important;height:126px!important;min-height:126px!important;align-items:center;justify-content:center}
+  .mc-home-v3__course-body{display:none!important}
+  .mc-home-v3__cover-copy{position:absolute!important;inset:0!important;padding:16px 18px!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}
+  .mc-home-v3__cover-copy b{font-size:21px!important;line-height:1.35!important;max-width:96%!important;white-space:normal!important;word-break:keep-all!important;overflow-wrap:normal!important}
+
+  .mc-home-v3__reason-grid{grid-template-columns:repeat(2,1fr)}
+  .mc-home-v3__reason-grid b{font-size:11px}
+  .mc-home-v3__reason-grid span{font-size:8px}
+  .mc-home-v3__cta{margin-top:0}
   .mc-home-v3__brand-mark{width:40px;height:35px;flex-basis:40px}
 }
 
 @media(max-width:560px){
-  .mc-home-v3__hero{height:365px!important}
-  .mc-home-v3__hero-inner{height:365px!important}
+  .mc-home-v3__hero{height:300px!important;min-height:300px!important}
+  .mc-home-v3__hero-inner{height:300px!important;min-height:300px!important;padding-top:29px}
   .mc-home-v3__hero-copy h1{font-size:clamp(32px,9.1vw,40px);line-height:1.08}
   .mc-home-v3__hero-copy p{font-size:12px}
   .mc-home-v3__hero-button{font-size:15px;padding:12px 21px}
-  .mc-home-v3__section-heading h2{font-size:21px}
+  .mc-home-v3__section{padding-left:14px;padding-right:14px}
+  .mc-home-v3__section-heading h2{font-size:20px}
   .mc-home-v3__section-heading>a{font-size:11px}
   .mc-home-v3__type-card{height:104px;min-height:104px}
-  .mc-home-v3__type-copy h3{font-size:24px}
+  .mc-home-v3__type-copy{left:36%!important}
+  .mc-home-v3__type-copy h3{font-size:23px}
   .mc-home-v3__type-copy p{font-size:10px}
-  .mc-home-v3__type-copy span{font-size:13px;padding:8px 15px}
-  .mc-home-v3__book-stack,.mc-home-v3__open-book{left:4%;bottom:5px;width:32%;height:88px}
-  .mc-home-v3__book-stack i{height:20px}
-  .mc-home-v3__book-stack i:nth-child(1){bottom:1px}
-  .mc-home-v3__book-stack i:nth-child(2){bottom:20px}
-  .mc-home-v3__book-stack i:nth-child(3){bottom:39px}
-  .mc-home-v3__book-stack b{bottom:57px;height:20px}
-  .mc-home-v3__open-book{height:84px}
-  .mc-home-v3__open-book:before,.mc-home-v3__open-book:after{bottom:12px;height:51px;border-width:2px}
-  .mc-home-v3__open-book i{bottom:4px;width:7px;height:61px}
-  .mc-home-v3__course-cover{height:126px!important}
-  .mc-home-v3__cover-copy b{font-size:18px;line-height:1.28;max-width:94%}
+  .mc-home-v3__type-copy span{font-size:11px;padding:7px 14px}
+  .mc-home-v3__course-card,.mc-home-v3__course-cover{height:126px!important;min-height:126px!important}
+  .mc-home-v3__cover-copy b{font-size:20px!important;line-height:1.35!important}
 }
