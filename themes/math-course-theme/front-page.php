@@ -10,29 +10,36 @@ $theme_uri = get_stylesheet_directory_uri();
 <main class="mc-home-v3">
     <section class="mc-home-v3__hero" aria-label="樊老师数学">
         <picture class="mc-home-v3__hero-media">
-            <source media="(max-width: 700px)" srcset="<?php echo esc_url($theme_uri . '/assets/images/home-banner-mobile.svg'); ?>">
-            <img src="<?php echo esc_url($theme_uri . '/assets/images/home-banner-desktop.svg'); ?>" alt="樊老师数学：让更多学生爱上数学，学好数学" fetchpriority="high">
+            <img src="<?php echo esc_url($theme_uri . '/assets/images/home-hero-bg.jpg'); ?>" alt="樊老师数学首页" fetchpriority="high">
         </picture>
-        <a class="mc-home-v3__hero-link" href="<?php echo esc_url($course_center_url); ?>" aria-label="浏览课程中心"></a>
+        <div class="mc-home-v3__hero-content">
+            <div class="mc-home-v3__hero-copy">
+                <h1><span>让更多学生</span><strong>爱上数学，学好数学</strong></h1>
+                <p>系统的课程 · 清晰的讲解 · 实用的方法</p>
+                <a class="mc-home-v3__hero-button" href="<?php echo esc_url($course_center_url); ?>">浏览课程 <span>→</span></a>
+            </div>
+        </div>
     </section>
 
-    <section class="mc-home-v3__types mc-container" aria-labelledby="mc-home-types-title">
-        <div class="mc-home-v3__heading">
-            <div>
-                <span class="mc-home-v3__eyebrow">COURSE PATHS</span>
-                <h2 id="mc-home-types-title">两大课程体系 · 满足不同学习需求</h2>
-                <p>系统课负责建立知识体系，教辅配套课负责紧跟教材与题型强化。</p>
-            </div>
-            <a href="<?php echo esc_url($course_center_url); ?>">了解全部课程 <span>→</span></a>
-        </div>
+    <section class="mc-home-v3__types mc-container" aria-label="课程体系">
         <div class="mc-home-v3__type-grid">
             <a class="mc-home-v3__type-card mc-home-v3__type-card--system" href="<?php echo esc_url($system_url); ?>">
-                <img src="<?php echo esc_url($theme_uri . '/assets/images/home-system.svg'); ?>" alt="系统课" loading="lazy">
-                <span class="mc-home-v3__type-overlay"><b>进入系统课 →</b></span>
+                <img src="<?php echo esc_url($theme_uri . '/assets/images/home-system-bg.jpg'); ?>" alt="系统课" loading="lazy">
+                <div class="mc-home-v3__type-copy">
+                    <h2>系统课</h2>
+                    <p>构建完整的知识体系</p>
+                    <p>从基础到提升，系统掌握初中数学</p>
+                    <span>进入系统课 →</span>
+                </div>
             </a>
             <a class="mc-home-v3__type-card mc-home-v3__type-card--supplementary" href="<?php echo esc_url($supplementary_url); ?>">
-                <img src="<?php echo esc_url($theme_uri . '/assets/images/home-supplementary.svg'); ?>" alt="教辅配套课" loading="lazy">
-                <span class="mc-home-v3__type-overlay"><b>进入配套课 →</b></span>
+                <img src="<?php echo esc_url($theme_uri . '/assets/images/home-supplementary-bg.jpg'); ?>" alt="教辅配套课" loading="lazy">
+                <div class="mc-home-v3__type-copy">
+                    <h2>教辅配套课</h2>
+                    <p>紧扣教材与教辅</p>
+                    <p>逐题精讲，吃透每一道题</p>
+                    <span>进入配套课 →</span>
+                </div>
             </a>
         </div>
     </section>
@@ -40,9 +47,8 @@ $theme_uri = get_stylesheet_directory_uri();
     <section class="mc-home-v3__popular mc-container" aria-labelledby="mc-home-popular-title">
         <div class="mc-home-v3__heading mc-home-v3__heading--popular">
             <div>
-                <span class="mc-home-v3__eyebrow">POPULAR COURSES</span>
                 <h2 id="mc-home-popular-title">热门课程</h2>
-                <p>从两套课程体系中精选当前值得优先学习的课程。</p>
+                <p>精选课程，快速开始学习。</p>
             </div>
             <a href="<?php echo esc_url($course_center_url); ?>">查看全部课程 <span>→</span></a>
         </div>
