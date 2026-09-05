@@ -28,7 +28,7 @@ $courses = get_posts(array(
             <nav class="mc-home-v3__nav" aria-label="主导航">
                 <a class="is-active" href="<?php echo esc_url(home_url('/')); ?>">首页</a>
                 <a href="<?php echo esc_url($course_center_url); ?>">课程中心</a>
-                <a href="<?php echo esc_url(home_url('/learning-center/')); ?>">学习指南</a>
+                <a href="<?php echo esc_url(home_url('/learning-center/')); ?>">学习中心</a>
                 <a href="#about">关于我们</a>
             </nav>
             <div class="mc-home-v3__header-tools">
@@ -44,7 +44,7 @@ $courses = get_posts(array(
         <nav id="mc-home-mobile-nav" class="mc-home-v3__mobile-nav" aria-label="移动端导航">
             <a href="<?php echo esc_url(home_url('/')); ?>">首页</a>
             <a href="<?php echo esc_url($course_center_url); ?>">课程中心</a>
-            <a href="<?php echo esc_url(home_url('/learning-center/')); ?>">学习指南</a>
+            <a href="<?php echo esc_url(home_url('/learning-center/')); ?>">学习中心</a>
             <a href="#about">关于我们</a>
         </nav>
     </header>
