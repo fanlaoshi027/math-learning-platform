@@ -1,27 +1,20 @@
 /* Homepage final visual pass — frontend only. */
 
-/* Hero portrait is intentionally removed; the math board remains as a quiet visual accent. */
+/* Hero: no portrait and no feature-circle strip. */
 .mc-home-v3__teacher{display:none!important}
-.mc-home-v3__hero-copy{width:64%!important}
-.mc-home-v3__chalkboard{right:5%;width:42%;opacity:.34}
+.mc-home-v3__hero{height:390px!important}
+.mc-home-v3__hero-inner{height:390px!important}
+.mc-home-v3__hero-copy{width:58%!important}
+.mc-home-v3__chalkboard{right:5%;width:42%;opacity:.28}
+.mc-home-v3__hero-features{display:none!important}
 
-/* Feature strip: white surface + outlined blue icons, rather than heavy filled circles. */
-.mc-home-v3__hero{height:474px}
-.mc-home-v3__hero-inner{height:390px}
-.mc-home-v3__hero-features{left:0;bottom:0;transform:none;width:100%;height:84px;padding:10px max(22px,calc((100% - 1240px)/2 + 22px));background:#fff;color:#26354b;grid-template-columns:repeat(4,1fr);gap:42px;box-sizing:border-box}
-.mc-home-v3__hero-features>div{display:flex;align-items:center;gap:11px;color:#26354b}
-.mc-home-v3__hero-features i{width:42px;height:42px;flex:0 0 42px;background:#f6fbff!important;border:2px solid #2779d5!important;box-shadow:none!important;color:#2779d5!important;font-size:21px}
-.mc-home-v3__hero-features b{font-size:14px;color:#26354b}
-.mc-home-v3__hero-features small{font-size:10px;color:#7b8797}
-
-/* Clean, simple book illustrations for the two category cards. */
+/* Category illustrations: simple, balanced book shapes. */
 .mc-home-v3__book-stack{left:5%;bottom:10px;width:29%;height:126px;transform:none}
 .mc-home-v3__book-stack i{height:27px;left:8%;width:84%;border:1px solid #d6e1ec;background:linear-gradient(90deg,#176fd2 0 14%,#fff 14% 100%);border-radius:4px 8px 6px 4px;box-shadow:0 4px 7px rgba(24,83,140,.12)}
 .mc-home-v3__book-stack i:nth-child(1){bottom:3px;transform:rotate(-1deg)}
 .mc-home-v3__book-stack i:nth-child(2){bottom:30px;left:4%;width:90%;transform:rotate(1deg)}
 .mc-home-v3__book-stack i:nth-child(3){bottom:57px;left:12%;width:78%;transform:rotate(-1deg)}
 .mc-home-v3__book-stack b{left:25%;bottom:83px;width:50%;height:25px;border:1px solid #d6e1ec;background:#fff;border-radius:4px;transform:rotate(-2deg);box-shadow:0 3px 6px rgba(24,83,140,.09)}
-
 .mc-home-v3__open-book{left:5%;bottom:12px;width:29%;height:124px}
 .mc-home-v3__open-book:before,.mc-home-v3__open-book:after{bottom:15px;width:45%;height:70px;background:#fffaf1;border:2px solid #f28a29;box-shadow:0 4px 7px rgba(153,83,30,.09)}
 .mc-home-v3__open-book:before{left:5%;transform:skewY(7deg) rotate(-3deg);border-radius:7px 2px 2px 7px}
@@ -30,63 +23,87 @@
 .mc-home-v3__open-book b{display:none}
 .mc-home-v3__open-book em{left:42%;bottom:7px;width:24px;height:8px;background:#f28a29;transform:none}
 
+/* Popular course covers: background color only — no vector artwork or uploaded cover image. */
+.mc-home-v3__course-cover{position:relative;overflow:hidden;background:#bfe6fa!important}
+.mc-home-v3__course-cover:before,.mc-home-v3__course-cover:after{display:none!important;content:none!important}
+.mc-home-v3__course-cover img{display:none!important}
+.mc-home-v3__course-cover--1{background:#bfe6fa!important}
+.mc-home-v3__course-cover--2{background:#f8cbd2!important}
+.mc-home-v3__course-cover--3{background:#bfeee3!important}
+.mc-home-v3__course-cover--4{background:#ffe0ae!important}
+.mc-home-v3__cover-copy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;gap:6px;padding:14px 10px;box-sizing:border-box;color:#073f91}
+.mc-home-v3__cover-copy b{font-size:22px;line-height:1.25;font-weight:900}
+.mc-home-v3__cover-copy small{font-size:13px;font-weight:700}
+.mc-home-v3__cover-copy em{font-size:10px;padding:4px 9px;background:rgba(255,255,255,.72);color:#1259aa;border-radius:99px;font-style:normal;font-weight:800}
+.mc-home-v3__course-cover--2 .mc-home-v3__cover-copy{color:#0c3d91}
+.mc-home-v3__course-cover--3 .mc-home-v3__cover-copy{color:#07545c}
+.mc-home-v3__course-cover--4 .mc-home-v3__cover-copy{color:#bd4a16}
+
+/* Course action button: always white text on blue. */
+.mc-home-v3__course-button,.mc-home-v3__course-button:visited{color:#fff!important;background:#1269dc!important}
+
 /* Larger homepage typography. */
 .mc-home-v3__nav a{font-size:15px}
 .mc-home-v3__account{font-size:13px}
-.mc-home-v3__hero-button{font-size:17px;padding:13px 29px}
-.mc-home-v3__section-heading h2{font-size:23px}
+.mc-home-v3__hero-button{font-size:18px;padding:14px 31px}
+.mc-home-v3__section-heading h2{font-size:24px}
 .mc-home-v3__section-heading>a{font-size:13px}
 .mc-home-v3__type-copy h3{font-size:31px}
 .mc-home-v3__type-copy p{font-size:14px}
-.mc-home-v3__type-copy span{font-size:14px;padding:9px 20px}
+.mc-home-v3__type-copy span{font-size:14px;padding:10px 21px}
 .mc-home-v3__course-body h3{font-size:14px}
-.mc-home-v3__course-button{font-size:12px;padding:8px}
-.mc-home-v3__reason-grid b{font-size:13px}
-.mc-home-v3__reason-grid span{font-size:9px}
+.mc-home-v3__course-button{font-size:13px;padding:9px}
+.mc-home-v3__reason-grid b{font-size:14px}
+.mc-home-v3__reason-grid span{font-size:10px}
 
-/* One consistent open-book logo for the homepage header/footer. */
-.mc-home-v3__brand-mark{position:relative;width:42px;height:36px;flex:0 0 42px}
-.mc-home-v3__brand-mark:before,.mc-home-v3__brand-mark:after{content:"";position:absolute;display:block;box-sizing:border-box}
-.mc-home-v3__brand-mark:before{left:3px;top:8px;width:17px;height:23px;border:3px solid #1769d8;border-right-width:2px;border-radius:4px 2px 2px 9px;transform:skewY(7deg);background:#fff}
-.mc-home-v3__brand-mark:after{right:3px;top:8px;width:17px;height:23px;border:3px solid #1769d8;border-left-width:2px;border-radius:2px 4px 9px 2px;transform:skewY(-7deg);background:#fff}
-.mc-home-v3__brand-mark i{position:absolute;z-index:2;left:19px;top:5px;width:4px;height:29px;border-radius:99px;background:#ff9418;transform:rotate(3deg)}
-.mc-home-v3__brand-mark i:after{content:"";position:absolute;left:-4px;bottom:-2px;width:12px;height:6px;border-radius:2px;background:#ff9418}
+/* Symmetric open-book logo matching the approved reference: two equal blue pages + clean white center. */
+.mc-home-v3__brand-mark{position:relative;width:44px;height:38px;flex:0 0 44px}
+.mc-home-v3__brand-mark:before,.mc-home-v3__brand-mark:after{content:"";position:absolute;top:5px;width:18px;height:27px;box-sizing:border-box;background:#1769d8}
+.mc-home-v3__brand-mark:before{left:3px;border-radius:4px 2px 2px 8px;clip-path:polygon(0 5%,88% 0,100% 100%,10% 90%)}
+.mc-home-v3__brand-mark:after{right:3px;border-radius:2px 4px 8px 2px;clip-path:polygon(12% 0,100% 5%,90% 90%,0 100%)}
+.mc-home-v3__brand-mark i{position:absolute;z-index:3;left:20px;top:5px;width:4px;height:30px;background:#fff;border-radius:99px;box-shadow:0 0 0 1px rgba(23,105,216,.12)}
+.mc-home-v3__brand-mark i:after{content:"";position:absolute;left:-3px;bottom:-2px;width:10px;height:5px;background:#1769d8;border-radius:0 0 3px 3px}
 .mc-home-v3__brand-mark b{display:none}
-.mc-home-v3__footer-brand>i{position:relative;width:38px;height:32px;border:0;border-radius:0;background:transparent;font-size:0;color:transparent}
-.mc-home-v3__footer-brand>i:before,.mc-home-v3__footer-brand>i:after{content:"";position:absolute;display:block;box-sizing:border-box}
-.mc-home-v3__footer-brand>i:before{left:2px;top:7px;width:16px;height:22px;border:3px solid rgba(255,255,255,.9);border-right-width:2px;border-radius:4px 2px 2px 8px;transform:skewY(7deg)}
-.mc-home-v3__footer-brand>i:after{right:2px;top:7px;width:16px;height:22px;border:3px solid rgba(255,255,255,.9);border-left-width:2px;border-radius:2px 4px 8px 2px;transform:skewY(-7deg)}
+.mc-home-v3__footer-brand>i{position:relative;width:44px;height:36px;border:0;border-radius:0;background:transparent;font-size:0;color:transparent}
+.mc-home-v3__footer-brand>i:before,.mc-home-v3__footer-brand>i:after{content:"";position:absolute;top:5px;width:18px;height:27px;box-sizing:border-box;background:#fff}
+.mc-home-v3__footer-brand>i:before{left:3px;border-radius:4px 2px 2px 8px;clip-path:polygon(0 5%,88% 0,100% 100%,10% 90%)}
+.mc-home-v3__footer-brand>i:after{right:3px;border-radius:2px 4px 8px 2px;clip-path:polygon(12% 0,100% 5%,90% 90%,0 100%)}
 
 @media(max-width:900px){
-  .mc-home-v3__hero{height:365px}
-  .mc-home-v3__hero-inner{height:273px}
+  .mc-home-v3__hero{height:365px!important}
+  .mc-home-v3__hero-inner{height:365px!important}
   .mc-home-v3__hero-copy{width:100%!important}
-  .mc-home-v3__chalkboard{right:-24%;width:63%;height:190px;opacity:.18}
-  .mc-home-v3__hero-features{height:92px;padding:10px 10px 8px;background:#fff;grid-template-columns:repeat(4,1fr);gap:2px}
-  .mc-home-v3__hero-features>div{display:grid;justify-items:center;align-content:center;gap:4px;text-align:center}
-  .mc-home-v3__hero-features i{width:34px;height:34px;flex:0 0 34px;background:#f7fbff!important;border:2px solid #2779d5!important;color:#2779d5!important}
-  .mc-home-v3__hero-features b{font-size:10px}
-  .mc-home-v3__hero-features small{font-size:7px}
-  .mc-home-v3__hero-button{font-size:14px;padding:11px 20px}
-  .mc-home-v3__section-heading h2{font-size:20px}
-  .mc-home-v3__type-copy h3{font-size:23px}
-  .mc-home-v3__type-copy p{font-size:10px}
-  .mc-home-v3__type-copy span{font-size:12px;padding:7px 14px}
-  .mc-home-v3__course-body h3{font-size:12px}
-  .mc-home-v3__course-button{font-size:11px;padding:7px}
+  .mc-home-v3__chalkboard{right:-24%;width:63%;height:190px;opacity:.16}
+  .mc-home-v3__hero-features{display:none!important}
+  .mc-home-v3__hero-button{font-size:15px;padding:12px 21px}
+  .mc-home-v3__section-heading h2{font-size:21px}
+  .mc-home-v3__type-copy h3{font-size:24px}
+  .mc-home-v3__type-copy p{font-size:11px}
+  .mc-home-v3__type-copy span{font-size:13px;padding:8px 15px}
+  .mc-home-v3__course-cover--1{background:#bfe6fa!important}
+  .mc-home-v3__course-cover--2{background:#f8cbd2!important}
+  .mc-home-v3__course-cover--3{background:#bfeee3!important}
+  .mc-home-v3__course-cover--4{background:#ffe0ae!important}
+  .mc-home-v3__cover-copy b{font-size:17px}
+  .mc-home-v3__cover-copy small{font-size:10px}
+  .mc-home-v3__cover-copy em{font-size:8px}
+  .mc-home-v3__course-body h3{font-size:13px}
+  .mc-home-v3__course-button{font-size:11px;padding:8px}
   .mc-home-v3__brand-mark{width:40px;height:35px;flex-basis:40px}
 }
 
 @media(max-width:560px){
+  .mc-home-v3__hero{height:365px!important}
+  .mc-home-v3__hero-inner{height:365px!important}
   .mc-home-v3__hero-copy h1{font-size:clamp(32px,9.1vw,40px);line-height:1.08}
   .mc-home-v3__hero-copy p{font-size:12px}
-  .mc-home-v3__hero-button{font-size:15px;padding:11px 20px}
-  .mc-home-v3__section-heading h2{font-size:20px}
-  .mc-home-v3__section-heading>a{font-size:10px}
+  .mc-home-v3__hero-button{font-size:15px;padding:12px 21px}
+  .mc-home-v3__section-heading h2{font-size:21px}
+  .mc-home-v3__section-heading>a{font-size:11px}
   .mc-home-v3__type-card{height:104px;min-height:104px}
-  .mc-home-v3__type-copy h3{font-size:23px}
+  .mc-home-v3__type-copy h3{font-size:24px}
   .mc-home-v3__type-copy p{font-size:10px}
-  .mc-home-v3__type-copy span{font-size:12px;padding:7px 14px}
+  .mc-home-v3__type-copy span{font-size:13px;padding:8px 15px}
   .mc-home-v3__book-stack,.mc-home-v3__open-book{left:4%;bottom:5px;width:32%;height:88px}
   .mc-home-v3__book-stack i{height:20px}
   .mc-home-v3__book-stack i:nth-child(1){bottom:1px}
