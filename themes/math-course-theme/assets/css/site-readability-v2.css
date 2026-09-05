@@ -1,0 +1,25 @@
+/* Site readability V2 — frontend typography only. Player navigation/layout is untouched. */
+body.mathcourse-site{font-size:17px}
+body.mathcourse-site .mc-site-nav a{font-size:16px}
+body.mathcourse-site .mc-brand__text{font-size:19px}
+body.mathcourse-site .mc-header-login,body.mathcourse-site .mc-user-pill{font-size:15px}
+body.mathcourse-site .mc-btn{font-size:16px;min-height:50px}
+body.mathcourse-site .mathcourse-center__title{font-size:21px;line-height:1.5}
+body.mathcourse-site .mathcourse-center__button{font-size:15px;padding:12px 14px}
+body.mathcourse-site .mc-course-filter a{font-size:16px}
+body.mathcourse-site .mc-course-grade-filter a{font-size:15px}
+body.mathcourse-site .mc-course-grade-filter>span{font-size:14px}
+body.mathcourse-site .mathcourse-course-detail,body.mathcourse-site .mc-learning{font-size:17px}
+body.mathcourse-site .mathcourse-course-detail p,body.mathcourse-site .mc-learning p{font-size:17px}
+@media(max-width:700px){
+  body.mathcourse-site{font-size:16px}
+  body.mathcourse-site .mc-brand__text{font-size:17px}
+  body.mathcourse-site .mc-site-nav a{font-size:15px}
+  body.mathcourse-site .mc-header-login{font-size:14px}
+  body.mathcourse-site .mathcourse-center__title{font-size:20px;line-height:1.5}
+  body.mathcourse-site .mathcourse-center__button{font-size:15px;padding:12px 13px}
+  body.mathcourse-site .mc-course-filter a{font-size:15px}
+  body.mathcourse-site .mc-course-grade-filter a{font-size:15px}
+  body.mathcourse-site .mathcourse-course-detail,body.mathcourse-site .mc-learning{font-size:16px}
+  body.mathcourse-site .mathcourse-course-detail p,body.mathcourse-site .mc-learning p{font-size:16px}
+}
