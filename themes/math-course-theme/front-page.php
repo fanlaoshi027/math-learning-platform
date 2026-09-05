@@ -9,16 +9,8 @@ $course_center_url = home_url('/course-center/');
 $system_url = add_query_arg('course_type', 'topic', $course_center_url);
 $supplementary_url = add_query_arg('course_type', 'supplementary', $course_center_url);
 $learning_url = home_url('/learning-center/');
-
-$courses = get_posts(array(
-    'post_type'      => 'courses',
-    'post_status'    => 'publish',
-    'posts_per_page' => 4,
-    'orderby'        => 'date',
-    'order'          => 'DESC',
-));
+$courses = get_posts(array('post_type'=>'courses','post_status'=>'publish','posts_per_page'=>4,'orderby'=>'date','order'=>'DESC'));
 ?>
-
 <main class="mc-home-v3">
     <header class="mc-home-v3__header">
         <div class="mc-home-v3__header-inner">
@@ -53,7 +45,7 @@ $courses = get_posts(array(
     <section class="mc-home-v3__hero" aria-label="樊老师数学">
         <div class="mc-home-v3__hero-bg" aria-hidden="true">
             <div class="mc-home-v3__chalkboard"><span>a² + b² = c²</span><span>x = −b ± √b²−4ac</span><span>数学不难</span><span>方法很重要！</span></div>
-            <div class="mc-home-v3__teacher"><i class="head"></i><i class="hair"></i><i class="body"></i><i class="arm arm-a"></i><i class="arm arm-b"></i></div>
+            <div class="mc-home-v3__teacher" aria-hidden="true"><i class="head"></i><i class="hair"></i><i class="body"></i><i class="arm arm-a"></i><i class="arm arm-b"></i></div>
             <div class="mc-home-v3__hero-line"></div>
         </div>
         <div class="mc-home-v3__hero-inner">
@@ -62,12 +54,6 @@ $courses = get_posts(array(
                 <p>系统的课程 · 清晰的讲解 · 实用的方法</p>
                 <a class="mc-home-v3__hero-button" href="<?php echo esc_url($course_center_url); ?>">浏览课程 <b>→</b></a>
             </div>
-        </div>
-        <div class="mc-home-v3__hero-features" aria-label="课程特色">
-            <div><i>◇</i><span><b>专业专注</b><small>深耕初中数学</small></span></div>
-            <div><i>▣</i><span><b>循序渐进</b><small>由浅入深，逐步提升</small></span></div>
-            <div><i>⊞</i><span><b>实战实用</b><small>紧扣中考，直击考点</small></span></div>
-            <div><i>♧</i><span><b>服务贴心</b><small>学习路上不孤单</small></span></div>
         </div>
     </section>
 
@@ -95,21 +81,18 @@ $courses = get_posts(array(
         </div>
         <div class="mc-home-v3__course-grid">
             <?php if ($courses) : foreach ($courses as $index => $course) :
-                $course_url = add_query_arg('course_id', $course->ID, home_url('/learning/'));
-                $cover = get_post_meta($course->ID, '_mathcourse_cover', true);
-                $title = get_the_title($course->ID);
-                $grade = (string) get_post_meta($course->ID, '_mathcourse_grade', true);
-                if (!$grade) { $grade = '8'; }
-                $cover_classes = 'mc-home-v3__course-cover mc-home-v3__course-cover--' . ($index + 1);
+                $course_url=add_query_arg('course_id',$course->ID,home_url('/learning/'));
+                $title=get_the_title($course->ID);
+                $grade=(string)get_post_meta($course->ID,'_mathcourse_grade',true); if(!$grade){$grade='8';}
+                $cover_classes='mc-home-v3__course-cover mc-home-v3__course-cover--'.($index+1);
             ?>
                 <article class="mc-home-v3__course-card">
                     <a class="<?php echo esc_attr($cover_classes); ?>" href="<?php echo esc_url($course_url); ?>">
-                        <?php if ($cover) : ?><img src="<?php echo esc_url($cover); ?>" alt="<?php echo esc_attr($title); ?>" loading="lazy"><?php endif; ?>
-                        <span class="mc-home-v3__cover-copy"><b><?php echo esc_html($title); ?></b><small><?php echo esc_html('八年级' === $grade || '8' === $grade ? '八年级上册' : '初中数学系统课'); ?></small><em><?php echo esc_html($index === 0 ? '热门推荐' : '系统精讲'); ?></em></span>
+                        <span class="mc-home-v3__cover-copy"><b><?php echo esc_html($title); ?></b><small><?php echo esc_html('八年级' === $grade || '8' === $grade ? '八年级上册' : '初中数学系统课'); ?></small><em><?php echo esc_html($index===0?'热门推荐':'系统精讲'); ?></em></span>
                     </a>
                     <div class="mc-home-v3__course-body">
                         <h3><?php echo esc_html($title); ?></h3>
-                        <div class="mc-home-v3__tags"><span><?php echo esc_html('8' === $grade ? '八年级' : ('9' === $grade ? '九年级' : '初中')); ?></span><span>视频精讲</span></div>
+                        <div class="mc-home-v3__tags"><span><?php echo esc_html('8'===$grade?'八年级':('9'===$grade?'九年级':'初中')); ?></span><span>视频精讲</span></div>
                         <a class="mc-home-v3__course-button" href="<?php echo esc_url($course_url); ?>">查看课程</a>
                     </div>
                 </article>
@@ -144,12 +127,7 @@ $courses = get_posts(array(
         <div class="mc-home-v3__copyright">© <?php echo esc_html(wp_date('Y')); ?> 樊老师数学 · 专注初中数学系统学习 · 鄂ICP备2026043242号</div>
     </footer>
 </main>
-
 <script>
-document.addEventListener('DOMContentLoaded',function(){
-    var btn=document.querySelector('.mc-home-v3__menu'),nav=document.getElementById('mc-home-mobile-nav');
-    if(!btn||!nav)return;
-    btn.addEventListener('click',function(){var open=btn.getAttribute('aria-expanded')==='true';btn.setAttribute('aria-expanded',String(!open));nav.classList.toggle('is-open',!open);});
-});
+document.addEventListener('DOMContentLoaded',function(){var btn=document.querySelector('.mc-home-v3__menu'),nav=document.getElementById('mc-home-mobile-nav');if(!btn||!nav)return;btn.addEventListener('click',function(){var open=btn.getAttribute('aria-expanded')==='true';btn.setAttribute('aria-expanded',String(!open));nav.classList.toggle('is-open',!open);});});
 </script>
 <?php get_footer(); ?>
