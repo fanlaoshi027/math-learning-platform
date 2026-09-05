@@ -6,7 +6,6 @@ $course_center_url = home_url('/course-center/');
 $system_url = add_query_arg('course_type', 'topic', $course_center_url);
 $supplementary_url = add_query_arg('course_type', 'supplementary', $course_center_url);
 ?>
-<link rel="stylesheet" id="mc-home-ui-v3-polish" href="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/home-ui-v3-polish.css?ver=' . rawurlencode( (string) filemtime( get_stylesheet_directory() . '/assets/home-ui-v3-polish.css' ) ) ); ?>">
 <main class="mc-home-v3">
     <section class="mc-home-v3__hero" aria-label="樊老师数学">
         <div class="mc-home-v3__hero-art" aria-hidden="true">
