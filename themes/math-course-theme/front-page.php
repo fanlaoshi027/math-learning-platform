@@ -4,6 +4,7 @@ get_header();
 ?>
 <link rel="stylesheet" id="mc-home-reference-mobile" href="<?php echo esc_url(get_stylesheet_directory_uri() . '/assets/home-reference-mobile.css?ver=' . rawurlencode((string) filemtime(get_stylesheet_directory() . '/assets/home-reference-mobile.css'))); ?>">
 <link rel="stylesheet" id="mc-home-reference-final" href="<?php echo esc_url(get_stylesheet_directory_uri() . '/assets/home-reference-final.css?ver=' . rawurlencode((string) filemtime(get_stylesheet_directory() . '/assets/home-reference-final.css'))); ?>">
+<link rel="stylesheet" id="mc-home-reference-adjustments" href="<?php echo esc_url(get_stylesheet_directory_uri() . '/assets/home-reference-adjustments.css?ver=' . rawurlencode((string) filemtime(get_stylesheet_directory() . '/assets/home-reference-adjustments.css'))); ?>">
 <?php
 $course_center_url = home_url('/course-center/');
 $system_url = add_query_arg('course_type', 'topic', $course_center_url);
