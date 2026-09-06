@@ -1,0 +1,35 @@
+/* 樊老师数学 · 学员登录页 */
+.mc-student-login-page{min-height:calc(100vh - 120px);box-sizing:border-box;padding:58px 20px 44px;background:linear-gradient(180deg,#f4f8fd 0%,#eef4fb 100%);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mc-student-login-card{width:min(430px,100%);box-sizing:border-box;background:#fff;border:1px solid #e2eaf3;border-radius:18px;padding:32px 34px 28px;box-shadow:0 16px 45px rgba(23,61,108,.10)}
+.mc-student-login-brand{display:flex;align-items:center;gap:11px;margin-bottom:25px;color:#123e80}
+.mc-student-login-brand strong{font-size:19px;line-height:1.2;font-weight:900;display:block}
+.mc-student-login-brand small{display:block;margin-top:3px;color:#8a98aa;font-size:11px;font-weight:600}
+.mc-student-login-book{position:relative;display:block;width:40px;height:32px;flex:0 0 40px}
+.mc-student-login-book:before,.mc-student-login-book:after{content:"";position:absolute;top:4px;width:17px;height:24px;background:#1769d8;border-radius:4px 2px 2px 7px}
+.mc-student-login-book:before{left:2px;transform:skewY(5deg)}
+.mc-student-login-book:after{right:2px;border-radius:2px 4px 7px 2px;transform:skewY(-5deg)}
+.mc-student-login-book i{position:absolute;z-index:2;left:18px;top:4px;width:4px;height:25px;border-radius:3px;background:#fff}
+.mc-student-login-heading{text-align:center;margin-bottom:22px}
+.mc-student-login-heading h1{margin:0;color:#17385f;font-size:29px;line-height:1.2;font-weight:900}
+.mc-student-login-heading p{margin:8px 0 0;color:#8997a9;font-size:14px}
+.mc-student-login-error{padding:10px 12px;margin:0 0 15px;border-radius:8px;background:#fff1f1;color:#d04a4a;font-size:13px;line-height:1.5}
+.mc-student-login-form label{display:block;margin:0 0 7px;color:#344a66;font-size:14px;font-weight:800}
+.mc-student-login-input{height:48px;box-sizing:border-box;display:flex;align-items:center;gap:9px;padding:0 13px;margin-bottom:16px;border:1px solid #dce5ef;border-radius:9px;background:#fbfcfe;transition:border-color .2s,box-shadow .2s}
+.mc-student-login-input:focus-within{border-color:#1769d8;box-shadow:0 0 0 3px rgba(23,105,216,.10);background:#fff}
+.mc-student-login-input>span{color:#9aa8b8;font-size:9px}
+.mc-student-login-input input{width:100%;height:100%;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;font-size:15px;color:#243b57}
+.mc-student-login-input input::placeholder{color:#a9b4c1}
+.mc-student-login-remember{display:flex!important;align-items:center;gap:7px;margin:0 0 17px!important;color:#78879a!important;font-weight:600!important;font-size:13px!important}
+.mc-student-login-remember input{margin:0;width:15px;height:15px}
+.mc-student-login-primary{display:flex;width:100%;height:48px;align-items:center;justify-content:center;box-sizing:border-box;border:0;border-radius:9px;background:#1769d8;color:#fff!important;text-decoration:none;font-size:16px;font-weight:900;cursor:pointer;box-shadow:0 7px 16px rgba(23,105,216,.18);transition:transform .15s,background .15s}
+.mc-student-login-primary:hover{background:#0e5fc9;transform:translateY(-1px)}
+.mc-student-login-contact{margin-top:20px;padding:14px 14px 13px;border-radius:10px;background:#f7f9fc;text-align:center;display:flex;flex-direction:column;gap:4px}
+.mc-student-login-contact strong{color:#354b67;font-size:14px}
+.mc-student-login-contact span{color:#78889c;font-size:13px;line-height:1.5}
+.mc-student-login-contact b{color:#1769d8;font-size:14px;font-weight:900}
+.mc-student-login-footnote{margin:15px 0 0;color:#9aa6b4;font-size:12px;text-align:center}
+.mc-student-login-card--logged{text-align:center}
+.mc-student-login-card--logged .mc-student-login-brand{justify-content:center}
+.mc-student-login-card--logged h1{margin:0;color:#17385f;font-size:27px}
+.mc-student-login-card--logged p{margin:9px 0 22px;color:#8795a6;font-size:14px}
+@media(max-width:560px){.mc-student-login-page{min-height:calc(100vh - 60px);padding:28px 14px 34px}.mc-student-login-card{padding:25px 20px 21px;border-radius:15px}.mc-student-login-heading h1{font-size:26px}.mc-student-login-brand{margin-bottom:21px}.mc-student-login-input{height:50px}.mc-student-login-primary{height:50px}}
