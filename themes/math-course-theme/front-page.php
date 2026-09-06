@@ -10,17 +10,21 @@ $course_center_url = home_url('/course-center/');
 $system_url = add_query_arg('course_type', 'topic', $course_center_url);
 $supplementary_url = add_query_arg('course_type', 'supplementary', $course_center_url);
 $learning_url = home_url('/learning-center/');
+$student_login_pages = get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
+$student_login_url = !empty($student_login_pages) ? get_permalink($student_login_pages[0]->ID) : home_url('/student-login/');
+$site_logo_id = absint(get_option('mathcourse_site_logo_id', 0));
+$site_logo_url = $site_logo_id && wp_attachment_is_image($site_logo_id) ? wp_get_attachment_image_url($site_logo_id, 'medium') : '';
 $courses = get_posts(array('post_type'=>'courses','post_status'=>'publish','posts_per_page'=>4,'orderby'=>'date','order'=>'DESC'));
 ?>
 <main class="mc-home-v3">
     <header class="mc-home-v3__header">
         <div class="mc-home-v3__header-inner">
-            <a class="mc-home-v3__brand" href="<?php echo esc_url(home_url('/')); ?>" aria-label="樊老师数学首页"><span class="mc-home-v3__brand-mark" aria-hidden="true"><i></i><b></b></span><span class="mc-home-v3__brand-copy"><strong>樊老师数学</strong><small>好方法 · 学得更轻松</small></span></a>
+            <a class="mc-home-v3__brand" href="<?php echo esc_url(home_url('/')); ?>" aria-label="樊老师数学首页"><span class="mc-home-v3__brand-mark <?php echo $site_logo_url ? 'has-custom-logo' : ''; ?>" aria-hidden="true"><?php if ($site_logo_url) : ?><img src="<?php echo esc_url($site_logo_url); ?>" alt=""><?php else : ?><i></i><b></b><?php endif; ?></span><span class="mc-home-v3__brand-copy"><strong>樊老师数学</strong><small>好方法 · 学得更轻松</small></span></a>
             <nav class="mc-home-v3__nav" aria-label="主导航"><a class="is-active" href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php endif; ?></nav>
-            <div class="mc-home-v3__header-tools"><?php if (is_user_logged_in()) : ?><a class="mc-home-v3__account" href="<?php echo esc_url($learning_url); ?>"><i>●</i><span>学习中心</span></a><?php else : ?><a class="mc-home-v3__account" href="<?php echo esc_url(wp_login_url($learning_url)); ?>"><i>●</i><span>登录 / 注册</span></a><?php endif; ?></div>
+            <div class="mc-home-v3__header-tools"><?php if (is_user_logged_in()) : ?><a class="mc-home-v3__account" href="<?php echo esc_url($learning_url); ?>"><i>●</i><span>学习中心</span></a><?php else : ?><a class="mc-home-v3__account" href="<?php echo esc_url($student_login_url); ?>"><i>●</i><span>学生登录</span></a><?php endif; ?></div>
             <button class="mc-home-v3__menu" type="button" aria-expanded="false" aria-controls="mc-home-mobile-nav"><span></span><span></span><span></span></button>
         </div>
-        <nav id="mc-home-mobile-nav" class="mc-home-v3__mobile-nav" aria-label="移动端导航"><a href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php endif; ?></nav>
+        <nav id="mc-home-mobile-nav" class="mc-home-v3__mobile-nav" aria-label="移动端导航"><a href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php else : ?><a href="<?php echo esc_url($student_login_url); ?>">学生登录</a><?php endif; ?></nav>
     </header>
     <section class="mc-home-v3__hero" aria-label="樊老师数学">
         <div class="mc-home-v3__hero-bg" aria-hidden="true"><div class="mc-home-v3__chalkboard"><span>a² + b² = c²</span><span>x = −b ± √b²−4ac</span><span>数学不难</span><span>方法很重要！</span></div><div class="mc-home-v3__teacher" aria-hidden="true"><i class="head"></i><i class="hair"></i><i class="body"></i><i class="arm arm-a"></i><i class="arm arm-b"></i></div></div>
@@ -45,24 +49,15 @@ $courses = get_posts(array('post_type'=>'courses','post_status'=>'publish','post
                 $cover_classes = 'mc-home-v3__course-cover mc-home-v3__course-cover--'.($index+1);
             ?>
                 <article class="mc-home-v3__course-card">
-                    <a class="<?php echo esc_attr($cover_classes); ?>" href="<?php echo esc_url($course_url); ?>" aria-label="<?php echo esc_attr($title); ?>">
-                        <span class="mc-home-v3__cover-copy"><b><?php echo esc_html($title); ?></b></span>
-                    </a>
-                    <div class="mc-home-v3__course-body">
-                        <h3><?php echo esc_html($title); ?></h3>
-                        <div class="mc-home-v3__tags">
-                            <?php if ($grade_text) : ?><span><?php echo esc_html($grade_text); ?></span><?php endif; ?>
-                            <span><?php echo esc_html($type_text); ?></span>
-                        </div>
-                        <a class="mc-home-v3__course-button" href="<?php echo esc_url($course_url); ?>">查看课程</a>
-                    </div>
+                    <a class="<?php echo esc_attr($cover_classes); ?>" href="<?php echo esc_url($course_url); ?>" aria-label="<?php echo esc_attr($title); ?>"><span class="mc-home-v3__cover-copy"><b><?php echo esc_html($title); ?></b></span></a>
+                    <div class="mc-home-v3__course-body"><h3><?php echo esc_html($title); ?></h3><div class="mc-home-v3__tags"><?php if ($grade_text) : ?><span><?php echo esc_html($grade_text); ?></span><?php endif; ?><span><?php echo esc_html($type_text); ?></span></div><a class="mc-home-v3__course-button" href="<?php echo esc_url($course_url); ?>">查看课程</a></div>
                 </article>
             <?php endforeach; else : ?><div class="mc-home-v3__course-empty">课程正在整理中，敬请期待。</div><?php endif; ?>
         </div>
     </section>
     <section id="about" class="mc-home-v3__section mc-home-v3__reasons"><div class="mc-home-v3__section-heading"><div><span class="accent"></span><h2>为什么选择樊老师数学</h2><p>用心做教育，帮助每一位学生稳步提升</p></div></div><div class="mc-home-v3__reason-grid"><div><i>◆</i><b>内容系统</b><span>覆盖初中数学全部知识点</span></div><div><i>●</i><b>讲解清晰</b><span>复杂问题简单化</span></div><div><i>▮</i><b>紧扣考点</b><span>直击中考重难点</span></div><div><i>♥</i><b>学生好评</b><span>已帮助数千名学生提升</span></div></div></section>
     <section class="mc-home-v3__cta"><div class="mc-home-v3__cta-art" aria-hidden="true"><i></i><b></b><em></em></div><div><strong>从现在开始，让数学成为你的优势！</strong><span>选择适合自己的课程，开启高效学习之旅</span></div><a href="<?php echo esc_url($course_center_url); ?>">立即开始学习 →</a></section>
-    <footer class="mc-home-v3__footer"><div class="mc-home-v3__footer-inner"><a class="mc-home-v3__footer-brand" href="<?php echo esc_url(home_url('/')); ?>"><i aria-hidden="true"></i><span><b>樊老师数学</b><small>好方法 · 学得更轻松</small></span></a><nav><a href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php endif; ?></nav><p>用数学，点亮更大的可能！</p></div><div class="mc-home-v3__copyright">© <?php echo esc_html(wp_date('Y')); ?> 樊老师数学 · 专注初中数学系统学习 · 鄂ICP备2026043242号</div></footer>
+    <footer class="mc-home-v3__footer"><div class="mc-home-v3__footer-inner"><a class="mc-home-v3__footer-brand" href="<?php echo esc_url(home_url('/')); ?>"><i aria-hidden="true"><?php if ($site_logo_url) : ?><img src="<?php echo esc_url($site_logo_url); ?>" alt=""><?php endif; ?></i><span><b>樊老师数学</b><small>好方法 · 学得更轻松</small></span></a><nav><a href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php else : ?><a href="<?php echo esc_url($student_login_url); ?>">学生登录</a><?php endif; ?></nav><p>用数学，点亮更大的可能！</p></div><div class="mc-home-v3__copyright">© <?php echo esc_html(wp_date('Y')); ?> 樊老师数学 · 专注初中数学系统学习 · 鄂ICP备2026043242号</div></footer>
 </main>
 <script>document.addEventListener('DOMContentLoaded',function(){var btn=document.querySelector('.mc-home-v3__menu'),nav=document.getElementById('mc-home-mobile-nav');if(!btn||!nav)return;btn.addEventListener('click',function(){var open=btn.getAttribute('aria-expanded')==='true';btn.setAttribute('aria-expanded',String(!open));nav.classList.toggle('is-open',!open);});});</script>
 <?php get_footer(); ?>
