@@ -30,6 +30,9 @@ class Menu {
         if (isset($_GET['page']) && 'mathcourse-course-trash' === sanitize_key(wp_unslash($_GET['page']))) {
             wp_enqueue_style('mathcourse-admin-course-trash', MATHCOURSE_URL . 'assets/admin-course-trash.css', array('mathcourse-admin-ui'), MATHCOURSE_VERSION);
         }
+        if (isset($_GET['page']) && 'mathcourse-frontend-settings' === sanitize_key(wp_unslash($_GET['page']))) {
+            wp_enqueue_media();
+        }
     }
 
     public function register_menu() {
@@ -41,6 +44,7 @@ class Menu {
         add_submenu_page('mathcourse', '课程授权', '学员授权', 'manage_options', 'mathcourse-access', array($this, 'access_page'));
         add_submenu_page('mathcourse', '课程激活码', '激活码管理', 'manage_options', 'mathcourse-activation', array($this, 'activation_page'));
         add_submenu_page('mathcourse', '学习进度', '学习进度', 'manage_options', 'mathcourse-progress', array($this, 'progress_page'));
+        add_submenu_page('mathcourse', '前端网页设置', '前端网页设置', 'manage_options', 'mathcourse-frontend-settings', array($this, 'frontend_settings_page'));
         add_submenu_page('mathcourse', '设置', '系统设置', 'manage_options', 'mathcourse-settings', array($this, 'settings_page'));
         add_submenu_page(null, '编辑课程', '编辑课程', 'manage_options', 'mathcourse-course-edit', array($this, 'course_edit_page'));
     }
@@ -93,5 +97,6 @@ class Menu {
     public function course_edit_page(){if(class_exists('MathCourse\\Admin\\Course_Editor'))(new Course_Editor())->render();}
     public function access_page(){if(class_exists('MathCourse\\Admin\\Access_Page'))(new Access_Page())->render();}
     public function progress_page(){if(class_exists('MathCourse\\Admin\\Progress_Page'))(new Progress_Page())->render();}
+    public function frontend_settings_page(){if(class_exists('MathCourse\\Admin\\Frontend_Settings'))(new Frontend_Settings())->render();}
     public function settings_page(){if(class_exists('MathCourse\\Admin\\Settings'))(new Settings())->render();}
 }
