@@ -32,14 +32,36 @@ $courses = get_posts(array('post_type'=>'courses','post_status'=>'publish','post
     <section class="mc-home-v3__section mc-home-v3__popular">
         <div class="mc-home-v3__section-heading"><div><span class="accent"></span><h2>热门课程</h2><p>精选优质课程，助你高效提升</p></div><a href="<?php echo esc_url($course_center_url); ?>">查看更多课程 →</a></div>
         <div class="mc-home-v3__course-grid">
-            <?php if ($courses) : foreach ($courses as $index => $course) : $course_url=add_query_arg('course_id',$course->ID,home_url('/learning/')); $title=get_the_title($course->ID); $cover_classes='mc-home-v3__course-cover mc-home-v3__course-cover--'.($index+1); ?>
-                <article class="mc-home-v3__course-card"><a class="<?php echo esc_attr($cover_classes); ?>" href="<?php echo esc_url($course_url); ?>"><span class="mc-home-v3__cover-copy"><b><?php echo esc_html($title); ?></b></span></a><div class="mc-home-v3__course-body" aria-hidden="true"></div></article>
+            <?php if ($courses) : foreach ($courses as $index => $course) :
+                $course_id = (int) $course->ID;
+                $course_url = add_query_arg('course_id',$course_id,home_url('/learning/'));
+                $title = get_the_title($course_id);
+                $grade = get_post_meta($course_id,'_mathcourse_grade',true);
+                $type = get_post_meta($course_id,'_mathcourse_type',true);
+                $grade_label = array('7'=>'七年级','8'=>'八年级','9'=>'九年级','10'=>'高一','11'=>'高二','12'=>'高三');
+                $grade_text = isset($grade_label[$grade]) ? $grade_label[$grade] : '';
+                $type_text = ($type === 'supplementary') ? '教辅配套课' : '初中数学体系课';
+                $cover_classes = 'mc-home-v3__course-cover mc-home-v3__course-cover--'.($index+1);
+            ?>
+                <article class="mc-home-v3__course-card">
+                    <a class="<?php echo esc_attr($cover_classes); ?>" href="<?php echo esc_url($course_url); ?>" aria-label="<?php echo esc_attr($title); ?>">
+                        <span class="mc-home-v3__cover-copy"><b><?php echo esc_html($title); ?></b></span>
+                    </a>
+                    <div class="mc-home-v3__course-body">
+                        <h3><?php echo esc_html($title); ?></h3>
+                        <div class="mc-home-v3__tags">
+                            <?php if ($grade_text) : ?><span><?php echo esc_html($grade_text); ?></span><?php endif; ?>
+                            <span><?php echo esc_html($type_text); ?></span>
+                        </div>
+                        <a class="mc-home-v3__course-button" href="<?php echo esc_url($course_url); ?>">查看课程</a>
+                    </div>
+                </article>
             <?php endforeach; else : ?><div class="mc-home-v3__course-empty">课程正在整理中，敬请期待。</div><?php endif; ?>
         </div>
     </section>
     <section id="about" class="mc-home-v3__section mc-home-v3__reasons"><div class="mc-home-v3__section-heading"><div><span class="accent"></span><h2>为什么选择樊老师数学</h2><p>用心做教育，帮助每一位学生稳步提升</p></div></div><div class="mc-home-v3__reason-grid"><div><i>◆</i><b>内容系统</b><span>覆盖初中数学全部知识点</span></div><div><i>●</i><b>讲解清晰</b><span>复杂问题简单化</span></div><div><i>▮</i><b>紧扣考点</b><span>直击中考重难点</span></div><div><i>♥</i><b>学生好评</b><span>已帮助数千名学生提升</span></div></div></section>
     <section class="mc-home-v3__cta"><div class="mc-home-v3__cta-art" aria-hidden="true"><i></i><b></b><em></em></div><div><strong>从现在开始，让数学成为你的优势！</strong><span>选择适合自己的课程，开启高效学习之旅</span></div><a href="<?php echo esc_url($course_center_url); ?>">立即开始学习 →</a></section>
-    <footer class="mc-home-v3__footer"><div class="mc-home-v3__footer-inner"><a class="mc-home-v3__footer-brand" href="<?php echo esc_url(home_url('/')); ?>"><i>↗</i><span><b>樊老师数学</b><small>好方法 · 学得更轻松</small></span></a><nav><a href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php endif; ?></nav><p>用数学，点亮更大的可能！</p></div><div class="mc-home-v3__copyright">© <?php echo esc_html(wp_date('Y')); ?> 樊老师数学 · 专注初中数学系统学习 · 鄂ICP备2026043242号</div></footer>
+    <footer class="mc-home-v3__footer"><div class="mc-home-v3__footer-inner"><a class="mc-home-v3__footer-brand" href="<?php echo esc_url(home_url('/')); ?>"><i aria-hidden="true"></i><span><b>樊老师数学</b><small>好方法 · 学得更轻松</small></span></a><nav><a href="<?php echo esc_url(home_url('/')); ?>">首页</a><a href="<?php echo esc_url($course_center_url); ?>">课程中心</a><?php if (is_user_logged_in()) : ?><a href="<?php echo esc_url($learning_url); ?>">学习中心</a><?php endif; ?></nav><p>用数学，点亮更大的可能！</p></div><div class="mc-home-v3__copyright">© <?php echo esc_html(wp_date('Y')); ?> 樊老师数学 · 专注初中数学系统学习 · 鄂ICP备2026043242号</div></footer>
 </main>
 <script>document.addEventListener('DOMContentLoaded',function(){var btn=document.querySelector('.mc-home-v3__menu'),nav=document.getElementById('mc-home-mobile-nav');if(!btn||!nav)return;btn.addEventListener('click',function(){var open=btn.getAttribute('aria-expanded')==='true';btn.setAttribute('aria-expanded',String(!open));nav.classList.toggle('is-open',!open);});});</script>
 <?php get_footer(); ?>
