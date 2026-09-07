@@ -14,7 +14,8 @@ class Student_Auth {
         $pages = get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
         $page = $pages ? $pages[0] : get_page_by_path('student-login', OBJECT, 'page');
         if($page){
-            $changes = array('ID' => $page->ID);
+            $id = (int)$page->ID;
+            $changes = array('ID' => $id);
             $needs_update = false;
             if($page->post_title !== '学员登录'){
                 $changes['post_title'] = '学员登录';
@@ -33,8 +34,14 @@ class Student_Auth {
                 $needs_update = true;
             }
             if($needs_update) wp_update_post($changes);
-            if(get_post_meta($page->ID,'_mathcourse_student_login',true) !== 'yes') update_post_meta($page->ID,'_mathcourse_student_login','yes');
-            return (int)$page->ID;
+            // The existing student-login page may have been assigned the learning
+            // template, which bypasses page content and therefore bypasses the
+            // [math_student_login] shortcode. Force the login page back to the
+            // normal page template; this change does not touch the learning player.
+            $template = get_post_meta($id, '_wp_page_template', true);
+            if($template && $template !== 'default') update_post_meta($id, '_wp_page_template', 'default');
+            if(get_post_meta($id,'_mathcourse_student_login',true) !== 'yes') update_post_meta($id,'_mathcourse_student_login','yes');
+            return $id;
         }
         $id = wp_insert_post(array(
             'post_title' => '学员登录',
@@ -45,6 +52,7 @@ class Student_Auth {
         ), true);
         if(is_wp_error($id)) return 0;
         update_post_meta($id,'_mathcourse_student_login','yes');
+        update_post_meta($id,'_wp_page_template','default');
         return (int)$id;
     }
 
