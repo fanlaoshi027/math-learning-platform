@@ -6,7 +6,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     enum SelectionHandle { case topLeft, topRight, bottomLeft, bottomRight }
 
     private struct Uniforms { var viewportSize: SIMD2<Float> }
-    private struct StoredStroke { var points: [InkPoint]; var style: PenStyle }
+    private struct StoredStroke { var points: [InkPoint]; var style: PenStyle; var rotation: Float = 0 }
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
     private let pipelineState: any MTLRenderPipelineState
@@ -38,6 +38,10 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     var canUndo: Bool { !committedStrokes.isEmpty }
     var canRedo: Bool { !redoStrokes.isEmpty }
     var hasSelection: Bool { selectedStrokeIndex != nil }
+    var selectedRotationDegrees: Double {
+        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return 0 }
+        return Double(committedStrokes[index].rotation * 180 / .pi)
+    }
 
     func setPenStyle(_ style: PenStyle) { penStyle = style; rebuildGeometry() }
     func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
@@ -76,11 +80,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
                 let a = SIMD2<Float>(stroke[segment].x, stroke[segment].y)
                 let b = SIMD2<Float>(stroke[segment + 1].x, stroke[segment + 1].y)
                 let distance = distanceFromPoint(point, toSegment: a, b)
-                if distance <= bestDistance {
-                    bestDistance = distance
-                    bestIndex = index
-                    break
-                }
+                if distance <= bestDistance { bestDistance = distance; bestIndex = index; break }
             }
         }
         selectedStrokeIndex = bestIndex
@@ -88,20 +88,26 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         return bestIndex != nil
     }
 
-    func clearSelection() {
-        selectedStrokeIndex = nil
-        rebuildGeometry()
-    }
+    func clearSelection() { selectedStrokeIndex = nil; rebuildGeometry() }
 
     func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? {
         guard let bounds = selectedBounds() else { return nil }
         let handles: [(SelectionHandle, SIMD2<Float>)] = [
-            (.topLeft, SIMD2<Float>(bounds.minX, bounds.minY)),
-            (.topRight, SIMD2<Float>(bounds.maxX, bounds.minY)),
-            (.bottomLeft, SIMD2<Float>(bounds.minX, bounds.maxY)),
-            (.bottomRight, SIMD2<Float>(bounds.maxX, bounds.maxY))
+            (.topLeft, SIMD2<Float>(bounds.minX, bounds.minY)), (.topRight, SIMD2<Float>(bounds.maxX, bounds.minY)),
+            (.bottomLeft, SIMD2<Float>(bounds.minX, bounds.maxY)), (.bottomRight, SIMD2<Float>(bounds.maxX, bounds.maxY))
         ]
         return handles.first { simd_distance(point, $0.1) <= tolerance }?.0
+    }
+
+    func rotationHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool {
+        guard let bounds = selectedBounds() else { return false }
+        let center = SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, bounds.minY - 28)
+        return simd_distance(point, center) <= tolerance
+    }
+
+    func rotationHandlePosition() -> SIMD2<Float>? {
+        guard let bounds = selectedBounds() else { return nil }
+        return SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, bounds.minY - 28)
     }
 
     func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) {
@@ -120,28 +126,49 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         let sx = newWidth / oldWidth
         let sy = newHeight / oldHeight
         let points = committedStrokes[index].points
-        committedStrokes[index].points = points.map {
-            InkPoint(x: anchor.x + ($0.x - anchor.x) * sx, y: anchor.y + ($0.y - anchor.y) * sy, pressure: $0.pressure)
+        committedStrokes[index].points = points.map { InkPoint(x: anchor.x + ($0.x - anchor.x) * sx, y: anchor.y + ($0.y - anchor.y) * sy, pressure: $0.pressure) }
+        redoStrokes.removeAll(keepingCapacity: true)
+        rebuildGeometry()
+    }
+
+    func rotateSelected(to point: SIMD2<Float>, from previous: SIMD2<Float>) {
+        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
+        let center = SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, (bounds.minY + bounds.maxY) * 0.5)
+        let a0 = atan2(previous.y - center.y, previous.x - center.x)
+        let a1 = atan2(point.y - center.y, point.x - center.x)
+        rotateSelected(by: a1 - a0)
+    }
+
+    func setSelectedRotationDegrees(_ degrees: Double) {
+        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
+        let target = Float(degrees * .pi / 180)
+        rotateSelected(by: target - committedStrokes[index].rotation)
+    }
+
+    private func rotateSelected(by delta: Float) {
+        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
+        let center = SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, (bounds.minY + bounds.maxY) * 0.5)
+        let c = cos(delta), s = sin(delta)
+        committedStrokes[index].points = committedStrokes[index].points.map {
+            let v = SIMD2<Float>($0.x, $0.y) - center
+            let r = SIMD2<Float>(v.x * c - v.y * s, v.x * s + v.y * c) + center
+            return InkPoint(x: r.x, y: r.y, pressure: $0.pressure)
         }
+        committedStrokes[index].rotation += delta
         redoStrokes.removeAll(keepingCapacity: true)
         rebuildGeometry()
     }
 
     func moveSelected(by delta: SIMD2<Float>) {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
-        committedStrokes[index].points = committedStrokes[index].points.map {
-            InkPoint(x: $0.x + delta.x, y: $0.y + delta.y, pressure: $0.pressure)
-        }
+        committedStrokes[index].points = committedStrokes[index].points.map { InkPoint(x: $0.x + delta.x, y: $0.y + delta.y, pressure: $0.pressure) }
         redoStrokes.removeAll(keepingCapacity: true)
         rebuildGeometry()
     }
 
     func deleteSelected() {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
-        committedStrokes.remove(at: index)
-        selectedStrokeIndex = nil
-        redoStrokes.removeAll(keepingCapacity: true)
-        rebuildGeometry()
+        committedStrokes.remove(at: index); selectedStrokeIndex = nil; redoStrokes.removeAll(keepingCapacity: true); rebuildGeometry()
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for: view.bounds.size) }
@@ -171,10 +198,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func selectedBounds() -> (minX: Float, maxX: Float, minY: Float, maxY: Float)? {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let first = committedStrokes[index].points.first else { return nil }
         var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
-        for point in committedStrokes[index].points {
-            minX = min(minX, point.x); maxX = max(maxX, point.x)
-            minY = min(minY, point.y); maxY = max(maxY, point.y)
-        }
+        for point in committedStrokes[index].points { minX = min(minX, point.x); maxX = max(maxX, point.x); minY = min(minY, point.y); maxY = max(maxY, point.y) }
         return (minX, maxX, minY, maxY)
     }
 
@@ -187,10 +211,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
             let length = max(sqrt(dx * dx + dy * dy), 0.001)
             let nx = -dy / length, ny = dx / length
             let w0 = strokeWidth(p0.pressure, style: style), w1 = strokeWidth(p1.pressure, style: style)
-            let a = SIMD2<Float>(p0.x + nx * w0, p0.y + ny * w0)
-            let b = SIMD2<Float>(p0.x - nx * w0, p0.y - ny * w0)
-            let c = SIMD2<Float>(p1.x + nx * w1, p1.y + ny * w1)
-            let d = SIMD2<Float>(p1.x - nx * w1, p1.y - ny * w1)
+            let a = SIMD2<Float>(p0.x + nx * w0, p0.y + ny * w0), b = SIMD2<Float>(p0.x - nx * w0, p0.y - ny * w0)
+            let c = SIMD2<Float>(p1.x + nx * w1, p1.y + ny * w1), d = SIMD2<Float>(p1.x - nx * w1, p1.y - ny * w1)
             appendTriangle(a, b, c, color: color, to: &output); appendTriangle(c, b, d, color: color, to: &output)
         }
         appendDisk(center: SIMD2<Float>(first.x, first.y), radius: strokeWidth(first.pressure, style: style), color: color, to: &output)
@@ -208,6 +230,10 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         appendLineQuad(a, b, width: 1.5, color: color, to: &output); appendLineQuad(b, c, width: 1.5, color: color, to: &output); appendLineQuad(c, d, width: 1.5, color: color, to: &output); appendLineQuad(d, a, width: 1.5, color: color, to: &output)
         let handleColor = SIMD4<Float>(1, 1, 1, 1)
         for center in [a, b, c, d] { appendDisk(center: center, radius: 5, color: color, to: &output); appendDisk(center: center, radius: 2.5, color: handleColor, to: &output) }
+        let rotationCenter = SIMD2<Float>((x0 + x1) * 0.5, y0 - 28)
+        appendLineQuad(SIMD2<Float>((x0 + x1) * 0.5, y0), rotationCenter, width: 1, color: color, to: &output)
+        appendDisk(center: rotationCenter, radius: 7, color: color, to: &output)
+        appendDisk(center: rotationCenter, radius: 3, color: handleColor, to: &output)
     }
 
     private func appendLineQuad(_ a: SIMD2<Float>, _ b: SIMD2<Float>, width: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
