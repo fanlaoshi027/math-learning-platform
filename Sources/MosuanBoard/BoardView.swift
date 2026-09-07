@@ -11,7 +11,7 @@ struct BoardView: View {
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
 
-                PenCanvas(tool: $selectedTool)
+                MetalInkCanvas(tool: $selectedTool)
                     .background(.white)
                     .clipShape(Rectangle())
                     .padding(24)
@@ -24,6 +24,20 @@ enum BoardTool: Equatable {
     case select
     case pen
     case eraser
+}
+
+struct MetalInkCanvas: NSViewRepresentable {
+    @Binding var tool: BoardTool
+
+    func makeNSView(context: Context) -> InkMetalView {
+        let view = InkMetalView()
+        view.isUserInteractionEnabledForTool = tool == .pen
+        return view
+    }
+
+    func updateNSView(_ nsView: InkMetalView, context: Context) {
+        nsView.isUserInteractionEnabledForTool = tool == .pen
+    }
 }
 
 struct ToolbarView: View {
