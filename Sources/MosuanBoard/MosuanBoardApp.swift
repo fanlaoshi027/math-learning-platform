@@ -4,7 +4,7 @@ import SwiftUI
 struct MosuanBoardApp: App {
     var body: some Scene {
         WindowGroup("Mosuan Board") {
-            BoardView()
+            BoardScreen()
                 .frame(minWidth: 1100, minHeight: 700)
         }
         .windowStyle(.titleBar)
