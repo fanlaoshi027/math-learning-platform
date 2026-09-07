@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.head.appendChild(s);
     }
     function applyInvert(container,on){var video=container.querySelector('video');container.classList.toggle('mathcourse-inverted',!!on);if(video){if(on)video.style.setProperty('filter',INVERT_FILTER,'important');else video.style.removeProperty('filter');}}
+    var hlsLoaderPromise=null;
+    function ensureHlsLibrary(){if(window.Hls)return Promise.resolve(window.Hls);if(hlsLoaderPromise)return hlsLoaderPromise;hlsLoaderPromise=new Promise(function(resolve,reject){var existing=document.querySelector('script[data-mathcourse-hls-fallback]');if(existing){existing.addEventListener('load',function(){window.Hls?resolve(window.Hls):reject(new Error('Hls unavailable'));});existing.addEventListener('error',reject);return;}var script=document.createElement('script');script.src='https://unpkg.com/hls.js@1.7.1/dist/hls.min.js';script.async=true;script.setAttribute('data-mathcourse-hls-fallback','1');script.onload=function(){window.Hls?resolve(window.Hls):reject(new Error('Hls fallback CDN failed'));};script.onerror=function(){reject(new Error('Hls fallback CDN failed'));};document.head.appendChild(script);});return hlsLoaderPromise;}
     function updateProgressUI(progress,lessonId){if(!progress)return;document.querySelectorAll('.mc-course-player__progress span').forEach(function(el){el.textContent='学习进度 '+Number(progress.percent||0)+'%';});document.querySelectorAll('.mc-course-player__progress strong').forEach(function(el){el.textContent=Number(progress.completed||0)+' / '+Number(progress.total||0)+' 课时';});document.querySelectorAll('.mc-course-player__progress i').forEach(function(el){el.style.width=Number(progress.percent||0)+'%';});document.querySelectorAll('.mc-course-player__sidebar-head span').forEach(function(el){el.textContent=Number(progress.completed||0)+'/'+Number(progress.total||0);});if(lessonId)document.querySelectorAll('.mc-course-player__item').forEach(function(el){if((el.getAttribute('href')||'').indexOf('lesson_id='+lessonId)!==-1){el.classList.add('is-complete');var check=el.querySelector('.mc-course-player__check');if(check)check.textContent='✓';}});}
     document.querySelectorAll('.mathcourse-artplayer[data-video-url]').forEach(function(container){
         var lessonId=parseInt(container.dataset.lessonId||'0',10),courseId=parseInt(container.dataset.courseId||'0',10),url=container.dataset.videoUrl||'',videoType=(container.dataset.videoType||'').toLowerCase();if(!lessonId||!url||(videoType!=='m3u8'&&videoType!=='mp4'))return;
@@ -23,23 +25,13 @@ document.addEventListener('DOMContentLoaded', function () {
         var options={container:container,url:url,id:'mathcourse-lesson-'+lessonId,type:videoType,lang:'zh-cn',theme:'#1677ff',volume:.7,muted:false,autoplay:false,autoPlayback:false,playsInline:true,fullscreen:true,fullscreenWeb:true,setting:true,playbackRate:false,flip:false,aspectRatio:false,screenshot:false,pip:false,fastForward:true,autoOrientation:true,mutex:true,moreVideoAttr:{playsInline:true,'webkit-playsinline':true,preload:'auto'},controls:[{name:'mathcourse-speed',position:'right',html:'1.0x',tooltip:'播放速度',selector:[{default:true,value:1,html:'1.0x'},{value:.75,html:'0.75x'},{value:1.25,html:'1.25x'},{value:1.5,html:'1.5x'},{value:2,html:'2.0x'}],onSelect:function(item){var rate=Number(item.value);if(!Number.isFinite(rate)||rate<=0)return item.html;try{if(window.mathcourseArtPlayers&&window.mathcourseArtPlayers[lessonId])window.mathcourseArtPlayers[lessonId].playbackRate=rate;}catch(e){}return item.html;}}]};
         if(videoType==='m3u8'){
             options.customType={m3u8:function(video,sourceUrl){
-                function attachHls(HlsClass){
-                    if(!HlsClass||!HlsClass.isSupported())return false;
-                    if(hls)try{hls.destroy();}catch(e){}
-                    hls=new HlsClass({enableWorker:true,lowLatencyMode:false,startFragPrefetch:true,backBufferLength:10,maxBufferLength:45,maxMaxBufferLength:90,maxBufferHole:.5,capLevelToPlayerSize:true,startLevel:-1,abrEwmaDefaultEstimate:2500000,abrEwmaFastLive:3,abrEwmaSlowLive:9,fragLoadingMaxRetry:4,fragLoadingRetryDelay:500,fragLoadingMaxRetryTimeout:4000,manifestLoadingMaxRetry:4,manifestLoadingRetryDelay:300,manifestLoadingMaxRetryTimeout:3000,levelLoadingMaxRetry:4,levelLoadingRetryDelay:300,levelLoadingMaxRetryTimeout:3000,nudgeMaxRetry:5,highBufferWatchdogPeriod:2,debug:false});
+                if(video.canPlayType&&video.canPlayType('application/vnd.apple.mpegurl')){video.src=sourceUrl;video.load();return;}
+                function attachHls(HlsClass){if(!HlsClass||!HlsClass.isSupported())return false;if(hls)hls.destroy();hls=new HlsClass({enableWorker:true,lowLatencyMode:false,startFragPrefetch:true,backBufferLength:10,maxBufferLength:45,maxMaxBufferLength:90,maxBufferHole:.5,capLevelToPlayerSize:true,startLevel:-1,abrEwmaDefaultEstimate:2500000,abrEwmaFastLive:3,abrEwmaSlowLive:9,fragLoadingMaxRetry:4,fragLoadingRetryDelay:500,fragLoadingMaxRetryTimeout:4000,manifestLoadingMaxRetry:4,manifestLoadingRetryDelay:300,manifestLoadingMaxRetryTimeout:3000,levelLoadingMaxRetry:4,levelLoadingRetryDelay:300,levelLoadingMaxRetryTimeout:3000,nudgeMaxRetry:5,highBufferWatchdogPeriod:2,debug:false});
                     hls.on(HlsClass.Events.MANIFEST_PARSED,function(){if(recoveryTimer){clearTimeout(recoveryTimer);recoveryTimer=null;}});
                     hls.on(HlsClass.Events.ERROR,function(event,data){if(!data||!data.fatal)return;if(data.type===HlsClass.ErrorTypes.NETWORK_ERROR){if(recoveryTimer)return;recoveryTimer=setTimeout(function(){recoveryTimer=null;if(hls){try{hls.startLoad(-1);}catch(e){}}},300);}else if(data.type===HlsClass.ErrorTypes.MEDIA_ERROR){try{hls.recoverMediaError();}catch(e){}}else{try{hls.destroy();}catch(e){}hls=null;}});
-                    hls.loadSource(sourceUrl);
-                    hls.attachMedia(video);
-                    return true;
+                    hls.loadSource(sourceUrl);hls.attachMedia(video);return true;
                 }
-                // Prefer MSE/HLS.js when available. Some Chromium-based browsers report
-                // native HLS support even though playback of our HLS stream is incomplete.
-                // HLS.js documentation recommends checking Hls.isSupported() first.
-                if(window.Hls&&attachHls(window.Hls))return;
-                // Fall back to the browser's native HLS implementation (notably iOS Safari).
-                if(video.canPlayType&&video.canPlayType('application/vnd.apple.mpegurl')){video.src=sourceUrl;video.load();return;}
-                console.warn('MathCourse: current browser does not support HLS playback.');
+                if(window.Hls&&attachHls(window.Hls))return;ensureHlsLibrary().then(function(HlsClass){if(!attachHls(HlsClass))console.warn('MathCourse: current browser does not support HLS playback.');}).catch(function(error){console.warn('MathCourse: hls.js failed to load.',error);});
             }};
         }
         var art=new Artplayer(options);window.mathcourseArtPlayers=window.mathcourseArtPlayers||{};window.mathcourseArtPlayers[lessonId]=art;
