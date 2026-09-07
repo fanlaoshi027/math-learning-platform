@@ -2,90 +2,28 @@ import SwiftUI
 
 struct BoardView: View {
     @State private var selectedTool: BoardTool = .pen
-    @State private var strokes: [Stroke] = []
-    @State private var currentStroke: Stroke?
 
     var body: some View {
         VStack(spacing: 0) {
             ToolbarView(selectedTool: $selectedTool)
-
             Divider()
 
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
 
-                Canvas { context, size in
-                    for stroke in strokes {
-                        draw(stroke, in: &context)
-                    }
-                    if let currentStroke {
-                        draw(currentStroke, in: &context)
-                    }
-                }
-                .gesture(drawingGesture)
-                .background(Color.white)
-                .clipShape(Rectangle())
-                .padding(24)
+                PenCanvas(tool: $selectedTool)
+                    .background(.white)
+                    .clipShape(Rectangle())
+                    .padding(24)
             }
         }
-    }
-
-    private var drawingGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                guard selectedTool == .pen else { return }
-                let point = StrokePoint(
-                    location: value.location,
-                    pressure: 1.0,
-                    timestamp: Date().timeIntervalSinceReferenceDate
-                )
-
-                if currentStroke == nil {
-                    currentStroke = Stroke(points: [point])
-                } else {
-                    currentStroke?.points.append(point)
-                }
-            }
-            .onEnded { _ in
-                guard let currentStroke else { return }
-                strokes.append(currentStroke)
-                self.currentStroke = nil
-            }
-    }
-
-    private func draw(_ stroke: Stroke, in context: inout GraphicsContext) {
-        guard let first = stroke.points.first else { return }
-
-        var path = Path()
-        path.move(to: first.location)
-        for point in stroke.points.dropFirst() {
-            path.addLine(to: point.location)
-        }
-
-        context.stroke(
-            path,
-            with: .color(.black),
-            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
-        )
     }
 }
 
-enum BoardTool {
+enum BoardTool: Equatable {
     case select
     case pen
     case eraser
-}
-
-struct StrokePoint: Identifiable {
-    let id = UUID()
-    let location: CGPoint
-    let pressure: CGFloat
-    let timestamp: TimeInterval
-}
-
-struct Stroke: Identifiable {
-    let id = UUID()
-    var points: [StrokePoint]
 }
 
 struct ToolbarView: View {
