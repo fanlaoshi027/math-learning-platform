@@ -13,6 +13,7 @@ final class InkMetalView: MTKView {
     private var lastSelectionPoint = SIMD2<Float>(0, 0)
     var isUserInteractionEnabledForTool = true
     var isSelectionTool = false
+    var isEraserTool = false
     var onHistoryChanged: (() -> Void)?
     var onSelectionChanged: (() -> Void)?
 
@@ -23,6 +24,7 @@ final class InkMetalView: MTKView {
     var selectedRotationDegrees: Double { renderer.selectedRotationDegrees }
 
     override var isFlipped: Bool { true }
+    override var acceptsFirstResponder: Bool { true }
 
     init(frame frameRect: NSRect = .zero) {
         guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else { fatalError("Metal is unavailable on this Mac") }
@@ -50,7 +52,19 @@ final class InkMetalView: MTKView {
     func setSelectedRotationDegrees(_ degrees: Double) { renderer.setSelectedRotationDegrees(degrees); onSelectionChanged?(); draw() }
 
     override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
         let point = makePoint(from: event)
+
+        if isEraserTool {
+            if renderer.selectStroke(at: point) {
+                renderer.deleteSelected()
+                onHistoryChanged?()
+                onSelectionChanged?()
+                draw()
+            }
+            return
+        }
+
         if isSelectionTool {
             if renderer.rotationHandle(at: point) {
                 rotationDrag = true
@@ -115,11 +129,13 @@ final class InkMetalView: MTKView {
 
     override func keyDown(with event: NSEvent) {
         if isSelectionTool && event.keyCode == 51 { deleteSelected(); return }
+        if event.modifierFlags.contains(.command) && event.keyCode == 6 { redo(); return }
+        if event.modifierFlags.contains(.command) && event.keyCode == 6 && event.modifierFlags.contains(.shift) { redo(); return }
         super.keyDown(with: event)
     }
 
     override func tabletPoint(with event: NSEvent) {
-        guard !isSelectionTool else {
+        guard !isSelectionTool && !isEraserTool else {
             switch event.phase {
             case .began: mouseDown(with: event)
             case .changed: mouseDragged(with: event)
