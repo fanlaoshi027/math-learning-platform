@@ -8,6 +8,8 @@ final class InkMetalView: MTKView {
     private var active = false
     private var selectionDrag = false
     private var resizeHandle: InkRenderer.SelectionHandle?
+    private var rotationDrag = false
+    private var lastRotationPoint = SIMD2<Float>(0, 0)
     private var lastSelectionPoint = SIMD2<Float>(0, 0)
     var isUserInteractionEnabledForTool = true
     var isSelectionTool = false
@@ -18,6 +20,7 @@ final class InkMetalView: MTKView {
     var canUndo: Bool { renderer.canUndo }
     var canRedo: Bool { renderer.canRedo }
     var hasSelection: Bool { renderer.hasSelection }
+    var selectedRotationDegrees: Double { renderer.selectedRotationDegrees }
 
     override var isFlipped: Bool { true }
 
@@ -48,6 +51,11 @@ final class InkMetalView: MTKView {
     override func mouseDown(with event: NSEvent) {
         let point = makePoint(from: event)
         if isSelectionTool {
+            if renderer.rotationHandle(at: point) {
+                rotationDrag = true
+                lastRotationPoint = point
+                return
+            }
             if let handle = renderer.selectionHandle(at: point) {
                 resizeHandle = handle
                 lastSelectionPoint = point
@@ -66,6 +74,13 @@ final class InkMetalView: MTKView {
     override func mouseDragged(with event: NSEvent) {
         let point = makePoint(from: event)
         if isSelectionTool {
+            if rotationDrag {
+                renderer.rotateSelected(to: point, from: lastRotationPoint)
+                lastRotationPoint = point
+                onSelectionChanged?()
+                draw()
+                return
+            }
             if let handle = resizeHandle {
                 renderer.resizeSelected(handle: handle, to: point)
                 draw()
@@ -86,6 +101,7 @@ final class InkMetalView: MTKView {
 
     override func mouseUp(with event: NSEvent) {
         if isSelectionTool {
+            rotationDrag = false
             resizeHandle = nil
             selectionDrag = false
             onSelectionChanged?()
@@ -97,10 +113,7 @@ final class InkMetalView: MTKView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if isSelectionTool && event.keyCode == 51 {
-            deleteSelected()
-            return
-        }
+        if isSelectionTool && event.keyCode == 51 { deleteSelected(); return }
         super.keyDown(with: event)
     }
 
