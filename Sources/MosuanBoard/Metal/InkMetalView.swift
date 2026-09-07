@@ -5,23 +5,26 @@ final class InkMetalView: MTKView {
     private let renderer: InkRenderer
     private var points: [InkPoint] = []
     private var active = false
+    var isUserInteractionEnabledForTool = true
 
     override var isFlipped: Bool { true }
 
     init(frame frameRect: NSRect = .zero) {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard let device = MTLCreateSystemDefaultDevice(),
+              let renderer = InkRenderer(device: device) else {
             fatalError("Metal is unavailable on this Mac")
         }
-        renderer = InkRenderer(device: device)
+        self.renderer = renderer
         super.init(frame: frameRect, device: device)
         configureMetal()
     }
 
     required init(coder: NSCoder) {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard let device = MTLCreateSystemDefaultDevice(),
+              let renderer = InkRenderer(device: device) else {
             fatalError("Metal is unavailable on this Mac")
         }
-        renderer = InkRenderer(device: device)
+        self.renderer = renderer
         super.init(coder: coder)
         self.device = device
         configureMetal()
@@ -37,6 +40,7 @@ final class InkMetalView: MTKView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard isUserInteractionEnabledForTool else { return }
         active = true
         points = [makePoint(from: event)]
         renderer.setStroke(points)
@@ -44,14 +48,14 @@ final class InkMetalView: MTKView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard active else { return }
+        guard isUserInteractionEnabledForTool, active else { return }
         points.append(makePoint(from: event))
         renderer.setStroke(points)
         draw()
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard active else { return }
+        guard isUserInteractionEnabledForTool, active else { return }
         points.append(makePoint(from: event))
         renderer.commitStroke(points)
         points.removeAll(keepingCapacity: true)
@@ -61,11 +65,16 @@ final class InkMetalView: MTKView {
     }
 
     override func tabletPoint(with event: NSEvent) {
+        guard isUserInteractionEnabledForTool else { return }
         switch event.phase {
         case .began: mouseDown(with: event)
         case .changed: mouseDragged(with: event)
         case .ended: mouseUp(with: event)
-        case .cancelled: active = false; points.removeAll(); renderer.setStroke([]); draw()
+        case .cancelled:
+            active = false
+            points.removeAll(keepingCapacity: true)
+            renderer.setStroke([])
+            draw()
         default: break
         }
     }
