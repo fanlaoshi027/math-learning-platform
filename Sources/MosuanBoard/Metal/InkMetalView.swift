@@ -7,6 +7,7 @@ final class InkMetalView: MTKView {
     private var points: [InkPoint] = []
     private var active = false
     private var selectionDrag = false
+    private var resizeHandle: InkRenderer.SelectionHandle?
     private var lastSelectionPoint = SIMD2<Float>(0, 0)
     var isUserInteractionEnabledForTool = true
     var isSelectionTool = false
@@ -40,13 +41,18 @@ final class InkMetalView: MTKView {
         clearColor = MTLClearColor(red: 1, green: 1, blue: 1, alpha: 1)
     }
 
-    func undo() { renderer.undo(); onHistoryChanged?(); draw() }
-    func redo() { renderer.redo(); onHistoryChanged?(); draw() }
+    func undo() { renderer.undo(); onHistoryChanged?(); onSelectionChanged?(); draw() }
+    func redo() { renderer.redo(); onHistoryChanged?(); onSelectionChanged?(); draw() }
     func deleteSelected() { renderer.deleteSelected(); onHistoryChanged?(); onSelectionChanged?(); draw() }
 
     override func mouseDown(with event: NSEvent) {
         let point = makePoint(from: event)
         if isSelectionTool {
+            if let handle = renderer.selectionHandle(at: point) {
+                resizeHandle = handle
+                lastSelectionPoint = point
+                return
+            }
             selectionDrag = renderer.selectStroke(at: point)
             lastSelectionPoint = point
             onSelectionChanged?()
@@ -60,6 +66,11 @@ final class InkMetalView: MTKView {
     override func mouseDragged(with event: NSEvent) {
         let point = makePoint(from: event)
         if isSelectionTool {
+            if let handle = resizeHandle {
+                renderer.resizeSelected(handle: handle, to: point)
+                draw()
+                return
+            }
             guard selectionDrag else { return }
             let delta = point - lastSelectionPoint
             if simd_length_squared(delta) > 0 {
@@ -75,13 +86,14 @@ final class InkMetalView: MTKView {
 
     override func mouseUp(with event: NSEvent) {
         if isSelectionTool {
+            resizeHandle = nil
             selectionDrag = false
             onSelectionChanged?()
             return
         }
         guard isUserInteractionEnabledForTool, active else { return }
         points.append(makePoint(from: event)); renderer.commitStroke(points)
-        points.removeAll(keepingCapacity: true); active = false; renderer.setStroke([]); onHistoryChanged?(); draw()
+        points.removeAll(keepingCapacity: true); active = false; renderer.setStroke([]); onHistoryChanged?(); onSelectionChanged?(); draw()
     }
 
     override func keyDown(with event: NSEvent) {
