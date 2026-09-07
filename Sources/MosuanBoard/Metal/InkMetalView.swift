@@ -7,6 +7,10 @@ final class InkMetalView: MTKView {
     private var active = false
     var isUserInteractionEnabledForTool = true
 
+    var penStyle: PenStyle = PenStyle() {
+        didSet { renderer.setPenStyle(penStyle) }
+    }
+
     override var isFlipped: Bool { true }
 
     init(frame frameRect: NSRect = .zero) {
@@ -17,6 +21,7 @@ final class InkMetalView: MTKView {
         self.renderer = renderer
         super.init(frame: frameRect, device: device)
         configureMetal()
+        renderer.setPenStyle(penStyle)
     }
 
     required init(coder: NSCoder) {
@@ -28,6 +33,7 @@ final class InkMetalView: MTKView {
         super.init(coder: coder)
         self.device = device
         configureMetal()
+        renderer.setPenStyle(penStyle)
     }
 
     private func configureMetal() {
