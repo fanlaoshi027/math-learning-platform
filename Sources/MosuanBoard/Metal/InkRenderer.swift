@@ -174,11 +174,14 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         committedStrokes.remove(at: index); selectedStrokeIndex = nil; redoStrokes.removeAll(keepingCapacity: true); rebuildGeometry()
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for: view.bounds.size) }
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for: view.drawableSize) }
 
     func draw(in view: MTKView) {
-        guard let descriptor = view.currentRenderPassDescriptor, let drawable = view.currentDrawable, let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
-        updateUniformBuffer(for: view.bounds.size)
+        guard let descriptor = view.currentRenderPassDescriptor,
+              let drawable = view.currentDrawable,
+              let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        updateUniformBuffer(for: view.drawableSize)
         encoder.setRenderPipelineState(pipelineState)
         if let vertexBuffer { encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0) }
         if let uniformBuffer { encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1) }
@@ -275,6 +278,9 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func updateUniformBuffer(for size: CGSize) {
         let uniform = Uniforms(viewportSize: SIMD2<Float>(Float(max(size.width, 1)), Float(max(size.height, 1))))
         if uniformBuffer == nil { uniformBuffer = device.makeBuffer(length: MemoryLayout<Uniforms>.stride, options: .storageModeShared) }
-        if let uniformBuffer { memcpy(uniformBuffer.contents(), [uniform], MemoryLayout<Uniforms>.stride) }
+        guard let uniformBuffer else { return }
+        withUnsafeBytes(of: uniform) { rawBuffer in
+            memcpy(uniformBuffer.contents(), rawBuffer.baseAddress!, MemoryLayout<Uniforms>.stride)
+        }
     }
 }
