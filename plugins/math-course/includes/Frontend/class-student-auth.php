@@ -11,8 +11,14 @@ class Student_Auth {
     }
 
     public static function ensure_login_page(){
-        $pages = get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
-        $page = $pages ? $pages[0] : get_page_by_path('student-login', OBJECT, 'page');
+        // Prefer the canonical slug first. An older installation may contain a
+        // stale page carrying the login marker while /student-login/ points to
+        // another page. The canonical URL must always own the login screen.
+        $page = get_page_by_path('student-login', OBJECT, 'page');
+        if(!$page){
+            $pages = get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
+            $page = $pages ? $pages[0] : null;
+        }
         if($page){
             $id = (int)$page->ID;
             $changes = array('ID' => $id);
@@ -34,12 +40,9 @@ class Student_Auth {
                 $needs_update = true;
             }
             if($needs_update) wp_update_post($changes);
-            // The existing student-login page may have been assigned the learning
-            // template, which bypasses page content and therefore bypasses the
-            // [math_student_login] shortcode. Force the login page back to the
-            // normal page template; this change does not touch the learning player.
-            $template = get_post_meta($id, '_wp_page_template', true);
-            if($template && $template !== 'default') update_post_meta($id, '_wp_page_template', 'default');
+            // Remove any stale custom page-template assignment left by an old
+            // learning-page setup. The login page is not a learning/player page.
+            if(get_post_meta($id,'_wp_page_template',true) !== 'default') update_post_meta($id,'_wp_page_template','default');
             if(get_post_meta($id,'_mathcourse_student_login',true) !== 'yes') update_post_meta($id,'_mathcourse_student_login','yes');
             return $id;
         }
@@ -59,9 +62,19 @@ class Student_Auth {
     public function __construct(){
         add_shortcode('math_student_login',array($this,'render'));
         add_action('init',array(__CLASS__,'ensure_login_page'),1);
+        // A legacy page can retain the learning template even after its
+        // database template setting is repaired. Force only /student-login/
+        // through the theme's normal content template at render time.
+        add_filter('template_include',array($this,'force_login_template'),9999);
         add_filter('login_redirect',array($this,'login_redirect'),10,3);
         add_action('admin_init',array($this,'block_student_admin'));
         add_action('wp_login',array($this,'enforce_frontend_login'),10,2);
+    }
+
+    public function force_login_template($template){
+        if(!is_page('student-login')) return $template;
+        $fallback = locate_template('index.php');
+        return $fallback ? $fallback : $template;
     }
 
     public function login_redirect($redirect_to,$requested,$user){
