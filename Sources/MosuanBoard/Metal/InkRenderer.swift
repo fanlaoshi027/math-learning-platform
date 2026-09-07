@@ -3,6 +3,8 @@ import MetalKit
 import simd
 
 final class InkRenderer: NSObject, MTKViewDelegate {
+    enum SelectionHandle { case topLeft, topRight, bottomLeft, bottomRight }
+
     private struct Uniforms { var viewportSize: SIMD2<Float> }
     private struct StoredStroke { var points: [InkPoint]; var style: PenStyle }
     private let device: any MTLDevice
@@ -91,11 +93,46 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         rebuildGeometry()
     }
 
+    func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? {
+        guard let bounds = selectedBounds() else { return nil }
+        let handles: [(SelectionHandle, SIMD2<Float>)] = [
+            (.topLeft, SIMD2<Float>(bounds.minX, bounds.minY)),
+            (.topRight, SIMD2<Float>(bounds.maxX, bounds.minY)),
+            (.bottomLeft, SIMD2<Float>(bounds.minX, bounds.maxY)),
+            (.bottomRight, SIMD2<Float>(bounds.maxX, bounds.maxY))
+        ]
+        return handles.first { simd_distance(point, $0.1) <= tolerance }?.0
+    }
+
+    func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) {
+        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
+        let anchor: SIMD2<Float>
+        switch handle {
+        case .topLeft: anchor = SIMD2<Float>(bounds.maxX, bounds.maxY)
+        case .topRight: anchor = SIMD2<Float>(bounds.minX, bounds.maxY)
+        case .bottomLeft: anchor = SIMD2<Float>(bounds.maxX, bounds.minY)
+        case .bottomRight: anchor = SIMD2<Float>(bounds.minX, bounds.minY)
+        }
+        let oldWidth = max(bounds.maxX - bounds.minX, 1)
+        let oldHeight = max(bounds.maxY - bounds.minY, 1)
+        let newWidth = max(abs(point.x - anchor.x), 1)
+        let newHeight = max(abs(point.y - anchor.y), 1)
+        let sx = newWidth / oldWidth
+        let sy = newHeight / oldHeight
+        let points = committedStrokes[index].points
+        committedStrokes[index].points = points.map {
+            InkPoint(x: anchor.x + ($0.x - anchor.x) * sx, y: anchor.y + ($0.y - anchor.y) * sy, pressure: $0.pressure)
+        }
+        redoStrokes.removeAll(keepingCapacity: true)
+        rebuildGeometry()
+    }
+
     func moveSelected(by delta: SIMD2<Float>) {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
         committedStrokes[index].points = committedStrokes[index].points.map {
             InkPoint(x: $0.x + delta.x, y: $0.y + delta.y, pressure: $0.pressure)
         }
+        redoStrokes.removeAll(keepingCapacity: true)
         rebuildGeometry()
     }
 
@@ -131,6 +168,16 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         vertexBuffer = vertices.isEmpty ? nil : device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<InkVertex>.stride, options: .storageModeShared)
     }
 
+    private func selectedBounds() -> (minX: Float, maxX: Float, minY: Float, maxY: Float)? {
+        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let first = committedStrokes[index].points.first else { return nil }
+        var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+        for point in committedStrokes[index].points {
+            minX = min(minX, point.x); maxX = max(maxX, point.x)
+            minY = min(minY, point.y); maxY = max(maxY, point.y)
+        }
+        return (minX, maxX, minY, maxY)
+    }
+
     private func appendStrokeGeometry(_ stroke: [InkPoint], style: PenStyle, to output: inout [InkVertex]) {
         guard let first = stroke.first, let last = stroke.last else { return }
         let color = metalColor(style)
@@ -154,38 +201,28 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func appendSelectionBounds(_ stroke: [InkPoint], color: SIMD4<Float>, to output: inout [InkVertex]) {
         guard let first = stroke.first else { return }
         var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
-        for point in stroke {
-            minX = min(minX, point.x); maxX = max(maxX, point.x)
-            minY = min(minY, point.y); maxY = max(maxY, point.y)
-        }
+        for point in stroke { minX = min(minX, point.x); maxX = max(maxX, point.x); minY = min(minY, point.y); maxY = max(maxY, point.y) }
         let pad: Float = 8
         let x0 = minX - pad, x1 = maxX + pad, y0 = minY - pad, y1 = maxY + pad
         let a = SIMD2<Float>(x0, y0), b = SIMD2<Float>(x1, y0), c = SIMD2<Float>(x1, y1), d = SIMD2<Float>(x0, y1)
-        appendLineQuad(a, b, width: 1.5, color: color, to: &output)
-        appendLineQuad(b, c, width: 1.5, color: color, to: &output)
-        appendLineQuad(c, d, width: 1.5, color: color, to: &output)
-        appendLineQuad(d, a, width: 1.5, color: color, to: &output)
+        appendLineQuad(a, b, width: 1.5, color: color, to: &output); appendLineQuad(b, c, width: 1.5, color: color, to: &output); appendLineQuad(c, d, width: 1.5, color: color, to: &output); appendLineQuad(d, a, width: 1.5, color: color, to: &output)
+        let handleColor = SIMD4<Float>(1, 1, 1, 1)
+        for center in [a, b, c, d] { appendDisk(center: center, radius: 5, color: color, to: &output); appendDisk(center: center, radius: 2.5, color: handleColor, to: &output) }
     }
 
     private func appendLineQuad(_ a: SIMD2<Float>, _ b: SIMD2<Float>, width: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
-        let delta = b - a
-        let length = max(simd_length(delta), 0.001)
-        let normal = SIMD2<Float>(-delta.y / length, delta.x / length) * width
-        appendTriangle(a + normal, a - normal, b + normal, color: color, to: &output)
-        appendTriangle(b + normal, a - normal, b - normal, color: color, to: &output)
+        let delta = b - a; let length = max(simd_length(delta), 0.001); let normal = SIMD2<Float>(-delta.y / length, delta.x / length) * width
+        appendTriangle(a + normal, a - normal, b + normal, color: color, to: &output); appendTriangle(b + normal, a - normal, b - normal, color: color, to: &output)
     }
 
     private func distanceFromPoint(_ p: SIMD2<Float>, toSegment a: SIMD2<Float>, _ b: SIMD2<Float>) -> Float {
-        let ab = b - a
-        let lengthSquared = simd_length_squared(ab)
+        let ab = b - a; let lengthSquared = simd_length_squared(ab)
         if lengthSquared < 0.0001 { return simd_distance(p, a) }
-        let t = max(0, min(1, simd_dot(p - a, ab) / lengthSquared))
-        return simd_distance(p, a + ab * t)
+        let t = max(0, min(1, simd_dot(p - a, ab) / lengthSquared)); return simd_distance(p, a + ab * t)
     }
 
     private func strokeWidth(_ pressure: Float, style: PenStyle) -> Float {
-        let p = max(0, min(1, pressure))
-        let curved = pow(p, Float(max(0.25, style.pressureCurve)))
+        let p = max(0, min(1, pressure)); let curved = pow(p, Float(max(0.25, style.pressureCurve)))
         if !style.pressureEnabled { return Float(max(0.5, style.width / 2)) }
         return Float(max(0.5, style.width * (0.45 + 0.75 * CGFloat(curved))))
     }
@@ -195,10 +232,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     private func appendDisk(center: SIMD2<Float>, radius: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
         let segments = 16, step = Float.pi * 2 / Float(segments)
-        for index in 0..<segments {
-            let a = Float(index) * step, b = Float(index + 1) * step
-            output += [InkVertex(position: center, color: color), InkVertex(position: center + SIMD2<Float>(cos(a), sin(a)) * radius, color: color), InkVertex(position: center + SIMD2<Float>(cos(b), sin(b)) * radius, color: color)]
-        }
+        for index in 0..<segments { let a = Float(index) * step, b = Float(index + 1) * step; output += [InkVertex(position: center, color: color), InkVertex(position: center + SIMD2<Float>(cos(a), sin(a)) * radius, color: color), InkVertex(position: center + SIMD2<Float>(cos(b), sin(b)) * radius, color: color)] }
     }
 
     private func updateUniformBuffer(for size: CGSize) {
