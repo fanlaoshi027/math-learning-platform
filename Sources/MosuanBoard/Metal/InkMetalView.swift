@@ -47,6 +47,7 @@ final class InkMetalView: MTKView {
     func undo() { renderer.undo(); onHistoryChanged?(); onSelectionChanged?(); draw() }
     func redo() { renderer.redo(); onHistoryChanged?(); onSelectionChanged?(); draw() }
     func deleteSelected() { renderer.deleteSelected(); onHistoryChanged?(); onSelectionChanged?(); draw() }
+    func setSelectedRotationDegrees(_ degrees: Double) { renderer.setSelectedRotationDegrees(degrees); onSelectionChanged?(); draw() }
 
     override func mouseDown(with event: NSEvent) {
         let point = makePoint(from: event)
