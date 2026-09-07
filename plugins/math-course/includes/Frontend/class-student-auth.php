@@ -4,51 +4,46 @@ defined('ABSPATH') || exit;
 
 class Student_Auth {
     private function login_url(){
-        $pages=get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
-        if($pages)return get_permalink($pages[0]->ID);
-        $page=get_page_by_path('student-login',OBJECT,'page');
+        $pages = get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
+        if($pages) return get_permalink($pages[0]->ID);
+        $page = get_page_by_path('student-login', OBJECT, 'page');
         return $page ? get_permalink($page->ID) : home_url('/student-login/');
     }
 
     public static function ensure_login_page(){
-        $pages=get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
-        $page=$pages ? $pages[0] : get_page_by_path('student-login',OBJECT,'page');
+        $pages = get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
+        $page = $pages ? $pages[0] : get_page_by_path('student-login', OBJECT, 'page');
         if($page){
-            $changes=array('ID'=>$page->ID);
-            $needs_update=false;
-            if($page->post_title!=='学员登录'){
-                $changes['post_title']='学员登录';
-                $needs_update=true;
+            $changes = array('ID' => $page->ID);
+            $needs_update = false;
+            if($page->post_title !== '学员登录'){
+                $changes['post_title'] = '学员登录';
+                $needs_update = true;
             }
-            if($page->post_name!=='student-login'){
-                $changes['post_name']='student-login';
-                $needs_update=true;
+            if($page->post_name !== 'student-login'){
+                $changes['post_name'] = 'student-login';
+                $needs_update = true;
             }
-            if(trim((string)$page->post_content)!=='[math_student_login]'){
-                $changes['post_content']='[math_student_login]';
-                $needs_update=true;
+            if(trim((string)$page->post_content) !== '[math_student_login]'){
+                $changes['post_content'] = '[math_student_login]';
+                $needs_update = true;
             }
-            if($page->post_status!=='publish'){
-                $changes['post_status']='publish';
-                $needs_update=true;
+            if($page->post_status !== 'publish'){
+                $changes['post_status'] = 'publish';
+                $needs_update = true;
             }
-            if($needs_update){
-                wp_update_post($changes);
-            }
-            if(get_post_meta($page->ID,'_mathcourse_student_login',true)!=='yes'){
-                update_post_meta($page->ID,'_mathcourse_student_login','yes');
-            }
+            if($needs_update) wp_update_post($changes);
+            if(get_post_meta($page->ID,'_mathcourse_student_login',true) !== 'yes') update_post_meta($page->ID,'_mathcourse_student_login','yes');
             return (int)$page->ID;
         }
-
-        $id=wp_insert_post(array(
-            'post_title'=>'学员登录',
-            'post_name'=>'student-login',
-            'post_content'=>'[math_student_login]',
-            'post_status'=>'publish',
-            'post_type'=>'page'
-        ),true);
-        if(is_wp_error($id))return 0;
+        $id = wp_insert_post(array(
+            'post_title' => '学员登录',
+            'post_name' => 'student-login',
+            'post_content' => '[math_student_login]',
+            'post_status' => 'publish',
+            'post_type' => 'page'
+        ), true);
+        if(is_wp_error($id)) return 0;
         update_post_meta($id,'_mathcourse_student_login','yes');
         return (int)$id;
     }
@@ -62,39 +57,34 @@ class Student_Auth {
     }
 
     public function login_redirect($redirect_to,$requested,$user){
-        if($user instanceof \WP_User && !in_array('administrator',(array)$user->roles,true)){
-            return home_url('/course-center/');
-        }
+        if($user instanceof \WP_User && !in_array('administrator',(array)$user->roles,true)) return home_url('/course-center/');
         return $redirect_to;
     }
 
     public function block_student_admin(){
-        if(!is_user_logged_in()||current_user_can('manage_options'))return;
+        if(!is_user_logged_in() || current_user_can('manage_options')) return;
         wp_safe_redirect($this->login_url());
         exit;
     }
 
     public function enforce_frontend_login($username,$user){
-        if($user instanceof \WP_User && !in_array('administrator',(array)$user->roles,true)){
-            set_transient('mathcourse_front_login_'.get_current_user_id(),'1',30);
-        }
+        if($user instanceof \WP_User && !in_array('administrator',(array)$user->roles,true)) set_transient('mathcourse_front_login_'.get_current_user_id(),'1',30);
     }
 
     public function render(){
         if(is_user_logged_in()){
             return '<main class="mc-student-login-page"><section class="mc-student-login-card mc-student-login-card--logged"><div class="mc-student-login-brand"><span class="mc-student-login-book" aria-hidden="true"></span><strong>樊老师数学</strong></div><h1>你已经登录</h1><p>进入课程中心，继续学习已激活的课程。</p><a class="mc-student-login-primary" href="'.esc_url(home_url('/course-center/')).'">进入课程中心</a></section></main>';
         }
-
-        $error='';
-        if('POST'===strtoupper($_SERVER['REQUEST_METHOD']??'')&&isset($_POST['mathcourse_login_nonce'])){
+        $error = '';
+        if('POST' === strtoupper($_SERVER['REQUEST_METHOD'] ?? '') && isset($_POST['mathcourse_login_nonce'])){
             if(!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['mathcourse_login_nonce'])),'mathcourse_login')){
-                $error='页面已过期，请刷新后重试。';
+                $error = '页面已过期，请刷新后重试。';
             }else{
-                $login=sanitize_text_field(wp_unslash($_POST['login']??''));
-                $password=(string)wp_unslash($_POST['password']??'');
-                $user=wp_signon(array('user_login'=>$login,'user_password'=>$password,'remember'=>!empty($_POST['remember'])),is_ssl());
+                $login = sanitize_text_field(wp_unslash($_POST['login'] ?? ''));
+                $password = (string)wp_unslash($_POST['password'] ?? '');
+                $user = wp_signon(array('user_login'=>$login,'user_password'=>$password,'remember'=>!empty($_POST['remember'])), is_ssl());
                 if(is_wp_error($user)){
-                    $error='账号或密码错误，请重新输入。';
+                    $error = '账号或密码错误，请重新输入。';
                 }elseif(in_array('administrator',(array)$user->roles,true)){
                     wp_safe_redirect(admin_url());
                 }else{
@@ -103,7 +93,6 @@ class Student_Auth {
                 exit;
             }
         }
-
         ob_start();
         ?>
         <main class="mc-student-login-page">
@@ -139,7 +128,7 @@ class Student_Auth {
     }
 
     private function register_url(){
-        $pages=get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'meta_key'=>'_mathcourse_activation_register','meta_value'=>'yes'));
-        return $pages?get_permalink($pages[0]->ID):home_url('/student-register/');
+        $pages = get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'meta_key'=>'_mathcourse_activation_register','meta_value'=>'yes'));
+        return $pages ? get_permalink($pages[0]->ID) : home_url('/student-register/');
     }
 }
