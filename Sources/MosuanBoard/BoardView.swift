@@ -3,6 +3,7 @@ import SwiftUI
 struct BoardView: View {
     @State private var selectedTool: BoardTool = .pen
     @State private var selectedPresetID = PenPreset.defaults[0].id
+    @StateObject private var controller = CanvasController()
 
     private var selectedPreset: PenPreset {
         PenPreset.defaults.first(where: { $0.id == selectedPresetID }) ?? PenPreset.defaults[0]
@@ -14,7 +15,7 @@ struct BoardView: View {
             Divider()
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
-                MetalInkCanvas(tool: $selectedTool, penStyle: selectedPreset.style, controller: CanvasController())
+                MetalInkCanvas(tool: $selectedTool, penStyle: selectedPreset.style, controller: controller)
                     .background(.white)
                     .clipShape(Rectangle())
                     .padding(24)
@@ -32,16 +33,20 @@ struct MetalInkCanvas: NSViewRepresentable {
 
     func makeNSView(context: Context) -> InkMetalView {
         let view = InkMetalView()
-        view.isUserInteractionEnabledForTool = tool == .pen
-        view.penStyle = penStyle
+        configure(view)
         controller.attach(view)
         return view
     }
 
     func updateNSView(_ nsView: InkMetalView, context: Context) {
-        nsView.isUserInteractionEnabledForTool = tool == .pen
-        nsView.penStyle = penStyle
+        configure(nsView)
         controller.attach(nsView)
+    }
+
+    private func configure(_ view: InkMetalView) {
+        view.isUserInteractionEnabledForTool = tool == .pen
+        view.isSelectionTool = tool == .select
+        view.penStyle = penStyle
     }
 }
 
