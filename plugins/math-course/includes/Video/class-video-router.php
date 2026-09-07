@@ -32,7 +32,7 @@ class Video_Router {
         $lesson_id = absint($lesson_id);
         if (!$lesson_id || !$this->adapter->get_lesson($lesson_id) || !$this->can_watch($lesson_id)) return '';
         $expires = time() + $this->token_ttl;
-        return home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $this->sign($lesson_id, $expires, '') . '/');
+        return add_query_arg(array('math_video'=>$lesson_id,'math_video_exp'=>$expires,'math_video_sig'=>$this->sign($lesson_id,$expires,'')), home_url('/index.php'));
     }
     private function sign($lesson_id, $expires, $file) {
         return rtrim(strtr(base64_encode(hash_hmac('sha256', absint($lesson_id) . '|' . absint($expires) . '|' . (string) $file, wp_salt('auth'), true)), '+/', '-_'), '=');
@@ -70,7 +70,7 @@ class Video_Router {
     }
     private function gateway_url($lesson_id, $expires, $file_ref) {
         $sig = $this->sign($lesson_id, $expires, $file_ref);
-        return add_query_arg('file', $file_ref, home_url('/math-video/' . $lesson_id . '/' . $expires . '/' . $sig . '/'));
+        return add_query_arg(array('file'=>$file_ref,'math_video'=>$lesson_id,'math_video_exp'=>$expires,'math_video_sig'=>$sig), home_url('/index.php'));
     }
     private function resolve_path($base_dir, $relative) {
         if (strpos($relative, '/') === 0) return $relative;
