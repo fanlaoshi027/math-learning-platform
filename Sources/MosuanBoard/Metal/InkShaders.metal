@@ -6,19 +6,24 @@ struct InkVertex {
     float4 color;
 };
 
+struct Uniforms {
+    float2 viewportSize;
+};
+
 struct RasterVertex {
     float4 position [[position]];
     float4 color;
 };
 
 vertex RasterVertex inkVertex(const device InkVertex *vertices [[buffer(0)]],
+                              constant Uniforms &uniforms [[buffer(1)]],
                               uint vertexID [[vertex_id]]) {
     InkVertex input = vertices[vertexID];
-    RasterVertex output;
+    float2 ndc = (input.position / uniforms.viewportSize) * 2.0 - 1.0;
+    ndc.y = -ndc.y;
 
-    // The initial prototype uses pixel coordinates and is converted to NDC
-    // by the renderer in a later pass. Keep the shader intentionally small.
-    output.position = float4(input.position.x, input.position.y, 0.0, 1.0);
+    RasterVertex output;
+    output.position = float4(ndc, 0.0, 1.0);
     output.color = input.color;
     return output;
 }
