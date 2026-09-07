@@ -5,11 +5,23 @@ defined('ABSPATH') || exit;
 class Student_Auth {
     private function login_url(){
         $pages=get_posts(array('post_type'=>'page','post_status'=>'publish','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
-        return $pages ? get_permalink($pages[0]->ID) : home_url('/student-login/');
+        if($pages)return get_permalink($pages[0]->ID);
+        $page=get_page_by_path('student-login',OBJECT,'page');
+        return $page ? get_permalink($page->ID) : home_url('/student-login/');
     }
     public static function ensure_login_page(){
         $pages=get_posts(array('post_type'=>'page','post_status'=>'any','posts_per_page'=>1,'meta_key'=>'_mathcourse_student_login','meta_value'=>'yes'));
-        if($pages)return (int)$pages[0]->ID;
+        $page=$pages ? $pages[0] : get_page_by_path('student-login',OBJECT,'page');
+        if($page){
+            $changes=array();
+            if($page->post_title!=='学员登录')$changes['ID']=$page->ID,$changes['post_title']='学员登录';
+            if($page->post_name!=='student-login'){$changes['ID']=$page->ID;$changes['post_name']='student-login';}
+            if(trim((string)$page->post_content)!=='[math_student_login]'){$changes['ID']=$page->ID;$changes['post_content']='[math_student_login]';}
+            if($page->post_status!=='publish'){$changes['ID']=$page->ID;$changes['post_status']='publish';}
+            if($changes)wp_update_post($changes);
+            if(get_post_meta($page->ID,'_mathcourse_student_login',true)!=='yes')update_post_meta($page->ID,'_mathcourse_student_login','yes');
+            return (int)$page->ID;
+        }
         $id=wp_insert_post(array('post_title'=>'学员登录','post_name'=>'student-login','post_content'=>'[math_student_login]','post_status'=>'publish','post_type'=>'page'),true);
         if(is_wp_error($id))return 0;
         update_post_meta($id,'_mathcourse_student_login','yes');
@@ -17,6 +29,7 @@ class Student_Auth {
     }
     public function __construct(){
         add_shortcode('math_student_login',array($this,'render'));
+        add_action('init',array(__CLASS__,'ensure_login_page'),1);
         add_filter('login_redirect',array($this,'login_redirect'),10,3);
         add_action('admin_init',array($this,'block_student_admin'));
         add_action('wp_login',array($this,'enforce_frontend_login'),10,2);
