@@ -20,7 +20,10 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private(set) var selectedStrokeIndex: Int?
 
     init?(device: any MTLDevice) {
-        guard let commandQueue = device.makeCommandQueue(), let library = device.makeDefaultLibrary(), let vertexFunction = library.makeFunction(name: "inkVertex"), let fragmentFunction = library.makeFunction(name: "inkFragment") else { return nil }
+        guard let commandQueue = device.makeCommandQueue(),
+              let library = try? device.makeDefaultLibrary(bundle: Bundle.module),
+              let vertexFunction = library.makeFunction(name: "inkVertex"),
+              let fragmentFunction = library.makeFunction(name: "inkFragment") else { return nil }
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = vertexFunction
         descriptor.fragmentFunction = fragmentFunction
@@ -248,22 +251,30 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     }
 
     private func strokeWidth(_ pressure: Float, style: PenStyle) -> Float {
-        let p = max(0, min(1, pressure)); let curved = pow(p, Float(max(0.25, style.pressureCurve)))
-        if !style.pressureEnabled { return Float(max(0.5, style.width / 2)) }
-        return Float(max(0.5, style.width * (0.45 + 0.75 * CGFloat(curved))))
+        let p = max(0, min(1, pressure)); let curved = style.pressureEnabled ? pow(p, max(0.25, Float(style.pressureCurve))) : 0.75
+        return Float(style.width) * (0.45 + 0.75 * curved)
     }
 
-    private func metalColor(_ style: PenStyle) -> SIMD4<Float> { SIMD4<Float>(Float(style.color.red), Float(style.color.green), Float(style.color.blue), Float(style.color.alpha * style.opacity)) }
-    private func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, color: SIMD4<Float>, to output: inout [InkVertex]) { output += [InkVertex(position: a, color: color), InkVertex(position: b, color: color), InkVertex(position: c, color: color)] }
+    private func metalColor(_ style: PenStyle) -> SIMD4<Float> {
+        SIMD4<Float>(Float(style.color.red), Float(style.color.green), Float(style.color.blue), Float(style.color.alpha * style.opacity))
+    }
+
+    private func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, color: SIMD4<Float>, to output: inout [InkVertex]) {
+        output.append(InkVertex(position: a, color: color)); output.append(InkVertex(position: b, color: color)); output.append(InkVertex(position: c, color: color))
+    }
 
     private func appendDisk(center: SIMD2<Float>, radius: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
-        let segments = 16, step = Float.pi * 2 / Float(segments)
-        for index in 0..<segments { let a = Float(index) * step, b = Float(index + 1) * step; output += [InkVertex(position: center, color: color), InkVertex(position: center + SIMD2<Float>(cos(a), sin(a)) * radius, color: color), InkVertex(position: center + SIMD2<Float>(cos(b), sin(b)) * radius, color: color)] }
+        let steps = 12
+        for index in 0..<steps {
+            let a0 = Float(index) / Float(steps) * 2 * .pi
+            let a1 = Float(index + 1) / Float(steps) * 2 * .pi
+            appendTriangle(center, center + SIMD2<Float>(cos(a0), sin(a0)) * radius, center + SIMD2<Float>(cos(a1), sin(a1)) * radius, color: color, to: &output)
+        }
     }
 
     private func updateUniformBuffer(for size: CGSize) {
-        var uniforms = Uniforms(viewportSize: SIMD2<Float>(Float(max(size.width, 1)), Float(max(size.height, 1))))
+        let uniform = Uniforms(viewportSize: SIMD2<Float>(Float(max(size.width, 1)), Float(max(size.height, 1))))
         if uniformBuffer == nil { uniformBuffer = device.makeBuffer(length: MemoryLayout<Uniforms>.stride, options: .storageModeShared) }
-        memcpy(uniformBuffer?.contents(), &uniforms, MemoryLayout<Uniforms>.stride)
+        if let uniformBuffer { memcpy(uniformBuffer.contents(), [uniform], MemoryLayout<Uniforms>.stride) }
     }
 }
