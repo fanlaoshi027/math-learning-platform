@@ -1,8 +1,7 @@
-import Foundation
+import Combine
 
 final class CanvasController: ObservableObject {
     weak var canvas: InkMetalView?
-
     @Published private(set) var canUndo = false
     @Published private(set) var canRedo = false
 
