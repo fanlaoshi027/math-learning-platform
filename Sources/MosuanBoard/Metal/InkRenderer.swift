@@ -73,7 +73,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        updateUniformBuffer(for: view.drawableSize)
+        updateUniformBuffer(for: view.bounds.size)
 
         encoder.setRenderPipelineState(pipelineState)
         if let vertexBuffer {
@@ -103,8 +103,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
                 let length = max(sqrt(dx * dx + dy * dy), 0.001)
                 let nx = -dy / length
                 let ny = dx / length
-                let width0 = 1.25 + 4.75 * max(0, min(1, p0.pressure))
-                let width1 = 1.25 + 4.75 * max(0, min(1, p1.pressure))
+                let width0 = 0.75 + 2.75 * max(0, min(1, p0.pressure))
+                let width1 = 0.75 + 2.75 * max(0, min(1, p1.pressure))
 
                 let a = SIMD2<Float>(p0.x + nx * width0, p0.y + ny * width0)
                 let b = SIMD2<Float>(p0.x - nx * width0, p0.y - ny * width0)
