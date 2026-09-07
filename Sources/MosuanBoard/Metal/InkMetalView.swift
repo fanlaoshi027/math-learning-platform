@@ -6,6 +6,7 @@ final class InkMetalView: MTKView {
     private var points: [InkPoint] = []
     private var active = false
     var isUserInteractionEnabledForTool = true
+    var onHistoryChanged: (() -> Void)?
 
     var penStyle: PenStyle = PenStyle() { didSet { renderer.setPenStyle(penStyle) } }
     var canUndo: Bool { renderer.canUndo }
@@ -33,8 +34,17 @@ final class InkMetalView: MTKView {
         clearColor = MTLClearColor(red: 1, green: 1, blue: 1, alpha: 1)
     }
 
-    func undo() { renderer.undo(); draw() }
-    func redo() { renderer.redo(); draw() }
+    func undo() {
+        renderer.undo()
+        onHistoryChanged?()
+        draw()
+    }
+
+    func redo() {
+        renderer.redo()
+        onHistoryChanged?()
+        draw()
+    }
 
     override func mouseDown(with event: NSEvent) {
         guard isUserInteractionEnabledForTool else { return }
@@ -49,7 +59,7 @@ final class InkMetalView: MTKView {
     override func mouseUp(with event: NSEvent) {
         guard isUserInteractionEnabledForTool, active else { return }
         points.append(makePoint(from: event)); renderer.commitStroke(points)
-        points.removeAll(keepingCapacity: true); active = false; renderer.setStroke([]); draw()
+        points.removeAll(keepingCapacity: true); active = false; renderer.setStroke([]); onHistoryChanged?(); draw()
     }
 
     override func tabletPoint(with event: NSEvent) {
