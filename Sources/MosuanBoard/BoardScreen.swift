@@ -4,8 +4,15 @@ struct BoardScreen: View {
     @StateObject private var controller = CanvasController()
     @State private var tool: BoardTool = .pen
     @State private var presetID = PenPreset.defaults[0].id
+    @State private var rotationText = "0"
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
+    private var rotationBinding: Binding<String> {
+        Binding(
+            get: { rotationText },
+            set: { rotationText = $0 }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +36,17 @@ struct BoardScreen: View {
                     .help(item.name)
                 }
                 Spacer()
+                if controller.hasSelection {
+                    HStack(spacing: 5) {
+                        Image(systemName: "rotate.right")
+                        TextField("角度", text: rotationBinding)
+                            .frame(width: 62)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { applyRotation() }
+                        Text("°")
+                    }
+                    .help("输入旋转角度")
+                }
                 Button { controller.deleteSelected() } label: { Label("删除", systemImage: "trash") }
                     .disabled(!controller.hasSelection)
                 Button { controller.undo() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
@@ -45,5 +63,20 @@ struct BoardScreen: View {
                 .background(.white)
                 .padding(24)
         }
+        .onChange(of: controller.rotationDegrees) { _, value in
+            rotationText = String(format: "%.1f", value)
+        }
+        .onChange(of: controller.hasSelection) { _, selected in
+            if selected { rotationText = String(format: "%.1f", controller.rotationDegrees) }
+            else { rotationText = "0" }
+        }
+    }
+
+    private func applyRotation() {
+        guard let value = Double(rotationText) else {
+            rotationText = String(format: "%.1f", controller.rotationDegrees)
+            return
+        }
+        controller.setRotationDegrees(value)
     }
 }
