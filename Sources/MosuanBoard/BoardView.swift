@@ -46,6 +46,7 @@ struct MetalInkCanvas: NSViewRepresentable {
     private func configure(_ view: InkMetalView) {
         view.isUserInteractionEnabledForTool = tool == .pen
         view.isSelectionTool = tool == .select
+        view.isEraserTool = tool == .eraser
         view.penStyle = penStyle
     }
 }
