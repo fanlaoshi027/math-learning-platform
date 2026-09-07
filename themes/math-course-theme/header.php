@@ -4,7 +4,13 @@ if ( is_user_logged_in() && ! current_user_can( 'manage_options' ) ) { show_admi
 $mathcourse_logo_id = absint( get_option( 'mathcourse_site_logo_id', 0 ) );
 $mathcourse_logo_url = $mathcourse_logo_id && wp_attachment_is_image( $mathcourse_logo_id ) ? wp_get_attachment_image_url( $mathcourse_logo_id, 'medium' ) : '';
 $mathcourse_login_pages = get_posts( array( 'post_type' => 'page', 'post_status' => 'publish', 'posts_per_page' => 1, 'meta_key' => '_mathcourse_student_login', 'meta_value' => 'yes' ) );
-$mathcourse_login_url = ! empty( $mathcourse_login_pages ) ? get_permalink( $mathcourse_login_pages[0]->ID ) : home_url( '/student-login/' );
+if ( ! empty( $mathcourse_login_pages ) ) {
+    $mathcourse_login_url = get_permalink( $mathcourse_login_pages[0]->ID );
+} else {
+    $mathcourse_login_page = get_page_by_path( 'student-login', OBJECT, 'page' );
+    $mathcourse_login_url = $mathcourse_login_page ? get_permalink( $mathcourse_login_page->ID ) : home_url( '/student-login/' );
+}
+$mathcourse_logout_url = wp_logout_url( home_url( '/' ) );
 ?><!doctype html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -42,7 +48,7 @@ $mathcourse_login_url = ! empty( $mathcourse_login_pages ) ? get_permalink( $mat
         <div class="mc-header-actions">
             <?php if ( is_user_logged_in() ) : ?>
                 <?php $current_user = wp_get_current_user(); $student_name = $current_user->display_name ?: $current_user->user_login; $student_initial = function_exists( 'mb_substr' ) ? mb_substr( $student_name, 0, 1 ) : substr( $student_name, 0, 1 ); ?>
-                <a class="mc-user-pill" href="<?php echo esc_url( home_url( '/learning-center/' ) ); ?>"><b><?php echo esc_html( $student_initial ); ?></b><span><?php echo esc_html( $student_name ); ?></span><i>|</i><span>退出</span></a>
+                <a class="mc-user-pill" href="<?php echo esc_url( $mathcourse_logout_url ); ?>"><b><?php echo esc_html( $student_initial ); ?></b><span><?php echo esc_html( $student_name ); ?></span><i>|</i><span>退出</span></a>
             <?php else : ?>
                 <a class="mc-header-login" href="<?php echo esc_url( $mathcourse_login_url ); ?>">学生登录</a>
             <?php endif; ?>
