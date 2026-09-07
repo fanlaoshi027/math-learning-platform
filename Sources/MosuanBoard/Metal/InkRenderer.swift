@@ -4,10 +4,12 @@ import simd
 
 final class InkRenderer: NSObject, MTKViewDelegate {
     private struct Uniforms { var viewportSize: SIMD2<Float> }
+    private struct StoredStroke { var points: [InkPoint]; var style: PenStyle }
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
     private let pipelineState: any MTLRenderPipelineState
-    private var committedStrokes: [[InkPoint]] = []
+    private var committedStrokes: [StoredStroke] = []
+    private var redoStrokes: [StoredStroke] = []
     private var activeStroke: [InkPoint] = []
     private var vertices: [InkVertex] = []
     private var vertexBuffer: (any MTLBuffer)?
@@ -15,10 +17,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var penStyle = PenStyle()
 
     init?(device: any MTLDevice) {
-        guard let commandQueue = device.makeCommandQueue(),
-              let library = device.makeDefaultLibrary(),
-              let vertexFunction = library.makeFunction(name: "inkVertex"),
-              let fragmentFunction = library.makeFunction(name: "inkFragment") else { return nil }
+        guard let commandQueue = device.makeCommandQueue(), let library = device.makeDefaultLibrary(), let vertexFunction = library.makeFunction(name: "inkVertex"), let fragmentFunction = library.makeFunction(name: "inkFragment") else { return nil }
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = vertexFunction
         descriptor.fragmentFunction = fragmentFunction
@@ -29,112 +28,92 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
         descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         guard let pipelineState = try? device.makeRenderPipelineState(descriptor: descriptor) else { return nil }
-        self.device = device
-        self.commandQueue = commandQueue
-        self.pipelineState = pipelineState
+        self.device = device; self.commandQueue = commandQueue; self.pipelineState = pipelineState
         super.init()
     }
 
-    func setPenStyle(_ style: PenStyle) {
-        penStyle = style
-        rebuildGeometry()
-    }
+    var canUndo: Bool { !committedStrokes.isEmpty }
+    var canRedo: Bool { !redoStrokes.isEmpty }
 
-    func setStroke(_ points: [InkPoint]) {
-        activeStroke = points
-        rebuildGeometry()
-    }
+    func setPenStyle(_ style: PenStyle) { penStyle = style; rebuildGeometry() }
+    func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
 
     func commitStroke(_ points: [InkPoint]) {
         guard points.count >= 2 else { activeStroke.removeAll(); rebuildGeometry(); return }
-        committedStrokes.append(points)
+        committedStrokes.append(StoredStroke(points: points, style: penStyle))
+        redoStrokes.removeAll(keepingCapacity: true)
         activeStroke.removeAll(keepingCapacity: true)
+        rebuildGeometry()
+    }
+
+    func undo() {
+        guard let stroke = committedStrokes.popLast() else { return }
+        redoStrokes.append(stroke)
+        rebuildGeometry()
+    }
+
+    func redo() {
+        guard let stroke = redoStrokes.popLast() else { return }
+        committedStrokes.append(stroke)
         rebuildGeometry()
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for: view.bounds.size) }
 
     func draw(in view: MTKView) {
-        guard let descriptor = view.currentRenderPassDescriptor,
-              let drawable = view.currentDrawable,
-              let commandBuffer = commandQueue.makeCommandBuffer(),
-              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        guard let descriptor = view.currentRenderPassDescriptor, let drawable = view.currentDrawable, let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
         updateUniformBuffer(for: view.bounds.size)
         encoder.setRenderPipelineState(pipelineState)
         if let vertexBuffer { encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0) }
         if let uniformBuffer { encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1) }
         if !vertices.isEmpty { encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count) }
-        encoder.endEncoding()
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
+        encoder.endEncoding(); commandBuffer.present(drawable); commandBuffer.commit()
     }
 
     private func rebuildGeometry() {
         var output: [InkVertex] = []
-        let strokes = committedStrokes + (activeStroke.isEmpty ? [] : [activeStroke])
-        for stroke in strokes where stroke.count >= 2 { appendStrokeGeometry(stroke, to: &output) }
+        for stroke in committedStrokes { appendStrokeGeometry(stroke.points, style: stroke.style, to: &output) }
+        if !activeStroke.isEmpty { appendStrokeGeometry(activeStroke, style: penStyle, to: &output) }
         vertices = output
-        if vertices.isEmpty { vertexBuffer = nil }
-        else { vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<InkVertex>.stride, options: .storageModeShared) }
+        vertexBuffer = vertices.isEmpty ? nil : device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<InkVertex>.stride, options: .storageModeShared)
     }
 
-    private func appendStrokeGeometry(_ stroke: [InkPoint], to output: inout [InkVertex]) {
+    private func appendStrokeGeometry(_ stroke: [InkPoint], style: PenStyle, to output: inout [InkVertex]) {
         guard let first = stroke.first, let last = stroke.last else { return }
+        let color = metalColor(style)
         for index in 0..<(stroke.count - 1) {
             let p0 = stroke[index], p1 = stroke[index + 1]
             let dx = p1.x - p0.x, dy = p1.y - p0.y
             let length = max(sqrt(dx * dx + dy * dy), 0.001)
             let nx = -dy / length, ny = dx / length
-            let w0 = strokeWidth(p0.pressure), w1 = strokeWidth(p1.pressure)
+            let w0 = strokeWidth(p0.pressure, style: style), w1 = strokeWidth(p1.pressure, style: style)
             let a = SIMD2<Float>(p0.x + nx * w0, p0.y + ny * w0)
             let b = SIMD2<Float>(p0.x - nx * w0, p0.y - ny * w0)
             let c = SIMD2<Float>(p1.x + nx * w1, p1.y + ny * w1)
             let d = SIMD2<Float>(p1.x - nx * w1, p1.y - ny * w1)
-            appendTriangle(a, b, c, to: &output)
-            appendTriangle(c, b, d, to: &output)
+            appendTriangle(a, b, c, color: color, to: &output); appendTriangle(c, b, d, color: color, to: &output)
         }
-        appendDisk(center: SIMD2<Float>(first.x, first.y), radius: strokeWidth(first.pressure), to: &output)
-        appendDisk(center: SIMD2<Float>(last.x, last.y), radius: strokeWidth(last.pressure), to: &output)
-        if stroke.count > 2 {
-            for point in stroke.dropFirst().dropLast() {
-                appendDisk(center: SIMD2<Float>(point.x, point.y), radius: strokeWidth(point.pressure), to: &output)
-            }
-        }
+        appendDisk(center: SIMD2<Float>(first.x, first.y), radius: strokeWidth(first.pressure, style: style), color: color, to: &output)
+        appendDisk(center: SIMD2<Float>(last.x, last.y), radius: strokeWidth(last.pressure, style: style), color: color, to: &output)
+        if stroke.count > 2 { for point in stroke.dropFirst().dropLast() { appendDisk(center: SIMD2<Float>(point.x, point.y), radius: strokeWidth(point.pressure, style: style), color: color, to: &output) } }
     }
 
-    private func strokeWidth(_ pressure: Float) -> Float {
+    private func strokeWidth(_ pressure: Float, style: PenStyle) -> Float {
         let p = max(0, min(1, pressure))
-        let curved = pow(p, Float(max(0.25, penStyle.pressureCurve)))
-        if !penStyle.pressureEnabled { return Float(max(0.5, penStyle.width / 2)) }
-        return Float(max(0.5, penStyle.width * (0.45 + 0.75 * CGFloat(curved))))
+        let curved = pow(p, Float(max(0.25, style.pressureCurve)))
+        if !style.pressureEnabled { return Float(max(0.5, style.width / 2)) }
+        return Float(max(0.5, style.width * (0.45 + 0.75 * CGFloat(curved))))
     }
 
-    private func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, to output: inout [InkVertex]) {
-        let color = metalColor()
-        output += [InkVertex(position: a, color: color), InkVertex(position: b, color: color), InkVertex(position: c, color: color)]
-    }
+    private func metalColor(_ style: PenStyle) -> SIMD4<Float> { SIMD4<Float>(Float(style.color.red), Float(style.color.green), Float(style.color.blue), Float(style.color.alpha * style.opacity)) }
+    private func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, color: SIMD4<Float>, to output: inout [InkVertex]) { output += [InkVertex(position: a, color: color), InkVertex(position: b, color: color), InkVertex(position: c, color: color)] }
 
-    private func appendDisk(center: SIMD2<Float>, radius: Float, to output: inout [InkVertex]) {
-        let color = metalColor()
-        let segments = 16
-        let step = Float.pi * 2 / Float(segments)
+    private func appendDisk(center: SIMD2<Float>, radius: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
+        let segments = 16, step = Float.pi * 2 / Float(segments)
         for index in 0..<segments {
             let a = Float(index) * step, b = Float(index + 1) * step
-            output += [
-                InkVertex(position: center, color: color),
-                InkVertex(position: center + SIMD2<Float>(cos(a), sin(a)) * radius, color: color),
-                InkVertex(position: center + SIMD2<Float>(cos(b), sin(b)) * radius, color: color)
-            ]
+            output += [InkVertex(position: center, color: color), InkVertex(position: center + SIMD2<Float>(cos(a), sin(a)) * radius, color: color), InkVertex(position: center + SIMD2<Float>(cos(b), sin(b)) * radius, color: color)]
         }
-    }
-
-    private func metalColor() -> SIMD4<Float> {
-        SIMD4<Float>(
-            Float(penStyle.color.red),
-            Float(penStyle.color.green),
-            Float(penStyle.color.blue),
-            Float(penStyle.color.alpha * penStyle.opacity)
-        )
     }
 
     private func updateUniformBuffer(for size: CGSize) {
