@@ -12,6 +12,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var vertices: [InkVertex] = []
     private var vertexBuffer: (any MTLBuffer)?
     private var uniformBuffer: (any MTLBuffer)?
+    private var penStyle = PenStyle()
 
     init?(device: any MTLDevice) {
         guard let commandQueue = device.makeCommandQueue(),
@@ -34,7 +35,15 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         super.init()
     }
 
-    func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
+    func setPenStyle(_ style: PenStyle) {
+        penStyle = style
+        rebuildGeometry()
+    }
+
+    func setStroke(_ points: [InkPoint]) {
+        activeStroke = points
+        rebuildGeometry()
+    }
 
     func commitStroke(_ points: [InkPoint]) {
         guard points.count >= 2 else { activeStroke.removeAll(); rebuildGeometry(); return }
@@ -95,17 +104,19 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     private func strokeWidth(_ pressure: Float) -> Float {
         let p = max(0, min(1, pressure))
-        return 0.9 + 3.6 * p
+        let curved = pow(p, Float(max(0.25, penStyle.pressureCurve)))
+        if !penStyle.pressureEnabled { return Float(max(0.5, penStyle.width / 2)) }
+        return Float(max(0.5, penStyle.width * (0.45 + 0.75 * CGFloat(curved))))
     }
 
     private func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, to output: inout [InkVertex]) {
-        let color = SIMD4<Float>(0, 0, 0, 1)
+        let color = metalColor()
         output += [InkVertex(position: a, color: color), InkVertex(position: b, color: color), InkVertex(position: c, color: color)]
     }
 
     private func appendDisk(center: SIMD2<Float>, radius: Float, to output: inout [InkVertex]) {
-        let color = SIMD4<Float>(0, 0, 0, 1)
-        let segments = 12
+        let color = metalColor()
+        let segments = 16
         let step = Float.pi * 2 / Float(segments)
         for index in 0..<segments {
             let a = Float(index) * step, b = Float(index + 1) * step
@@ -115,6 +126,15 @@ final class InkRenderer: NSObject, MTKViewDelegate {
                 InkVertex(position: center + SIMD2<Float>(cos(b), sin(b)) * radius, color: color)
             ]
         }
+    }
+
+    private func metalColor() -> SIMD4<Float> {
+        SIMD4<Float>(
+            Float(penStyle.color.red),
+            Float(penStyle.color.green),
+            Float(penStyle.color.blue),
+            Float(penStyle.color.alpha * penStyle.opacity)
+        )
     }
 
     private func updateUniformBuffer(for size: CGSize) {
