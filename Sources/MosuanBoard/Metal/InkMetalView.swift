@@ -129,8 +129,6 @@ final class InkMetalView: MTKView {
 
     override func keyDown(with event: NSEvent) {
         if isSelectionTool && event.keyCode == 51 { deleteSelected(); return }
-        if event.modifierFlags.contains(.command) && event.keyCode == 6 { redo(); return }
-        if event.modifierFlags.contains(.command) && event.keyCode == 6 && event.modifierFlags.contains(.shift) { redo(); return }
         super.keyDown(with: event)
     }
 
