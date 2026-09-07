@@ -7,6 +7,11 @@ final class CanvasController: ObservableObject {
 
     func attach(_ canvas: InkMetalView) {
         self.canvas = canvas
+        canvas.onHistoryChanged = { [weak self, weak canvas] in
+            guard let self, let canvas else { return }
+            self.canUndo = canvas.canUndo
+            self.canRedo = canvas.canRedo
+        }
         refreshState()
     }
 
