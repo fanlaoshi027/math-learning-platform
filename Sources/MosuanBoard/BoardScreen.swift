@@ -29,6 +29,8 @@ struct BoardScreen: View {
                     .help(item.name)
                 }
                 Spacer()
+                Button { controller.deleteSelected() } label: { Label("删除", systemImage: "trash") }
+                    .disabled(!controller.hasSelection)
                 Button { controller.undo() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }
                     .keyboardShortcut("z", modifiers: .command)
                     .disabled(!controller.canUndo)
