@@ -12,6 +12,7 @@ final class InkMetalView: MTKView {
     private var rotationDrag=false
     private var panDrag=false
     private var spaceHeld=false
+    private var middleButtonHeld=false
     private var lastPoint=SIMD2<Float>(0,0)
     private var lastRotationPoint=SIMD2<Float>(0,0)
     private var smartLineDetected=false
@@ -46,6 +47,7 @@ final class InkMetalView: MTKView {
     private func notifyState(){onHistoryChanged?();onSelectionChanged?();onPageStateChanged?(renderer.exportPageState())}
 
     override func mouseDown(with event:NSEvent){window?.makeFirstResponder(self);let p=makePoint(from:event)
+        if event.buttonNumber == 2 { middleButtonHeld=true; panDrag=true; lastPoint=p; return }
         if spaceHeld {panDrag=true;lastPoint=p;return}
         if isEraserTool {renderer.beginHistoryTransaction();eraserPoints=[p];return}
         if isSelectionTool {if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return};if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return};selectionDrag=renderer.selectStroke(at:p);lastPoint=p;onSelectionChanged?();draw();return}
@@ -58,6 +60,7 @@ final class InkMetalView: MTKView {
         guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));if isLineTool || (isSmartLineTool && smartLineDetected){renderer.setStroke(linePreview(from:points))}else{renderer.setStroke(points)};scheduleSmartLineDetection();draw()
     }
     override func mouseUp(with event:NSEvent){smartLineWorkItem?.cancel();let p=makePoint(from:event)
+        if event.buttonNumber == 2 || middleButtonHeld { middleButtonHeld=false;panDrag=false;return }
         if panDrag{panDrag=false;return}
         if isEraserTool{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return}
         if isSelectionTool{rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();return}
