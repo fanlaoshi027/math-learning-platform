@@ -13,6 +13,8 @@ struct BoardScreen: View {
     @State private var presetID = PenPreset.defaults[0].id
     @State private var rotationText = "0"
     @State private var toolbarDock: ToolbarDock = .top
+    @State private var isDraggingToolbar = false
+    @State private var dragLocation = CGPoint.zero
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var rotationBinding: Binding<String> {
@@ -29,6 +31,10 @@ struct BoardScreen: View {
                 MetalInkCanvas(tool: $tool, penStyle: preset.style, controller: controller)
                     .background(.white)
                     .padding(24)
+
+                if isDraggingToolbar {
+                    dockingGuides(for: proxy.size)
+                }
 
                 toolbar(in: proxy.size)
                     .frame(
@@ -178,10 +184,61 @@ struct BoardScreen: View {
             .help("拖动工具条到上、下、左、右")
             .gesture(
                 DragGesture(coordinateSpace: .named("board"))
+                    .onChanged { value in
+                        isDraggingToolbar = true
+                        dragLocation = value.location
+                    }
                     .onEnded { value in
                         toolbarDock = nearestDock(for: value.location, in: size)
+                        isDraggingToolbar = false
                     }
             )
+    }
+
+    @ViewBuilder
+    private func dockingGuides(for size: CGSize) -> some View {
+        let target = nearestDock(for: dragLocation, in: size)
+
+        ZStack {
+            edgeGuide(.top, selected: target == .top, size: size)
+            edgeGuide(.bottom, selected: target == .bottom, size: size)
+            edgeGuide(.left, selected: target == .left, size: size)
+            edgeGuide(.right, selected: target == .right, size: size)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func edgeGuide(_ dock: ToolbarDock, selected: Bool, size: CGSize) -> some View {
+        let thickness: CGFloat = selected ? 8 : 3
+        let opacity = selected ? 0.28 : 0.08
+
+        return Rectangle()
+            .fill(Color.accentColor.opacity(opacity))
+            .frame(
+                width: dock == .left || dock == .right ? thickness : size.width,
+                height: dock == .top || dock == .bottom ? thickness : size.height
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: edgeAlignment(dock))
+            .overlay(alignment: edgeAlignment(dock)) {
+                if selected {
+                    Text("停靠")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(12)
+                }
+            }
+    }
+
+    private func edgeAlignment(_ dock: ToolbarDock) -> Alignment {
+        switch dock {
+        case .top: return .top
+        case .bottom: return .bottom
+        case .left: return .leading
+        case .right: return .trailing
+        }
     }
 
     private func nearestDock(for point: CGPoint, in size: CGSize) -> ToolbarDock {
