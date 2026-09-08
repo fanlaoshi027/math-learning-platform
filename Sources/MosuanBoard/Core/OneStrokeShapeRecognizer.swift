@@ -2,7 +2,6 @@ import CoreGraphics
 import Foundation
 
 /// Cross-platform, input-device-independent recognition of simple one-stroke shapes.
-///
 /// The recognizer only proposes a structured object; the caller decides whether
 /// the global "一笔成型" switch is enabled and whether to accept the proposal.
 struct OneStrokeShapeRecognizer {
@@ -17,8 +16,6 @@ struct OneStrokeShapeRecognizer {
     struct Result: Equatable {
         let shape: Shape
         let score: CGFloat
-
-        /// Scores below this value should normally remain freehand strokes.
         var isConfident: Bool { score >= 0.72 }
     }
 
@@ -39,33 +36,18 @@ struct OneStrokeShapeRecognizer {
         guard points.count >= configuration.minimumPoints,
               let first = points.first,
               let last = points.last else { return nil }
-
         let length = pathLength(points)
         guard length >= configuration.minimumLength else { return nil }
-
         let bounds = boundingBox(points)
         guard bounds.width > 1 || bounds.height > 1 else { return nil }
 
         let endpointDistance = distance(first, last)
         let closed = endpointDistance <= max(bounds.width, bounds.height) * configuration.closedDistanceRatio
+        if !closed { return recognizeLine(points: points, length: length) }
 
-        if !closed {
-            if let line = recognizeLine(points: points, length: length) {
-                return line
-            }
-            return nil
-        }
-
-        if let rectangle = recognizeRectangle(points: points, bounds: bounds) {
-            return rectangle
-        }
-        if let triangle = recognizeTriangle(points: points, bounds: bounds) {
-            return triangle
-        }
-        if let ellipse = recognizeEllipse(points: points, bounds: bounds) {
-            return ellipse
-        }
-
+        if let rectangle = recognizeRectangle(points: points, bounds: bounds) { return rectangle }
+        if let triangle = recognizeTriangle(points: points, bounds: bounds) { return triangle }
+        if let ellipse = recognizeEllipse(points: points, bounds: bounds) { return ellipse }
         return nil
     }
 
@@ -74,8 +56,6 @@ struct OneStrokeShapeRecognizer {
         case let .line(start, end):
             return .line(from: start, to: end, style: style)
         case let .arrow(start, end):
-            // Arrow is represented as a structured line object with an explicit
-            // arrowhead marker in parameters so renderers can share geometry.
             var object = GraphicObject.line(from: start, to: end, style: style)
             object.kind = .arrow
             object.geometry.parameters["arrowHead"] = 1
@@ -90,20 +70,13 @@ struct OneStrokeShapeRecognizer {
         }
     }
 
-    // MARK: - Line / arrow
-
     private func recognizeLine(points: [CGPoint], length: CGFloat) -> Result? {
         guard let first = points.first, let last = points.last else { return nil }
         let direct = distance(first, last)
         guard direct > 0 else { return nil }
-
         let straightness = direct / max(length, 0.001)
         guard straightness >= configuration.lineStraightness else { return nil }
-
         let score = min(0.99, 0.72 + (straightness - configuration.lineStraightness) * 12)
-
-        // A short backward movement near the end is a useful, conservative
-        // signal for a hand-drawn arrowhead. Plain lines remain the default.
         if looksLikeArrow(points: points, shaftStart: first, shaftEnd: last) {
             return Result(shape: .arrow(start: first, end: last), score: min(score, 0.90))
         }
@@ -114,32 +87,24 @@ struct OneStrokeShapeRecognizer {
         guard points.count >= 10 else { return false }
         let total = pathLength(points)
         guard total > 0 else { return false }
-
         let tailDistance = max(total * 0.16, 8)
         var travelled: CGFloat = 0
         var candidates: [CGPoint] = []
         for index in stride(from: points.count - 1, through: 1, by: -1) {
-            let segment = distance(points[index], points[index - 1])
-            travelled += segment
+            travelled += distance(points[index], points[index - 1])
             candidates.append(points[index])
             if travelled >= tailDistance { break }
         }
         guard candidates.count >= 3 else { return false }
-
         let end = shaftEnd
         let shaftVector = CGVector(dx: end.x - shaftStart.x, dy: end.y - shaftStart.y)
         let shaftLength = hypot(shaftVector.dx, shaftVector.dy)
         guard shaftLength > 1 else { return false }
         let ux = shaftVector.dx / shaftLength
         let uy = shaftVector.dy / shaftLength
-
-        // Arrowheads deviate laterally from the shaft close to the endpoint.
         let lateral = candidates.map { abs(($0.x - end.x) * (-uy) + ($0.y - end.y) * ux) }
-        let maxLateral = lateral.max() ?? 0
-        return maxLateral >= max(4, shaftLength * 0.035)
+        return (lateral.max() ?? 0) >= max(4, shaftLength * 0.035)
     }
-
-    // MARK: - Closed shapes
 
     private func recognizeRectangle(points: [CGPoint], bounds: CGRect) -> Result? {
         guard bounds.width > 12, bounds.height > 12 else { return nil }
@@ -151,10 +116,9 @@ struct OneStrokeShapeRecognizer {
         ]
         let error = averageDistanceToPolyline(points, corners + [corners[0]]) / max(bounds.width, bounds.height)
         guard error <= configuration.shapeFitTolerance else { return nil }
-
         let aspect = min(bounds.width, bounds.height) / max(bounds.width, bounds.height)
         let score = min(0.98, 0.82 + (1 - min(error / configuration.shapeFitTolerance, 1)) * 0.10 + aspect * 0.04)
-        return Result(shape: .rectangle(bounds, ), score: score)
+        return Result(shape: .rectangle(bounds), score: score)
     }
 
     private func recognizeTriangle(points: [CGPoint], bounds: CGRect) -> Result? {
@@ -173,7 +137,6 @@ struct OneStrokeShapeRecognizer {
         let rx = bounds.width / 2
         let ry = bounds.height / 2
         guard rx > 0, ry > 0 else { return nil }
-
         var error: CGFloat = 0
         for point in points {
             let nx = (point.x - center.x) / rx
@@ -182,20 +145,15 @@ struct OneStrokeShapeRecognizer {
         }
         error /= CGFloat(points.count)
         guard error <= configuration.shapeFitTolerance else { return nil }
-
         return Result(shape: .ellipse(bounds), score: min(0.96, 0.80 + (1 - error / configuration.shapeFitTolerance) * 0.14))
     }
-
-    // MARK: - Geometry helpers
 
     private func simplified(_ input: [CGPoint]) -> [CGPoint] {
         guard input.count > 2 else { return input }
         var output: [CGPoint] = [input[0]]
         let minimumSpacing: CGFloat = 1.5
         for point in input.dropFirst() {
-            if distance(output[output.count - 1], point) >= minimumSpacing {
-                output.append(point)
-            }
+            if distance(output[output.count - 1], point) >= minimumSpacing { output.append(point) }
         }
         return output
     }
@@ -215,18 +173,14 @@ struct OneStrokeShapeRecognizer {
         return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
-    private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-        hypot(a.x - b.x, a.y - b.y)
-    }
+    private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
 
     private func averageDistanceToPolyline(_ points: [CGPoint], _ polyline: [CGPoint]) -> CGFloat {
         guard polyline.count >= 2 else { return .greatestFiniteMagnitude }
         var total: CGFloat = 0
         for point in points {
             var best = CGFloat.greatestFiniteMagnitude
-            for i in 0..<(polyline.count - 1) {
-                best = min(best, distance(point, polyline[i], polyline[i + 1]))
-            }
+            for i in 0..<(polyline.count - 1) { best = min(best, distance(point, polyline[i], polyline[i + 1])) }
             total += best
         }
         return total / CGFloat(max(points.count, 1))
@@ -248,15 +202,15 @@ struct OneStrokeShapeRecognizer {
             points.max { $0.x < $1.x }
         ].compactMap { $0 }
         var unique: [CGPoint] = []
-        for p in candidates where unique.allSatisfy({ distance($0, p) > max(bounds.width, bounds.height) * 0.12 }) {
-            unique.append(p)
-        }
+        for p in candidates where unique.allSatisfy({ distance($0, p) > max(bounds.width, bounds.height) * 0.12 }) { unique.append(p) }
         return unique
     }
 
     private func orderedPolygon(_ points: [CGPoint]) -> [CGPoint] {
-        let center = CGPoint(x: points.reduce(0) { $0 + $1.x } / CGFloat(points.count),
-                             y: points.reduce(0) { $0 + $1.y } / CGFloat(points.count))
+        let center = CGPoint(
+            x: points.reduce(0) { $0 + $1.x } / CGFloat(points.count),
+            y: points.reduce(0) { $0 + $1.y } / CGFloat(points.count)
+        )
         return points.sorted {
             atan2($0.y - center.y, $0.x - center.x) < atan2($1.y - center.y, $1.x - center.x)
         }
