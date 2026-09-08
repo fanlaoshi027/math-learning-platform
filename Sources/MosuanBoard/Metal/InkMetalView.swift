@@ -8,6 +8,7 @@ final class InkMetalView: MTKView {
     private var eraserPoints:[SIMD2<Float>]=[]
     private var active=false
     private var selectionDrag=false
+    private var temporarySelectHeld=false
     private var resizeHandle:InkRenderer.SelectionHandle?
     private var rotationDrag=false
     private var panDrag=false
@@ -45,31 +46,36 @@ final class InkMetalView: MTKView {
     func zoomIn(){renderer.zoom(by:1.2,around:SIMD2(Float(bounds.midX),Float(bounds.midY)));onZoomChanged?(renderer.zoomPercent);draw()}
     func zoomOut(){renderer.zoom(by:1/1.2,around:SIMD2(Float(bounds.midX),Float(bounds.midY)));onZoomChanged?(renderer.zoomPercent);draw()}
     private func notifyState(){onHistoryChanged?();onSelectionChanged?();onPageStateChanged?(renderer.exportPageState())}
+    private var selectionModeActive:Bool { isSelectionTool || temporarySelectHeld }
 
     override func mouseDown(with event:NSEvent){window?.makeFirstResponder(self);let p=makePoint(from:event)
         if event.buttonNumber == 2 { middleButtonHeld=true; panDrag=true; lastPoint=p; return }
         if spaceHeld {panDrag=true;lastPoint=p;return}
-        if isEraserTool {renderer.beginHistoryTransaction();eraserPoints=[p];return}
-        if isSelectionTool {if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return};if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return};selectionDrag=renderer.selectStroke(at:p);lastPoint=p;onSelectionChanged?();draw();return}
+        if isEraserTool && !temporarySelectHeld {renderer.beginHistoryTransaction();eraserPoints=[p];return}
+        if selectionModeActive {
+            if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return}
+            if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return}
+            selectionDrag=renderer.selectStroke(at:p);lastPoint=p;onSelectionChanged?();draw();return
+        }
         guard isUserInteractionEnabledForTool else{return};renderer.beginHistoryTransaction();active=true;smartLineDetected=false;smartLineWorkItem?.cancel();let c=renderer.canvasPoint(from:p);points=[InkPoint(x:c.x,y:c.y,pressure:event.pressure>0 ? Float(event.pressure):1)];renderer.setStroke(points);draw()
     }
     override func mouseDragged(with event:NSEvent){let p=makePoint(from:event)
         if panDrag {renderer.pan(by:p-lastPoint);lastPoint=p;draw();return}
-        if isEraserTool {eraserPoints.append(p);return}
-        if isSelectionTool {if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return};if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);draw();return};guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;draw()};return}
+        if isEraserTool && !temporarySelectHeld {eraserPoints.append(p);return}
+        if selectionModeActive {if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return};if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);draw();return};guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;draw()};return}
         guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));if isLineTool || (isSmartLineTool && smartLineDetected){renderer.setStroke(linePreview(from:points))}else{renderer.setStroke(points)};scheduleSmartLineDetection();draw()
     }
     override func mouseUp(with event:NSEvent){smartLineWorkItem?.cancel();let p=makePoint(from:event)
         if event.buttonNumber == 2 || middleButtonHeld { middleButtonHeld=false;panDrag=false;return }
         if panDrag{panDrag=false;return}
-        if isEraserTool{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return}
-        if isSelectionTool{rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();return}
+        if isEraserTool && !temporarySelectHeld{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return}
+        if selectionModeActive{rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();return}
         guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));let committed=(isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points;renderer.commitStroke(committed);renderer.endHistoryTransaction();points.removeAll(keepingCapacity:true);active=false;smartLineDetected=false;renderer.setStroke([]);notifyState();draw()
     }
 
     override func scrollWheel(with event:NSEvent){let p=makePoint(from:event);if event.modifierFlags.contains(.command){let factor=powf(1.0018,Float(event.scrollingDeltaY));renderer.zoom(by:factor,around:p);onZoomChanged?(renderer.zoomPercent);draw()}else{renderer.pan(by:SIMD2(Float(event.scrollingDeltaX),Float(event.scrollingDeltaY)));draw()}}
-    override func keyDown(with event:NSEvent){if event.isARepeat{return};if event.keyCode==49{spaceHeld=true;return};if isSelectionTool && event.keyCode==51{deleteSelected();return};if event.modifierFlags.contains(.command) && event.keyCode==24{zoomIn();return};if event.modifierFlags.contains(.command) && event.keyCode==27{zoomOut();return};if event.modifierFlags.contains(.command) && event.keyCode==36{resetZoom();return};super.keyDown(with:event)}
-    override func keyUp(with event:NSEvent){if event.keyCode==49{spaceHeld=false;panDrag=false;return};super.keyUp(with:event)}
+    override func keyDown(with event:NSEvent){if event.isARepeat{return};if event.keyCode==58{temporarySelectHeld=true;return};if event.keyCode==49{spaceHeld=true;return};if selectionModeActive && event.keyCode==51{deleteSelected();return};if event.modifierFlags.contains(.command) && event.keyCode==24{zoomIn();return};if event.modifierFlags.contains(.command) && event.keyCode==27{zoomOut();return};if event.modifierFlags.contains(.command) && event.keyCode==36{resetZoom();return};super.keyDown(with:event)}
+    override func keyUp(with event:NSEvent){if event.keyCode==58{temporarySelectHeld=false;return};if event.keyCode==49{spaceHeld=false;panDrag=false;return};super.keyUp(with:event)}
     override func tabletPoint(with event:NSEvent){switch event.phase{case .began:mouseDown(with:event);case .changed:mouseDragged(with:event);case .ended:mouseUp(with:event);case .cancelled:smartLineWorkItem?.cancel();active=false;points.removeAll(keepingCapacity:true);renderer.setStroke([]);renderer.endHistoryTransaction();draw();default:break}}
 
     private func scheduleSmartLineDetection(){guard isSmartLineTool,points.count>=4 else{return};smartLineWorkItem?.cancel();let work=DispatchWorkItem{[weak self] in guard let self,self.active,self.isSmartLineTool,self.points.count>=4 else{return};if self.isLikelyStraightLine(self.points){self.smartLineDetected=true;self.renderer.setStroke(self.linePreview(from:self.points));self.draw()}};smartLineWorkItem=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.18,execute:work)}
