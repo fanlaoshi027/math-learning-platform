@@ -14,7 +14,8 @@ let package = Package(
                 "BoardScreenFixed.swift",
                 "Metal/InkRenderer.swift",
                 "Core/GraphicObjectStore.swift",
-                "Core/GraphicObjectStoreFixed.swift"
+                "Core/GraphicObjectStoreFixed.swift",
+                "Core/GraphicObjectStoreV2.swift"
             ],
             resources: [.process("Metal/InkShaders.metal")]
         )
