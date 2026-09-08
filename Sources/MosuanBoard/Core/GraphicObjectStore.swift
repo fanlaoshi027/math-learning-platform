@@ -45,7 +45,7 @@ final class GraphicObjectStore {
         for object in objects where object.kind == .line {
             guard object.geometry.points.count >= 2 else { continue }
             for endpoint in 0...1 {
-                let p = object.geometry.points[endpoint]
+                let p = transformedPoint(object.geometry.points[endpoint], in: object)
                 let d = hypot(p.x - point.x, p.y - point.y)
                 guard d <= tolerance else { continue }
                 if best == nil || d < best!.distance {
@@ -54,6 +54,65 @@ final class GraphicObjectStore {
             }
         }
         return best
+    }
+
+    /// Returns the axis-aligned bounds of an object's transformed geometry.
+    func bounds(of id: UUID) -> CGRect? {
+        guard let object = object(with: id) else { return nil }
+        return bounds(of: object)
+    }
+
+    func bounds(of object: GraphicObject) -> CGRect? {
+        let points: [CGPoint]
+        switch object.kind {
+        case .line, .polygon, .arrow, .freehandStroke:
+            points = object.geometry.points
+        case .rectangle, .ellipse, .coordinateSystem, .functionGraph:
+            points = [
+                CGPoint(x: object.geometry.x, y: object.geometry.y),
+                CGPoint(x: object.geometry.x + object.geometry.width, y: object.geometry.y + object.geometry.height)
+            ]
+        case .group:
+            return object.children.compactMap(bounds(of:)).reduce(nil) { partial, next in
+                partial?.union(next) ?? next
+            }
+        }
+        guard let first = points.first else { return nil }
+        var result = CGRect(origin: transformedPoint(first, in: object), size: .zero)
+        for point in points.dropFirst() {
+            result = result.union(CGRect(origin: transformedPoint(point, in: object), size: .zero))
+        }
+        return result.insetBy(dx: -max(1, object.style.strokeWidth), dy: -max(1, object.style.strokeWidth))
+    }
+
+    /// Hit-tests a structured object in object/world coordinates.
+    func hitTest(at point: CGPoint, tolerance: CGFloat = 10) -> UUID? {
+        for object in objects.reversed() {
+            if hitTest(object, at: point, tolerance: tolerance) { return object.id }
+        }
+        return nil
+    }
+
+    private func hitTest(_ object: GraphicObject, at point: CGPoint, tolerance: CGFloat) -> Bool {
+        switch object.kind {
+        case .line, .arrow:
+            guard object.geometry.points.count >= 2 else { return false }
+            let a = transformedPoint(object.geometry.points[0], in: object)
+            let b = transformedPoint(object.geometry.points[1], in: object)
+            return distance(point, toSegment: a, b) <= tolerance + object.style.strokeWidth
+        case .polygon:
+            guard object.geometry.points.count >= 2 else { return false }
+            let transformed = object.geometry.points.map { transformedPoint($0, in: object) }
+            return zip(transformed, transformed.dropFirst()).contains { distance(point, toSegment: $0, $1) <= tolerance + object.style.strokeWidth }
+        case .rectangle, .ellipse, .coordinateSystem, .functionGraph:
+            return bounds(of: object)?.insetBy(dx: -tolerance, dy: -tolerance).contains(point) == true
+        case .freehandStroke:
+            guard object.geometry.points.count >= 2 else { return false }
+            let points = object.geometry.points.map { transformedPoint($0, in: object) }
+            return zip(points, points.dropFirst()).contains { distance(point, toSegment: $0, $1) <= tolerance + object.style.strokeWidth }
+        case .group:
+            return object.children.contains { hitTest($0, at: point, tolerance: tolerance) }
+        }
     }
 
     /// Moves one endpoint of a structured line while preserving the other endpoint.
@@ -67,11 +126,46 @@ final class GraphicObjectStore {
         return true
     }
 
+    /// Applies a transform to an object without rewriting its source geometry.
+    @discardableResult
+    func transform(id: UUID, scale: CGSize? = nil, rotation: CGFloat? = nil, position: CGPoint? = nil) -> Bool {
+        guard let index = objects.firstIndex(where: { $0.id == id }) else { return false }
+        if let scale { objects[index].transform.scale = scale }
+        if let rotation { objects[index].transform.rotation = rotation }
+        if let position { objects[index].transform.position = position }
+        return true
+    }
+
     func exportObjects() -> [GraphicObject] {
         objects
     }
 
     func importObjects(_ value: [GraphicObject]) {
         objects = value
+    }
+
+    private func transformedPoint(_ point: CGPoint, in object: GraphicObject) -> CGPoint {
+        let center = object.transform.rotationCenter
+        let translated = CGPoint(x: point.x - center.x, y: point.y - center.y)
+        let scaled = CGPoint(
+            x: translated.x * object.transform.scale.width,
+            y: translated.y * object.transform.scale.height
+        )
+        let c = cos(object.transform.rotation)
+        let s = sin(object.transform.rotation)
+        return CGPoint(
+            x: scaled.x * c - scaled.y * s + center.x + object.transform.position.x,
+            y: scaled.x * s + scaled.y * c + center.y + object.transform.position.y
+        )
+    }
+
+    private func distance(_ point: CGPoint, toSegment a: CGPoint, _ b: CGPoint) -> CGFloat {
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        let lengthSquared = dx * dx + dy * dy
+        if lengthSquared == 0 { return hypot(point.x - a.x, point.y - a.y) }
+        let t = max(0, min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared))
+        let projection = CGPoint(x: a.x + t * dx, y: a.y + t * dy)
+        return hypot(point.x - projection.x, point.y - projection.y)
     }
 }
