@@ -118,6 +118,22 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     @discardableResult func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { let p = canvasPoint(from: point); var hit: Int?; var best = tolerance / zoomScale; for i in committedStrokes.indices.reversed() { let s = committedStrokes[i].points; guard s.count > 1 else { continue }; for j in 0..<(s.count-1) { let d = distance(p, SIMD2(s[j].x,s[j].y), SIMD2(s[j+1].x,s[j+1].y)); if d <= best { best = d; hit = i; break } } }; selectedStrokeIndices = hit.map { [$0] } ?? []; selectedObjectIDs = []; rebuildGeometry(); return hit != nil }
     @discardableResult func toggleStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { selectStroke(at: point, tolerance: tolerance) }
     @discardableResult func selectStrokes(in viewRect: CGRect, fullyContained: Bool = false) -> Int { let a = canvasPoint(from: SIMD2(Float(viewRect.minX),Float(viewRect.minY))); let b = canvasPoint(from: SIMD2(Float(viewRect.maxX),Float(viewRect.maxY))); let r = CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(a.x-b.x)), height: CGFloat(abs(a.y-b.y))); let result = committedStrokes.indices.filter { guard let b = bounds(committedStrokes[$0].points) else { return false }; return fullyContained ? r.contains(b) : r.intersects(b) }; selectedStrokeIndices = Array(result); selectedObjectIDs = []; rebuildGeometry(); return result.count }
+
+    /// Selects both structured objects and freehand strokes touched by a closed lasso.
+    /// The lasso itself is supplied in view coordinates; content is tested in canvas coordinates.
+    @discardableResult func selectLasso(in viewPoints: [SIMD2<Float>]) -> Int {
+        guard viewPoints.count >= 3 else { clearSelection(); return 0 }
+        let lasso = viewPoints.map { p in
+            let c = canvasPoint(from: p)
+            return CGPoint(x: CGFloat(c.x), y: CGFloat(c.y))
+        }
+        selectedObjectIDs = objectStore.objectsIntersectingLasso(lasso)
+        selectedStrokeIndices = committedStrokes.indices.filter { strokeIntersectsLasso(committedStrokes[$0].points, lasso) }
+        customRotationCenter = nil
+        rebuildGeometry()
+        return selectionCount
+    }
+
     func clearSelection() { selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; rebuildGeometry() }
 
     func selectionBounds() -> CGRect? { var result: CGRect?; for i in selectedStrokeIndices { if let b = bounds(committedStrokes[i].points) { result = result?.union(b) ?? b } }; for id in selectedObjectIDs { if let b = objectStore.bounds(of: id) { result = result?.union(b) ?? b } }; return result?.insetBy(dx: -8, dy: -8) }
@@ -125,7 +141,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func selectionCenter() -> SIMD2<Float>? { guard let r = selectionBounds() else { return nil }; return SIMD2(Float(r.midX), Float(r.midY)) }
     func setRotationCenter(to point: SIMD2<Float>) { customRotationCenter = canvasPoint(from: point); rebuildGeometry() }
     func rotationCenterViewPoint() -> SIMD2<Float>? { guard let c = customRotationCenter ?? selectionCenter() else { return nil }; return viewPoint(from: c) }
-    func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? { guard let r = selectionBounds() else { return nil }; let p = canvasPoint(from: point); let t = tolerance / zoomScale; let h:[(SelectionHandle,SIMD2<Float>)] = [(.topLeft,SIMD2(Float(r.minX),Float(r.minY))),(.topRight,SIMD2(Float(r.maxX),Float(r.minY))),(.bottomLeft,SIMD2(Float(r.minX),Float(r.maxY))),(.bottomRight,SIMD2(Float(r.maxX),Float(r.minY)))]; return h.first { simd_distance(p,$0.1) <= t }?.0 }
+    func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? { guard let r = selectionBounds() else { return nil }; let p = canvasPoint(from: point); let t = tolerance / zoomScale; let h:[(SelectionHandle,SIMD2<Float>)] = [(.topLeft,SIMD2(Float(r.minX),Float(r.minY))),(.topRight,SIMD2(Float(r.maxX),Float(r.minY))),(.bottomLeft,SIMD2(Float(r.minX),Float(r.maxY))),(.bottomRight,SIMD2(Float(r.maxX),Float(r.maxY)))]; return h.first { simd_distance(p,$0.1) <= t }?.0 }
     func rotationHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool { guard let r = selectionBounds() else { return false }; let p = canvasPoint(from: point); return simd_distance(p,SIMD2(Float(r.midX),Float(r.minY-28))) <= tolerance / zoomScale }
     func rotationCenterHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool { guard customRotationCenter != nil, let c = rotationCenterViewPoint() else { return false }; return simd_distance(point,c) <= tolerance }
 
@@ -147,6 +163,20 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func appendStroke(_ s:[InkPoint],style:PenStyle,to out:inout[InkVertex]) { guard !s.isEmpty else { return }; let color=metalColor(style); if s.count>1 { for i in 0..<(s.count-1) { let p=s[i],q=s[i+1],dx=q.x-p.x,dy=q.y-p.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/l,ny=dx/l,w0=strokeWidth(p.pressure,style),w1=strokeWidth(q.pressure,style); let a=viewPoint(from:SIMD2(p.x+nx*w0,p.y+ny*w0)),b=viewPoint(from:SIMD2(p.x-nx*w0,p.y-ny*w0)),c=viewPoint(from:SIMD2(q.x+nx*w1,q.y+ny*w1)),d=viewPoint(from:SIMD2(q.x-nx*w1,q.y-ny*w1)); triangle(a,b,c,color:color,to:&out); triangle(c,b,d,color:color,to:&out) } }; for p in s { disk(viewPoint(from:SIMD2(p.x,p.y)), strokeWidth(p.pressure,style), color, to:&out) } }
     private func appendSelection(_ r:CGRect,to out:inout[InkVertex]) { let c=SIMD4<Float>(0.1,0.45,1,0.75),a=viewPoint(from:SIMD2(Float(r.minX),Float(r.minY))),b=viewPoint(from:SIMD2(Float(r.maxX),Float(r.maxY))),p0=SIMD2(a.x,a.y),p1=SIMD2(b.x,a.y),p2=SIMD2(b.x,b.y),p3=SIMD2(a.x,b.y); appendLine(p0,p1,width:1.5,color:c,to:&out);appendLine(p1,p2,width:1.5,color:c,to:&out);appendLine(p2,p3,width:1.5,color:c,to:&out);appendLine(p3,p0,width:1.5,color:c,to:&out);for p in [p0,p1,p2,p3] { disk(p,5,c,to:&out) };let rot=SIMD2((a.x+b.x)/2,a.y-28);appendLine(SIMD2((a.x+b.x)/2,a.y),rot,width:1,color:c,to:&out);disk(rot,7,c,to:&out);if let rc=customRotationCenter { disk(viewPoint(from:rc),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) };if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .line { for q in objectStore.transformedPoints(of:o).prefix(2) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) } } else if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .polygon { for q in objectStore.transformedPoints(of:o) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out) } } }
     private func bounds(_ p:[InkPoint])->CGRect? { guard let f=p.first else { return nil }; var x0=f.x,x1=f.x,y0=f.y,y1=f.y;for q in p{x0=min(x0,q.x);x1=max(x1,q.x);y0=min(y0,q.y);y1=max(y1,q.y)};return CGRect(x:CGFloat(x0),y:CGFloat(y0),width:CGFloat(x1-x0),height:CGFloat(y1-y0)) }
+    private func strokeIntersectsLasso(_ stroke:[InkPoint], _ lasso:[CGPoint])->Bool {
+        guard stroke.count >= 2, lasso.count >= 3 else { return false }
+        if stroke.contains(where: { pointInPolygon(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)), lasso) }) { return true }
+        for pair in zip(stroke, stroke.dropFirst()) {
+            let a = CGPoint(x: CGFloat(pair.0.x), y: CGFloat(pair.0.y))
+            let b = CGPoint(x: CGFloat(pair.1.x), y: CGFloat(pair.1.y))
+            if segmentIntersectsPolygon(a, b, lasso) { return true }
+        }
+        return false
+    }
+    private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool { var inside=false; var j=poly.count-1; for i in poly.indices { let a=poly[i],b=poly[j]; if (a.y > p.y) != (b.y > p.y) { let d=b.y-a.y; if d != 0 { let x=(b.x-a.x)*(p.y-a.y)/d+a.x; if p.x < x { inside.toggle() } } }; j=i }; return inside }
+    private func segmentIntersectsPolygon(_ a:CGPoint,_ b:CGPoint,_ polygon:[CGPoint])->Bool { if pointInPolygon(a,polygon) || pointInPolygon(b,polygon) { return true }; var edges=Array(polygon.dropFirst()); edges.append(polygon[0]); return zip(polygon,edges).contains { segmentsIntersect(a,b,$0.0,$0.1) } }
+    private func segmentsIntersect(_ a:CGPoint,_ b:CGPoint,_ c:CGPoint,_ d:CGPoint)->Bool { func cross(_ p:CGPoint,_ q:CGPoint,_ r:CGPoint)->CGFloat { (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x) }; let o1=cross(a,b,c),o2=cross(a,b,d),o3=cross(c,d,a),o4=cross(c,d,b); let eps:CGFloat=0.001; if abs(o1)<eps && onSegment(a,b,c){return true}; if abs(o2)<eps && onSegment(a,b,d){return true}; if abs(o3)<eps && onSegment(c,d,a){return true}; if abs(o4)<eps && onSegment(c,d,b){return true}; return (o1 > 0) != (o2 > 0) && (o3 > 0) != (o4 > 0) }
+    private func onSegment(_ a:CGPoint,_ b:CGPoint,_ p:CGPoint)->Bool { p.x >= min(a.x,b.x)-0.001 && p.x <= max(a.x,b.x)+0.001 && p.y >= min(a.y,b.y)-0.001 && p.y <= max(a.y,b.y)+0.001 }
     private func appendLine(_ a:SIMD2<Float>,_ b:SIMD2<Float>,width:Float,color:SIMD4<Float>,to out:inout[InkVertex]) { let d=b-a,l=max(simd_length(d),0.001),n=SIMD2(-d.y,d.x)/l*width;triangle(a+n,a-n,b+n,color:color,to:&out);triangle(b+n,a-n,b-n,color:color,to:&out) }
     private func distance(_ p:SIMD2<Float>,_ a:SIMD2<Float>,_ b:SIMD2<Float>)->Float { let d=b-a,l=simd_length_squared(d);if l<0.0001{return simd_distance(p,a)};let t=max(0,min(1,simd_dot(p-a,d)/l));return simd_distance(p,a+d*t) }
     private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float { let p=max(0,min(1,pressure));let c=style.pressureEnabled ? pow(p,max(0.25,Float(style.pressureCurve))):0.75;return Float(style.width)*(0.45+0.75*c) }
