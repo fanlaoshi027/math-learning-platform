@@ -1,7 +1,8 @@
 import Foundation
 
-/// Persistent page metadata. The actual ink/object layer will be attached to this page model
-/// as the document engine is expanded.
+/// One page in a Mosuan document.
+/// Page metadata and its actual canvas content travel together so switching pages never
+/// loses strokes or structured graphic objects.
 struct BoardPage: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
@@ -9,6 +10,7 @@ struct BoardPage: Identifiable, Codable, Equatable {
     var height: Double
     var background: String
     var pattern: Int
+    var content: CanvasPageState
 
     init(
         id: UUID = UUID(),
@@ -16,7 +18,8 @@ struct BoardPage: Identifiable, Codable, Equatable {
         width: Double = 1280,
         height: Double = 720,
         background: String = "white",
-        pattern: Int = 0
+        pattern: Int = 0,
+        content: CanvasPageState = CanvasPageState()
     ) {
         self.id = id
         self.title = title
@@ -24,11 +27,12 @@ struct BoardPage: Identifiable, Codable, Equatable {
         self.height = height
         self.background = background
         self.pattern = pattern
+        self.content = content
     }
 }
 
-/// The document-level page container. Page content is deliberately kept separate from
-/// the UI so PDF pages, whiteboard pages and future .mosuan persistence can share it.
+/// Document-level page container. This is intentionally platform-independent so the same
+/// model can later be used by macOS, iPadOS and Windows implementations.
 struct MosuanDocument: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
@@ -57,17 +61,18 @@ struct MosuanDocument: Identifiable, Codable, Equatable {
 
     mutating func addPage(after index: Int? = nil, template: BoardPage? = nil) {
         let source = template ?? currentPage ?? BoardPage()
-        var page = source
-        page = BoardPage(
+        let page = BoardPage(
             title: "第 \(pages.count + 1) 页",
             width: source.width,
             height: source.height,
             background: source.background,
-            pattern: source.pattern
+            pattern: source.pattern,
+            content: template == nil ? CanvasPageState() : source.content
         )
         let insertionIndex = min(max((index ?? currentPageIndex) + 1, 0), pages.count)
         pages.insert(page, at: insertionIndex)
         currentPageIndex = insertionIndex
+        renumberUntitledPages()
     }
 
     mutating func duplicateCurrentPage() {
@@ -79,11 +84,11 @@ struct MosuanDocument: Identifiable, Codable, Equatable {
         guard pages.count > 1, pages.indices.contains(index) else { return }
         pages.remove(at: index)
         currentPageIndex = min(currentPageIndex, pages.count - 1)
-        if index < currentPageIndex { currentPageIndex -= 1 }
+        renumberUntitledPages()
     }
 
     mutating func movePage(from source: Int, to destination: Int) {
-        guard pages.indices.contains(source), destination >= 0, destination < pages.count, source != destination else { return }
+        guard pages.indices.contains(source), pages.indices.contains(destination), source != destination else { return }
         let page = pages.remove(at: source)
         pages.insert(page, at: destination)
         if currentPageIndex == source {
@@ -92,6 +97,28 @@ struct MosuanDocument: Identifiable, Codable, Equatable {
             currentPageIndex -= 1
         } else if source > currentPageIndex && destination <= currentPageIndex {
             currentPageIndex += 1
+        }
+    }
+
+    mutating func updateCurrentPageContent(_ content: CanvasPageState) {
+        guard pages.indices.contains(currentPageIndex) else { return }
+        pages[currentPageIndex].content = content
+    }
+
+    mutating func updatePageContent(_ content: CanvasPageState, at index: Int) {
+        guard pages.indices.contains(index) else { return }
+        pages[index].content = content
+    }
+
+    mutating func updateCurrentPageAppearance(background: String, pattern: Int) {
+        guard pages.indices.contains(currentPageIndex) else { return }
+        pages[currentPageIndex].background = background
+        pages[currentPageIndex].pattern = pattern
+    }
+
+    private mutating func renumberUntitledPages() {
+        for index in pages.indices where pages[index].title.hasPrefix("第 ") {
+            pages[index].title = "第 \(index + 1) 页"
         }
     }
 }
