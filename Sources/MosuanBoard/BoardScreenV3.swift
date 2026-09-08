@@ -15,6 +15,7 @@ struct BoardScreen: View {
     @State private var inverted = false
     @State private var eyeComfortBackground: EyeComfortBackground = .black90
     @State private var customHex = "1A1A1A"
+    @State private var interfaceTheme: BoardInterfaceTheme = .light
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var toolbarIsVertical: Bool { toolbarDock == .left || toolbarDock == .right }
@@ -52,12 +53,15 @@ struct BoardScreen: View {
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.toolbarDock"), let saved=ToolbarDock(rawValue:raw) { toolbarDock=saved }
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.eyeComfortBackground"), let saved=EyeComfortBackground(rawValue:raw) { eyeComfortBackground=saved }
                 if let saved=UserDefaults.standard.string(forKey:"mosuan.customHex") { customHex=saved }
+                if let raw=UserDefaults.standard.string(forKey:"mosuan.interfaceTheme"), let saved=BoardInterfaceTheme(rawValue:raw) { interfaceTheme=saved }
             }
             .onChange(of:toolbarDock) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.toolbarDock") }
             .onChange(of:eyeComfortBackground) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.eyeComfortBackground") }
             .onChange(of:customHex) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.customHex") }
+            .onChange(of:interfaceTheme) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.interfaceTheme") }
         }
         .frame(minWidth:1100,minHeight:700)
+        .preferredColorScheme(interfaceTheme.colorScheme)
     }
 
     private var toolbarAlignment:Alignment { switch toolbarDock { case .top:.top; case .bottom:.bottom; case .left:.leading; case .right:.trailing } }
@@ -117,6 +121,15 @@ struct BoardScreen: View {
                 Menu { ForEach(EyeComfortBackground.allCases) { item in Button(item.title) { eyeComfortBackground=item } } } label: { Label(eyeComfortBackground.title,systemImage:"moon.fill") }.menuStyle(.borderlessButton)
             }
         }
+        Menu {
+            ForEach(BoardInterfaceTheme.allCases) { item in
+                Button { interfaceTheme = item } label: {
+                    Label(item.title, systemImage: item.systemImage)
+                }
+            }
+        } label: {
+            Label(interfaceTheme.title, systemImage: interfaceTheme.systemImage)
+        }.menuStyle(.borderlessButton)
         if controller.hasSelection {
             TextField("角度",text:Binding(get:{rotationText},set:{rotationText=$0})).frame(width:58).textFieldStyle(.roundedBorder).onSubmit { if let d=Double(rotationText) { controller.setRotationDegrees(d) } }
             Text("°")
