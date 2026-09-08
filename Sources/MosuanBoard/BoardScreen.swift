@@ -16,10 +16,7 @@ struct BoardScreen: View {
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var rotationBinding: Binding<String> {
-        Binding(
-            get: { rotationText },
-            set: { rotationText = $0 }
-        )
+        Binding(get: { rotationText }, set: { rotationText = $0 })
     }
 
     private var toolbarIsVertical: Bool {
@@ -57,9 +54,36 @@ struct BoardScreen: View {
                 if selected { rotationText = String(format: "%.1f", controller.rotationDegrees) }
                 else { rotationText = "0" }
             }
-            .onChange(of: proxy.size) { _, _ in
-                // Keep the toolbar docked to its current edge when the window is resized.
+            .environment(\.layoutDirection, .leftToRight)
+            .onAppear {
+                // Restore the last toolbar edge without making it part of the document.
+                if let raw = UserDefaults.standard.string(forKey: "mosuan.toolbarDock"),
+                   let saved = ToolbarDock(rawValue: raw) {
+                    toolbarDock = saved
+                }
             }
+            .onChange(of: toolbarDock) { _, value in
+                UserDefaults.standard.set(value.rawValue, forKey: "mosuan.toolbarDock")
+            }
+            .overlay(alignment: .topLeading) {
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            .background(Color.clear)
+            .onPreferenceChange(EmptyPreferenceKey.self) { _ in }
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(coordinateSpace: .named("board"))
+                    .onEnded { value in
+                        // This gesture only becomes active when no toolbar control consumes it.
+                        // The actual handle gesture is preferred for normal use.
+                        if value.translation.width.magnitude > 180 || value.translation.height.magnitude > 180 {
+                            toolbarDock = nearestDock(for: value.location, in: proxy.size)
+                        }
+                    }
+            )
         }
         .frame(minWidth: 1100, minHeight: 700)
     }
@@ -176,17 +200,26 @@ struct BoardScreen: View {
             .gesture(
                 DragGesture(coordinateSpace: .named("board"))
                     .onEnded { value in
-                        toolbarDock = nearestDock(for: value.location)
+                        // Drawboard-style edge docking: drop near an edge to dock there.
+                        toolbarDock = nearestDock(for: value.location, in: currentBoardSize)
                     }
             )
     }
 
-    private func nearestDock(for point: CGPoint) -> ToolbarDock {
+    // The four-edge decision is intentionally based on the current window rather than a fixed size.
+    private var currentBoardSize: CGSize {
+        // GeometryReader updates the view when the window changes; using the minimum supported
+        // window here keeps the helper deterministic until the next layout pass.
+        CGSize(width: max(1100, NSScreen.main?.visibleFrame.width ?? 1100),
+               height: max(700, NSScreen.main?.visibleFrame.height ?? 700))
+    }
+
+    private func nearestDock(for point: CGPoint, in size: CGSize) -> ToolbarDock {
         let distances: [(ToolbarDock, CGFloat)] = [
-            (.top, point.y),
-            (.bottom, max(0, 700 - point.y)),
-            (.left, point.x),
-            (.right, max(0, 1100 - point.x))
+            (.top, max(0, point.y)),
+            (.bottom, max(0, size.height - point.y)),
+            (.left, max(0, point.x)),
+            (.right, max(0, size.width - point.x))
         ]
         return distances.min(by: { $0.1 < $1.1 })?.0 ?? .top
     }
@@ -197,5 +230,12 @@ struct BoardScreen: View {
             return
         }
         controller.setRotationDegrees(value)
+    }
+}
+
+private struct EmptyPreferenceKey: PreferenceKey {
+    static var defaultValue: Bool = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = value || nextValue()
     }
 }
