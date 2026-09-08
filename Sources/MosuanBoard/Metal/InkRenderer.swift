@@ -6,7 +6,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     enum SelectionHandle { case topLeft, topRight, bottomLeft, bottomRight }
     private struct Uniforms { var viewportSize: SIMD2<Float> }
     private struct StoredStroke { var id: UUID; var points: [InkPoint]; var style: PenStyle; var rotation: Float = 0 }
-    private struct HistoryState { var strokes: [StoredStroke]; var selection: Int? }
+    private struct HistoryState { var strokes: [StoredStroke]; var selection: [Int] }
 
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
@@ -17,218 +17,77 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var vertexBuffer: (any MTLBuffer)?
     private var uniformBuffer: (any MTLBuffer)?
     private var penStyle = PenStyle()
-    private(set) var selectedStrokeIndex: Int?
-    private var backgroundColor = SIMD4<Float>(1, 1, 1, 1)
+    private(set) var selectedStrokeIndices: [Int] = []
+    private var customRotationCenter: SIMD2<Float>?
+    private var backgroundColor = SIMD4<Float>(1,1,1,1)
     private var displayInverted = false
     private var backgroundPattern = 0
-    private var panOffset = SIMD2<Float>(0, 0)
+    private var panOffset = SIMD2<Float>(0,0)
     private var zoomScale: Float = 1
-    private var undoStack: [HistoryState] = []
-    private var redoStack: [HistoryState] = []
-    private var transactionStart: HistoryState?
+    private var undoStack:[HistoryState]=[]
+    private var redoStack:[HistoryState]=[]
+    private var transactionStart:HistoryState?
 
-    init?(device: any MTLDevice) {
-        guard let commandQueue = device.makeCommandQueue(),
-              let library = try? device.makeDefaultLibrary(bundle: Bundle.module),
-              let vertexFunction = library.makeFunction(name: "inkVertex"),
-              let fragmentFunction = library.makeFunction(name: "inkFragment") else { return nil }
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = vertexFunction
-        descriptor.fragmentFunction = fragmentFunction
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        guard let pipelineState = try? device.makeRenderPipelineState(descriptor: descriptor) else { return nil }
-        self.device = device; self.commandQueue = commandQueue; self.pipelineState = pipelineState
-        super.init()
+    init?(device:any MTLDevice){
+        guard let q=device.makeCommandQueue(),let library=try? device.makeDefaultLibrary(bundle:Bundle.module),let vf=library.makeFunction(name:"inkVertex"),let ff=library.makeFunction(name:"inkFragment") else{return nil}
+        let d=MTLRenderPipelineDescriptor();d.vertexFunction=vf;d.fragmentFunction=ff;d.colorAttachments[0].pixelFormat=.bgra8Unorm;d.colorAttachments[0].isBlendingEnabled=true;d.colorAttachments[0].sourceRGBBlendFactor=.sourceAlpha;d.colorAttachments[0].destinationRGBBlendFactor=.oneMinusSourceAlpha;d.colorAttachments[0].sourceAlphaBlendFactor=.sourceAlpha;d.colorAttachments[0].destinationAlphaBlendFactor=.oneMinusSourceAlpha
+        guard let p=try? device.makeRenderPipelineState(descriptor:d) else{return nil};self.device=device;commandQueue=q;pipelineState=p;super.init()
     }
 
-    var canUndo: Bool { !undoStack.isEmpty }
-    var canRedo: Bool { !redoStack.isEmpty }
-    var hasSelection: Bool { selectedStrokeIndex != nil }
-    var selectedRotationDegrees: Double {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return 0 }
-        return Double(committedStrokes[index].rotation * 180 / .pi)
-    }
-    var zoomPercent: Int { Int((zoomScale * 100).rounded()) }
+    var canUndo:Bool{!undoStack.isEmpty};var canRedo:Bool{!redoStack.isEmpty};var hasSelection:Bool{!selectedStrokeIndices.isEmpty};var selectionCount:Int{selectedStrokeIndices.count};var selectedStrokeIndex:Int?{selectedStrokeIndices.count==1 ? selectedStrokeIndices[0]:nil};var zoomPercent:Int{Int((zoomScale*100).rounded())}
+    var selectedRotationDegrees:Double{guard let i=selectedStrokeIndex,committedStrokes.indices.contains(i) else{return 0};return Double(committedStrokes[i].rotation*180/.pi)}
 
-    func setPenStyle(_ style: PenStyle) { penStyle = style; rebuildGeometry() }
-    func setBackgroundColor(_ color: SIMD4<Float>) { backgroundColor = color; rebuildGeometry() }
-    func setDisplayInverted(_ inverted: Bool) { displayInverted = inverted; rebuildGeometry() }
-    func setBackgroundPattern(_ pattern: Int) { backgroundPattern = pattern; rebuildGeometry() }
-    func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
+    func setPenStyle(_ s:PenStyle){penStyle=s;rebuildGeometry()};func setBackgroundColor(_ c:SIMD4<Float>){backgroundColor=c;rebuildGeometry()};func setDisplayInverted(_ v:Bool){displayInverted=v;rebuildGeometry()};func setBackgroundPattern(_ p:Int){backgroundPattern=p;rebuildGeometry()};func setStroke(_ p:[InkPoint]){activeStroke=p;rebuildGeometry()}
+    func canvasPoint(from p:SIMD2<Float>)->SIMD2<Float>{(p-panOffset)/zoomScale};func viewPoint(from p:SIMD2<Float>)->SIMD2<Float>{p*zoomScale+panOffset};func pan(by d:SIMD2<Float>){panOffset += d;rebuildGeometry()}
+    func zoom(by f:Float,around p:SIMD2<Float>){let old=zoomScale,new=min(max(old*f,0.25),4);guard abs(new-old)>0.0001 else{return};let c=canvasPoint(from:p);zoomScale=new;panOffset=p-c*zoomScale;rebuildGeometry()}
+    func setZoom(_ v:Float,around p:SIMD2<Float>){let new=min(max(v,0.25),4);guard abs(new-zoomScale)>0.0001 else{return};let c=canvasPoint(from:p);zoomScale=new;panOffset=p-c*zoomScale;rebuildGeometry()}
+    func resetZoom(centeredIn size:CGSize){zoomScale=1;panOffset=SIMD2(Float(size.width*0.5),Float(size.height*0.5));rebuildGeometry()}
 
-    func canvasPoint(from viewPoint: SIMD2<Float>) -> SIMD2<Float> { (viewPoint - panOffset) / zoomScale }
-    func viewPoint(from canvasPoint: SIMD2<Float>) -> SIMD2<Float> { canvasPoint * zoomScale + panOffset }
-    func pan(by delta: SIMD2<Float>) { panOffset += delta; rebuildGeometry() }
+    func exportPageState()->CanvasPageState{CanvasPageState(strokes:committedStrokes.map{CanvasStroke(id:$0.id,points:$0.points,style:$0.style,rotation:$0.rotation)})}
+    func importPageState(_ state:CanvasPageState){committedStrokes=state.strokes.map{StoredStroke(id:$0.id,points:$0.points,style:$0.style,rotation:$0.rotation)};activeStroke=[];selectedStrokeIndices=[];customRotationCenter=nil;undoStack=[];redoStack=[];transactionStart=nil;rebuildGeometry()}
+    func beginHistoryTransaction(){if transactionStart==nil{transactionStart=captureState()}}
+    func endHistoryTransaction(){guard let before=transactionStart else{return};transactionStart=nil;let after=captureState();if before.strokes != after.strokes || before.selection != after.selection{undoStack.append(before);redoStack.removeAll()}}
+    private func recordMutation(){guard transactionStart==nil else{return};undoStack.append(captureState());redoStack.removeAll()};private func captureState()->HistoryState{HistoryState(strokes:committedStrokes,selection:selectedStrokeIndices)};private func restore(_ s:HistoryState){committedStrokes=s.strokes;selectedStrokeIndices=s.selection.filter{committedStrokes.indices.contains($0)};customRotationCenter=nil;rebuildGeometry()}
+    func undo(){guard let s=undoStack.popLast() else{return};redoStack.append(captureState());restore(s)};func redo(){guard let s=redoStack.popLast() else{return};undoStack.append(captureState());restore(s)}
+    func commitStroke(_ p:[InkPoint]){guard p.count>=2 else{activeStroke=[];rebuildGeometry();return};recordMutation();committedStrokes.append(StoredStroke(id:UUID(),points:p,style:penStyle));selectedStrokeIndices=[];activeStroke=[];rebuildGeometry()}
 
-    func zoom(by factor: Float, around viewPoint: SIMD2<Float>) {
-        let oldZoom = zoomScale
-        let newZoom = min(max(oldZoom * factor, 0.25), 4.0)
-        guard abs(newZoom - oldZoom) > 0.0001 else { return }
-        let canvas = canvasPoint(from: viewPoint)
-        zoomScale = newZoom
-        panOffset = viewPoint - canvas * zoomScale
-        rebuildGeometry()
-    }
+    @discardableResult func selectStroke(at point:SIMD2<Float>,tolerance:Float=10)->Bool{let c=canvasPoint(from:point),tol=tolerance/zoomScale;var best:Int?;var bd=tol;for i in committedStrokes.indices.reversed(){let s=committedStrokes[i].points;guard s.count>=2 else{continue};for n in 0..<(s.count-1){let d=distanceFromPoint(c,toSegment:SIMD2(s[n].x,s[n].y),SIMD2(s[n+1].x,s[n+1].y));if d<=bd{bd=d;best=i;break}}};selectedStrokeIndices=best.map{[$0]} ?? [];customRotationCenter=nil;rebuildGeometry();return best != nil}
+    @discardableResult func toggleStroke(at point:SIMD2<Float>,tolerance:Float=10)->Bool{let c=canvasPoint(from:point),tol=tolerance/zoomScale;var hit:Int?;for i in committedStrokes.indices.reversed(){let s=committedStrokes[i].points;guard s.count>=2 else{continue};for n in 0..<(s.count-1) where distanceFromPoint(c,toSegment:SIMD2(s[n].x,s[n].y),SIMD2(s[n+1].x,s[n+1].y))<=tol{hit=i;break};if hit != nil{break}};guard let i=hit else{return false};if selectedStrokeIndices.contains(i){selectedStrokeIndices.removeAll{$0==i}}else{selectedStrokeIndices.append(i)};rebuildGeometry();return true}
+    @discardableResult func selectStrokes(in viewRect:CGRect,fullyContained:Bool=false)->Int{let p0=canvasPoint(from:SIMD2(Float(viewRect.minX),Float(viewRect.minY))),p1=canvasPoint(from:SIMD2(Float(viewRect.maxX),Float(viewRect.maxY)));let r=CGRect(x:CGFloat(min(p0.x,p1.x)),y:CGFloat(min(p0.y,p1.y)),width:CGFloat(abs(p1.x-p0.x)),height:CGFloat(abs(p1.y-p0.y)));let result=committedStrokes.indices.filter{guard let b=strokeBounds(committedStrokes[$0].points) else{return false};return fullyContained ? r.contains(b):r.intersects(b)};selectedStrokeIndices=Array(result);customRotationCenter=nil;rebuildGeometry();return result.count}
+    func clearSelection(){selectedStrokeIndices=[];customRotationCenter=nil;rebuildGeometry()}
 
-    func setZoom(_ value: Float, around viewPoint: SIMD2<Float>) {
-        let newZoom = min(max(value, 0.25), 4.0)
-        guard abs(newZoom - zoomScale) > 0.0001 else { return }
-        let canvas = canvasPoint(from: viewPoint)
-        zoomScale = newZoom
-        panOffset = viewPoint - canvas * zoomScale
-        rebuildGeometry()
-    }
+    func selectionBounds()->CGRect?{let bs=selectedStrokeIndices.compactMap{committedStrokes.indices.contains($0) ? strokeBounds(committedStrokes[$0].points):nil};guard var r=bs.first else{return nil};for b in bs.dropFirst(){r=r.union(b)};return r.insetBy(dx:-8,dy:-8)}
+    func selectionBoundsInView()->CGRect?{guard let r=selectionBounds() else{return nil};let a=viewPoint(from:SIMD2(Float(r.minX),Float(r.minY))),b=viewPoint(from:SIMD2(Float(r.maxX),Float(r.maxY)));return CGRect(x:CGFloat(min(a.x,b.x)),y:CGFloat(min(a.y,b.y)),width:CGFloat(abs(b.x-a.x)),height:CGFloat(abs(b.y-a.y)))}
+    func selectionCenter()->SIMD2<Float>?{guard let r=selectionBounds() else{return nil};return SIMD2(Float(r.midX),Float(r.midY))}
+    func setRotationCenter(to viewPoint:SIMD2<Float>){customRotationCenter=canvasPoint(from:viewPoint);rebuildGeometry()};func rotationCenterViewPoint()->SIMD2<Float>?{guard let c=customRotationCenter ?? selectionCenter() else{return nil};return viewPoint(from:c)}
 
-    func resetZoom(centeredIn size: CGSize) {
-        zoomScale = 1
-        panOffset = SIMD2(Float(size.width * 0.5), Float(size.height * 0.5))
-        rebuildGeometry()
-    }
+    func selectionHandle(at point:SIMD2<Float>,tolerance:Float=10)->SelectionHandle?{guard let r=selectionBounds() else{return nil};let p=canvasPoint(from:point),t=tolerance/zoomScale;let h:[(SelectionHandle,SIMD2<Float>)]=[(.topLeft,SIMD2(Float(r.minX),Float(r.minY))),(.topRight,SIMD2(Float(r.maxX),Float(r.minY))),(.bottomLeft,SIMD2(Float(r.minX),Float(r.maxY))),(.bottomRight,SIMD2(Float(r.maxX),Float(r.maxY)))];return h.first{simd_distance(p,$0.1)<=t}?.0}
+    func rotationHandle(at point:SIMD2<Float>,tolerance:Float=12)->Bool{guard let r=selectionBounds() else{return false};let p=canvasPoint(from:point),c=SIMD2(Float(r.midX),Float(r.minY-28));return simd_distance(p,c)<=tolerance/zoomScale}
+    func rotationCenterHandle(at point:SIMD2<Float>,tolerance:Float=12)->Bool{guard customRotationCenter != nil,let c=rotationCenterViewPoint() else{return false};return simd_distance(point,c)<=tolerance}
 
-    func exportPageState() -> CanvasPageState {
-        CanvasPageState(strokes: committedStrokes.map { CanvasStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) })
-    }
+    func resizeSelected(handle:SelectionHandle,to point:SIMD2<Float>){guard !selectedStrokeIndices.isEmpty,let r=selectionBounds() else{return};let p=canvasPoint(from:point);let a:SIMD2<Float>;switch handle{case .topLeft:a=SIMD2(Float(r.maxX),Float(r.maxY));case .topRight:a=SIMD2(Float(r.minX),Float(r.maxY));case .bottomLeft:a=SIMD2(Float(r.maxX),Float(r.minY));case .bottomRight:a=SIMD2(Float(r.minX),Float(r.minY))};let ow=max(Float(r.width),1),oh=max(Float(r.height),1),sx=max(abs(p.x-a.x),1)/ow,sy=max(abs(p.y-a.y),1)/oh;for i in selectedStrokeIndices where committedStrokes.indices.contains(i){committedStrokes[i].points=committedStrokes[i].points.map{InkPoint(x:a.x+($0.x-a.x)*sx,y:a.y+($0.y-a.y)*sy,pressure:$0.pressure)}};rebuildGeometry()}
+    func scaleSelected(by f:Float){guard f>0,let c=selectionCenter() else{return};for i in selectedStrokeIndices where committedStrokes.indices.contains(i){committedStrokes[i].points=committedStrokes[i].points.map{InkPoint(x:c.x+($0.x-c.x)*f,y:c.y+($0.y-c.y)*f,pressure:$0.pressure)}};rebuildGeometry()}
+    func moveSelected(by d:SIMD2<Float>){for i in selectedStrokeIndices where committedStrokes.indices.contains(i){committedStrokes[i].points=committedStrokes[i].points.map{InkPoint(x:$0.x+d.x,y:$0.y+d.y,pressure:$0.pressure)}};rebuildGeometry()}
+    func rotateSelected(to point:SIMD2<Float>,from previous:SIMD2<Float>){guard let c=customRotationCenter ?? selectionCenter() else{return};let p=canvasPoint(from:point),q=canvasPoint(from:previous);rotateSelected(by:atan2(p.y-c.y,p.x-c.x)-atan2(q.y-c.y,q.x-c.x),center:c)}
+    func setSelectedRotationDegrees(_ degrees:Double){guard let c=selectionCenter() else{return};rotateSelected(by:Float(degrees-selectedRotationDegrees)*.pi/180,center:c)}
+    private func rotateSelected(by d:Float,center c:SIMD2<Float>){let co=cos(d),si=sin(d);for i in selectedStrokeIndices where committedStrokes.indices.contains(i){committedStrokes[i].points=committedStrokes[i].points.map{let v=SIMD2($0.x,$0.y)-c;return InkPoint(x:v.x*co-v.y*si+c.x,y:v.x*si+v.y*co+c.y,pressure:$0.pressure)};committedStrokes[i].rotation += d};rebuildGeometry()}
+    func reflectSelected(horizontal:Bool){guard let c=selectionCenter() else{return};for i in selectedStrokeIndices where committedStrokes.indices.contains(i){committedStrokes[i].points=committedStrokes[i].points.map{horizontal ? InkPoint(x:2*c.x-$0.x,y:$0.y,pressure:$0.pressure):InkPoint(x:$0.x,y:2*c.y-$0.y,pressure:$0.pressure)}};rebuildGeometry()}
+    func deleteSelected(){guard !selectedStrokeIndices.isEmpty else{return};recordMutation();for i in selectedStrokeIndices.sorted(by:>).where({committedStrokes.indices.contains($0)}){committedStrokes.remove(at:i)};selectedStrokeIndices=[];customRotationCenter=nil;rebuildGeometry()}
 
-    func importPageState(_ state: CanvasPageState) {
-        committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }
-        activeStroke.removeAll(keepingCapacity: true); selectedStrokeIndex = nil
-        undoStack.removeAll(keepingCapacity: true); redoStack.removeAll(keepingCapacity: true); transactionStart = nil
-        rebuildGeometry()
-    }
+    func mtkView(_ view:MTKView,drawableSizeWillChange size:CGSize){updateUniformBuffer(for:size)}
+    func draw(in view:MTKView){guard let d=view.currentRenderPassDescriptor,let drawable=view.currentDrawable,let cb=commandQueue.makeCommandBuffer(),let e=cb.makeRenderCommandEncoder(descriptor:d) else{return};d.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:1);updateUniformBuffer(for:view.drawableSize);e.setRenderPipelineState(pipelineState);if let b=vertexBuffer{e.setVertexBuffer(b,offset:0,index:0)};if let b=uniformBuffer{e.setVertexBuffer(b,offset:0,index:1)};if !vertices.isEmpty{e.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:vertices.count)};e.endEncoding();cb.present(drawable);cb.commit()}
 
-    func beginHistoryTransaction() { if transactionStart == nil { transactionStart = captureState() } }
-    func endHistoryTransaction() {
-        guard let before = transactionStart else { return }
-        transactionStart = nil
-        let after = captureState()
-        if before.strokes != after.strokes || before.selection != after.selection { undoStack.append(before); redoStack.removeAll(keepingCapacity: true) }
-    }
-    private func recordMutation() { guard transactionStart == nil else { return }; undoStack.append(captureState()); redoStack.removeAll(keepingCapacity: true) }
-    private func captureState() -> HistoryState { HistoryState(strokes: committedStrokes, selection: selectedStrokeIndex) }
-    private func restore(_ state: HistoryState) { committedStrokes = state.strokes; selectedStrokeIndex = state.selection; rebuildGeometry() }
-
-    func commitStroke(_ points: [InkPoint]) {
-        guard points.count >= 2 else { activeStroke.removeAll(); rebuildGeometry(); return }
-        recordMutation()
-        committedStrokes.append(StoredStroke(id: UUID(), points: points, style: penStyle))
-        selectedStrokeIndex = nil; activeStroke.removeAll(keepingCapacity: true); rebuildGeometry()
-    }
-
-    func undo() { guard let state = undoStack.popLast() else { return }; redoStack.append(captureState()); restore(state) }
-    func redo() { guard let state = redoStack.popLast() else { return }; undoStack.append(captureState()); restore(state) }
-
-    @discardableResult
-    func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool {
-        let canvas = canvasPoint(from: point)
-        let canvasTolerance = tolerance / zoomScale
-        var bestIndex: Int?; var bestDistance = canvasTolerance
-        for index in committedStrokes.indices.reversed() {
-            let stroke = committedStrokes[index].points
-            guard stroke.count >= 2 else { continue }
-            for segment in 0..<(stroke.count - 1) {
-                let a = SIMD2(stroke[segment].x, stroke[segment].y), b = SIMD2(stroke[segment + 1].x, stroke[segment + 1].y)
-                let distance = distanceFromPoint(canvas, toSegment: a, b)
-                if distance <= bestDistance { bestDistance = distance; bestIndex = index; break }
-            }
-        }
-        selectedStrokeIndex = bestIndex; rebuildGeometry(); return bestIndex != nil
-    }
-
-    func clearSelection() { selectedStrokeIndex = nil; rebuildGeometry() }
-
-    func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? {
-        guard let bounds = selectedBounds() else { return nil }
-        let p = canvasPoint(from: point), t = tolerance / zoomScale
-        let handles: [(SelectionHandle, SIMD2<Float>)] = [(.topLeft, SIMD2(bounds.minX,bounds.minY)),(.topRight,SIMD2(bounds.maxX,bounds.minY)),(.bottomLeft,SIMD2(bounds.minX,bounds.maxY)),(.bottomRight,SIMD2(bounds.maxX,bounds.maxY))]
-        return handles.first { simd_distance(p, $0.1) <= t }?.0
-    }
-
-    func rotationHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool {
-        guard let bounds = selectedBounds() else { return false }
-        let p = canvasPoint(from: point); let center = SIMD2((bounds.minX+bounds.maxX)*0.5, bounds.minY-28)
-        return simd_distance(p, center) <= tolerance / zoomScale
-    }
-
-    func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
-        let p = canvasPoint(from: point); let anchor: SIMD2<Float>
-        switch handle { case .topLeft: anchor = SIMD2(bounds.maxX,bounds.maxY); case .topRight: anchor = SIMD2(bounds.minX,bounds.maxY); case .bottomLeft: anchor = SIMD2(bounds.maxX,bounds.minY); case .bottomRight: anchor = SIMD2(bounds.minX,bounds.minY) }
-        let oldWidth = max(bounds.maxX-bounds.minX,1), oldHeight = max(bounds.maxY-bounds.minY,1)
-        let sx = max(abs(p.x-anchor.x),1)/oldWidth, sy = max(abs(p.y-anchor.y),1)/oldHeight
-        committedStrokes[index].points = committedStrokes[index].points.map { InkPoint(x: anchor.x+($0.x-anchor.x)*sx, y: anchor.y+($0.y-anchor.y)*sy, pressure: $0.pressure) }
-        rebuildGeometry()
-    }
-
-    func rotateSelected(to point: SIMD2<Float>, from previous: SIMD2<Float>) {
-        guard let bounds = selectedBounds() else { return }
-        let p = canvasPoint(from: point), q = canvasPoint(from: previous), center = SIMD2((bounds.minX+bounds.maxX)*0.5,(bounds.minY+bounds.maxY)*0.5)
-        rotateSelected(by: atan2(p.y-center.y,p.x-center.x)-atan2(q.y-center.y,q.x-center.x))
-    }
-
-    func setSelectedRotationDegrees(_ degrees: Double) {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
-        rotateSelected(by: Float(degrees * .pi / 180) - committedStrokes[index].rotation)
-    }
-
-    private func rotateSelected(by delta: Float) {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
-        let center = SIMD2((bounds.minX+bounds.maxX)*0.5,(bounds.minY+bounds.maxY)*0.5), c=cos(delta), s=sin(delta)
-        committedStrokes[index].points = committedStrokes[index].points.map { let v=SIMD2($0.x,$0.y)-center; return InkPoint(x:v.x*c-v.y*s+center.x,y:v.x*s+v.y*c+center.y,pressure:$0.pressure) }
-        committedStrokes[index].rotation += delta; rebuildGeometry()
-    }
-
-    func moveSelected(by delta: SIMD2<Float>) {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
-        committedStrokes[index].points = committedStrokes[index].points.map { InkPoint(x:$0.x+delta.x,y:$0.y+delta.y,pressure:$0.pressure) }; rebuildGeometry()
-    }
-
-    func deleteSelected() {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
-        recordMutation(); committedStrokes.remove(at:index); selectedStrokeIndex=nil; rebuildGeometry()
-    }
-
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for:size) }
-    func draw(in view: MTKView) {
-        guard let descriptor=view.currentRenderPassDescriptor, let drawable=view.currentDrawable, let commandBuffer=commandQueue.makeCommandBuffer(), let encoder=commandBuffer.makeRenderCommandEncoder(descriptor:descriptor) else { return }
-        descriptor.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:1)
-        updateUniformBuffer(for:view.drawableSize); encoder.setRenderPipelineState(pipelineState)
-        if let vertexBuffer { encoder.setVertexBuffer(vertexBuffer,offset:0,index:0) }; if let uniformBuffer { encoder.setVertexBuffer(uniformBuffer,offset:0,index:1) }
-        if !vertices.isEmpty { encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:vertices.count) }
-        encoder.endEncoding(); commandBuffer.present(drawable); commandBuffer.commit()
-    }
-
-    private func viewPosition(_ point: SIMD2<Float>) -> SIMD2<Float> { point * zoomScale + panOffset }
-
-    private func rebuildGeometry() {
-        var output:[InkVertex]=[]
-        appendBackgroundPattern(to:&output)
-        for index in committedStrokes.indices { let stroke=committedStrokes[index]; appendStrokeGeometry(stroke.points,style:stroke.style,to:&output); if selectedStrokeIndex==index { appendSelectionBounds(stroke.points,color:SIMD4(0.1,0.45,1,0.75),to:&output) } }
-        if !activeStroke.isEmpty { appendStrokeGeometry(activeStroke,style:penStyle,to:&output) }
-        vertices=output; vertexBuffer=vertices.isEmpty ? nil : device.makeBuffer(bytes:vertices,length:vertices.count*MemoryLayout<InkVertex>.stride,options:.storageModeShared)
-    }
-
-    private func appendBackgroundPattern(to output: inout [InkVertex]) {
-        guard backgroundPattern != 0 else { return }
-        let color = displayInverted ? SIMD4<Float>(0.24,0.24,0.24,0.55) : SIMD4<Float>(0.82,0.84,0.88,0.55)
-        let step: Float = (backgroundPattern == 3 ? 24 : 32), extent: Float = 4000
-        if backgroundPattern == 1 { var y:Float = -extent; while y <= extent { appendLineQuad(viewPosition(SIMD2(-extent,y)),viewPosition(SIMD2(extent,y)),width:0.55*zoomScale,color:color,to:output); y += step } }
-        else if backgroundPattern == 3 { var y:Float = -extent; while y <= extent { var x:Float = -extent; while x <= extent { appendDisk(center:viewPosition(SIMD2(x,y)),radius:1.1*zoomScale,color:color,to:output); x += step }; y += step } }
-        else { var x:Float = -extent; while x <= extent { appendLineQuad(viewPosition(SIMD2(x,-extent)),viewPosition(SIMD2(x,extent)),width:0.45*zoomScale,color:color,to:output); x += step }; var y:Float = -extent; while y <= extent { appendLineQuad(viewPosition(SIMD2(-extent,y)),viewPosition(SIMD2(extent,y)),width:0.45*zoomScale,color:color,to:output); y += step } }
-    }
-
-    private func selectedBounds() -> (minX:Float,maxX:Float,minY:Float,maxY:Float)? { guard let i=selectedStrokeIndex,committedStrokes.indices.contains(i),let first=committedStrokes[i].points.first else{return nil}; var minX=first.x,maxX=first.x,minY=first.y,maxY=first.y; for p in committedStrokes[i].points { minX=min(minX,p.x);maxX=max(maxX,p.x);minY=min(minY,p.y);maxY=max(maxY,p.y) }; return(minX,maxX,minY,maxY) }
-    private func appendStrokeGeometry(_ stroke:[InkPoint],style:PenStyle,to output:inout[InkVertex]) { guard let first=stroke.first else{return}; let color=metalColor(style); for i in 0..<(max(stroke.count-1,0)) { let p0=stroke[i],p1=stroke[i+1],dx=p1.x-p0.x,dy=p1.y-p0.y,length=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/length,ny=dx/length,w0=strokeWidth(p0.pressure,style:style)*zoomScale,w1=strokeWidth(p1.pressure,style:style)*zoomScale; let a=viewPosition(SIMD2(p0.x+nx*strokeWidth(p0.pressure,style:style),p0.y+ny*strokeWidth(p0.pressure,style:style))),b=viewPosition(SIMD2(p0.x-nx*strokeWidth(p0.pressure,style:style),p0.y-ny*strokeWidth(p0.pressure,style:style))),c=viewPosition(SIMD2(p1.x+nx*strokeWidth(p1.pressure,style:style),p1.y+ny*strokeWidth(p1.pressure,style:style))),d=viewPosition(SIMD2(p1.x-nx*strokeWidth(p1.pressure,style:style),p1.y-ny*strokeWidth(p1.pressure,style:style))); appendTriangle(a,b,c,color:color,to:&output);appendTriangle(c,b,d,color:color,to:&output) }; appendDisk(center:viewPosition(SIMD2(first.x,first.y)),radius:strokeWidth(first.pressure,style:style)*zoomScale,color:color,to:&output); if let last=stroke.last { appendDisk(center:viewPosition(SIMD2(last.x,last.y)),radius:strokeWidth(last.pressure,style:style)*zoomScale,color:color,to:&output) }; if stroke.count>2 { for p in stroke.dropFirst().dropLast(){appendDisk(center:viewPosition(SIMD2(p.x,p.y)),radius:strokeWidth(p.pressure,style:style)*zoomScale,color:color,to:&output)} } }
-    private func appendSelectionBounds(_ stroke:[InkPoint],color:SIMD4<Float>,to output:inout[InkVertex]) { guard let b=selectedBounds() else{return}; let pad:Float=8,x0=(b.minX-pad)*zoomScale+panOffset.x,x1=(b.maxX+pad)*zoomScale+panOffset.x,y0=(b.minY-pad)*zoomScale+panOffset.y,y1=(b.maxY+pad)*zoomScale+panOffset.y,a=SIMD2(x0,y0),bb=SIMD2(x1,y0),c=SIMD2(x1,y1),d=SIMD2(x0,y1); appendLineQuad(a,bb,width:1.5,color:color,to:&output);appendLineQuad(bb,c,width:1.5,color:color,to:&output);appendLineQuad(c,d,width:1.5,color:color,to:&output);appendLineQuad(d,a,width:1.5,color:color,to:&output); for p in [a,bb,c,d]{appendDisk(center:p,radius:5,color:color,to:&output);appendDisk(center:p,radius:2.5,color:SIMD4(1,1,1,1),to:&output)}; let r=SIMD2((x0+x1)*0.5,y0-28);appendLineQuad(SIMD2((x0+x1)*0.5,y0),r,width:1,color:color,to:&output);appendDisk(center:r,radius:7,color:color,to:&output);appendDisk(center:r,radius:3,color:SIMD4(1,1,1,1),to:&output) }
-    private func appendLineQuad(_ a:SIMD2<Float>,_ b:SIMD2<Float>,width:Float,color:SIMD4<Float>,to output:inout[InkVertex]) { let d=b-a,l=max(simd_length(d),0.001),n=SIMD2(-d.y/l,d.x/l)*width;appendTriangle(a+n,a-n,b+n,color:color,to:&output);appendTriangle(b+n,a-n,b-n,color:color,to:&output) }
-    private func distanceFromPoint(_ p:SIMD2<Float>,toSegment a:SIMD2<Float>,_ b:SIMD2<Float>)->Float { let ab=b-a,l=simd_length_squared(ab);if l<0.0001{return simd_distance(p,a)};let t=max(0,min(1,simd_dot(p-a,ab)/l));return simd_distance(p,a+ab*t) }
-    private func strokeWidth(_ pressure:Float,style:PenStyle)->Float { let p=max(0,min(1,pressure)),c=style.pressureEnabled ? pow(p,max(0.25,Float(style.pressureCurve))):0.75;return Float(style.width)*(0.45+0.75*c) }
-    private func metalColor(_ style:PenStyle)->SIMD4<Float> { var c=SIMD4(Float(style.color.red),Float(style.color.green),Float(style.color.blue),Float(style.color.alpha*style.opacity));if displayInverted { let hi=max(c.x,max(c.y,c.z)),lo=min(c.x,min(c.y,c.z));if hi<0.12 || lo>0.88 {c=SIMD4(1,1,1,c.w)} };return c }
-    private func appendTriangle(_ a:SIMD2<Float>,_ b:SIMD2<Float>,_ c:SIMD2<Float>,color:SIMD4<Float>,to output:inout[InkVertex]) { output.append(InkVertex(position:a,color:color));output.append(InkVertex(position:b,color:color));output.append(InkVertex(position:c,color:color)) }
-    private func appendDisk(center:SIMD2<Float>,radius:Float,color:SIMD4<Float>,to output:inout[InkVertex]) { let n=12;for i in 0..<n {let a=Float(i)/Float(n)*2*.pi,b=Float(i+1)/Float(n)*2*.pi;appendTriangle(center,center+SIMD2(cos(a),sin(a))*radius,center+SIMD2(cos(b),sin(b))*radius,color:color,to:&output)} }
-    private func updateUniformBuffer(for size:CGSize) { let u=Uniforms(viewportSize:SIMD2(Float(max(size.width,1)),Float(max(size.height,1))));if uniformBuffer==nil{uniformBuffer=device.makeBuffer(length:MemoryLayout<Uniforms>.stride,options:.storageModeShared)};guard let b=uniformBuffer else{return};withUnsafeBytes(of:u){memcpy(b.contents(),$0.baseAddress!,MemoryLayout<Uniforms>.stride)} }
+    private func viewPosition(_ p:SIMD2<Float>)->SIMD2<Float>{p*zoomScale+panOffset}
+    private func rebuildGeometry(){var o:[InkVertex]=[];appendBackgroundPattern(to:&o);if let r=selectionBounds(){for i in committedStrokes.indices{let s=committedStrokes[i];appendStrokeGeometry(s.points,style:s.style,to:&o);if selectedStrokeIndices.contains(i){appendSelectionBounds(r,to:&o)}}}else{for s in committedStrokes{appendStrokeGeometry(s.points,style:s.style,to:&o)}};if !activeStroke.isEmpty{appendStrokeGeometry(activeStroke,style:penStyle,to:&o)};vertices=o;vertexBuffer=vertices.isEmpty ? nil:device.makeBuffer(bytes:vertices,length:vertices.count*MemoryLayout<InkVertex>.stride,options:.storageModeShared)}
+    private func appendBackgroundPattern(to o:inout[InkVertex]){guard backgroundPattern != 0 else{return};let c=displayInverted ? SIMD4<Float>(0.24,0.24,0.24,0.55):SIMD4<Float>(0.82,0.84,0.88,0.55),step:Float=backgroundPattern==3 ? 24:32,ext:Float=4000;if backgroundPattern==1{var y:Float = -ext;while y<=ext{appendLineQuad(viewPosition(SIMD2(-ext,y)),viewPosition(SIMD2(ext,y)),width:0.55*zoomScale,color:c,to:&o);y+=step}}else if backgroundPattern==3{var y:Float = -ext;while y<=ext{var x:Float = -ext;while x<=ext{appendDisk(center:viewPosition(SIMD2(x,y)),radius:1.1*zoomScale,color:c,to:&o);x+=step};y+=step}}else{var x:Float = -ext;while x<=ext{appendLineQuad(viewPosition(SIMD2(x,-ext)),viewPosition(SIMD2(x,ext)),width:0.45*zoomScale,color:c,to:&o);x+=step};var y:Float = -ext;while y<=ext{appendLineQuad(viewPosition(SIMD2(-ext,y)),viewPosition(SIMD2(ext,y)),width:0.45*zoomScale,color:c,to:&o);y+=step}}}
+    private func appendStrokeGeometry(_ s:[InkPoint],style:PenStyle,to o:inout[InkVertex]){guard !s.isEmpty else{return};let c=metalColor(style);if s.count>1{for i in 0..<(s.count-1){let p0=s[i],p1=s[i+1],dx=p1.x-p0.x,dy=p1.y-p0.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/l,ny=dx/l,w0=strokeWidth(p0.pressure,style:style),w1=strokeWidth(p1.pressure,style:style);let a=viewPosition(SIMD2(p0.x+nx*w0,p0.y+ny*w0)),b=viewPosition(SIMD2(p0.x-nx*w0,p0.y-ny*w0)),cc=viewPosition(SIMD2(p1.x+nx*w1,p1.y+ny*w1)),d=viewPosition(SIMD2(p1.x-nx*w1,p1.y-ny*w1));appendTriangle(a,b,cc,color:c,to:&o);appendTriangle(cc,b,d,color:c,to:&o)}};for p in s{appendDisk(center:viewPosition(SIMD2(p.x,p.y)),radius:strokeWidth(p.pressure,style:style),color:c,to:&o)}}
+    private func appendSelectionBounds(_ r:CGRect,to o:inout[InkVertex]){let c=SIMD4<Float>(0.1,0.45,1,0.75),x0=Float(r.minX)*zoomScale+panOffset.x,x1=Float(r.maxX)*zoomScale+panOffset.x,y0=Float(r.minY)*zoomScale+panOffset.y,y1=Float(r.maxY)*zoomScale+panOffset.y,a=SIMD2(x0,y0),b=SIMD2(x1,y0),cc=SIMD2(x1,y1),d=SIMD2(x0,y1);appendLineQuad(a,b,width:1.5,color:c,to:&o);appendLineQuad(b,cc,width:1.5,color:c,to:&o);appendLineQuad(cc,d,width:1.5,color:c,to:&o);appendLineQuad(d,a,width:1.5,color:c,to:&o);for p in [a,b,cc,d]{appendDisk(center:p,radius:5,color:c,to:&o);appendDisk(center:p,radius:2.5,color:SIMD4<Float>(1,1,1,1),to:&o)};let rot=SIMD2((x0+x1)*0.5,y0-28);appendLineQuad(SIMD2((x0+x1)*0.5,y0),rot,width:1,color:c,to:&o);appendDisk(center:rot,radius:7,color:c,to:&o);appendDisk(center:rot,radius:3,color:SIMD4<Float>(1,1,1,1),to:&o);if let rc=customRotationCenter{let p=viewPosition(rc);appendDisk(center:p,radius:7,color:SIMD4<Float>(0.95,0.55,0.05,1),to:&o);appendDisk(center:p,radius:3,color:SIMD4<Float>(1,1,1,1),to:&o)}}
+    private func strokeBounds(_ p:[InkPoint])->CGRect?{guard let f=p.first else{return nil};var minX=f.x,maxX=f.x,minY=f.y,maxY=f.y;for q in p{minX=min(minX,q.x);maxX=max(maxX,q.x);minY=min(minY,q.y);maxY=max(maxY,q.y)};return CGRect(x:CGFloat(minX),y:CGFloat(minY),width:CGFloat(maxX-minX),height:CGFloat(maxY-minY))}
+    private func appendLineQuad(_ a:SIMD2<Float>,_ b:SIMD2<Float>,width:Float,color:SIMD4<Float>,to o:inout[InkVertex]){let d=b-a,l=max(simd_length(d),0.001),n=SIMD2(-d.y,d.x)/l*width;appendTriangle(a+n,a-n,b+n,color:color,to:&o);appendTriangle(b+n,a-n,b-n,color:color,to:&o)}
+    private func distanceFromPoint(_ p:SIMD2<Float>,toSegment a:SIMD2<Float>,_ b:SIMD2<Float>)->Float{let ab=b-a,l=simd_length_squared(ab);if l<0.0001{return simd_distance(p,a)};let t=max(0,min(1,simd_dot(p-a,ab)/l));return simd_distance(p,a+ab*t)}
+    private func strokeWidth(_ p:Float,style:PenStyle)->Float{let x=max(0,min(1,p)),c=style.pressureEnabled ? pow(x,max(0.25,Float(style.pressureCurve))):0.75;return Float(style.width)*(0.45+0.75*c)}
+    private func metalColor(_ s:PenStyle)->SIMD4<Float>{var c=SIMD4(Float(s.color.red),Float(s.color.green),Float(s.color.blue),Float(s.color.alpha*s.opacity));if displayInverted{let hi=max(c.x,max(c.y,c.z)),lo=min(c.x,min(c.y,c.z));if hi<0.12 || lo>0.88{c=SIMD4(1,1,1,c.w)}};return c}
+    private func appendTriangle(_ a:SIMD2<Float>,_ b:SIMD2<Float>,_ c:SIMD2<Float>,color:SIMD4<Float>,to o:inout[InkVertex]){o.append(InkVertex(position:a,color:color));o.append(InkVertex(position:b,color:color));o.append(InkVertex(position:c,color:color))}
+    private func appendDisk(center:SIMD2<Float>,radius:Float,color:SIMD4<Float>,to o:inout[InkVertex]){let n=12;for i in 0..<n{let a=Float(i)/Float(n)*2*.pi,b=Float(i+1)/Float(n)*2*.pi;appendTriangle(center,center+SIMD2(cos(a),sin(a))*radius,center+SIMD2(cos(b),sin(b))*radius,color:color,to:&o)}}
+    private func updateUniformBuffer(for size:CGSize){let u=Uniforms(viewportSize:SIMD2(Float(max(size.width,1)),Float(max(size.height,1))));if uniformBuffer==nil{uniformBuffer=device.makeBuffer(length:MemoryLayout<Uniforms>.stride,options:.storageModeShared)};guard let b=uniformBuffer else{return};withUnsafeBytes(of:u){memcpy(b.contents(),$0.baseAddress!,MemoryLayout<Uniforms>.stride)}}
 }
