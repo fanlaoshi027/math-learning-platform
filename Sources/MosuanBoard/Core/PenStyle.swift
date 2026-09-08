@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 struct PenStyle: Equatable, Codable {
     enum Tip: String, CaseIterable, Codable { case ballpoint, pencil, marker, highlighter }
