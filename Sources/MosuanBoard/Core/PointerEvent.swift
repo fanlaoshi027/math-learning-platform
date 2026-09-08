@@ -27,6 +27,9 @@ struct MosuanPointerEvent: Equatable {
     var deviceType: DeviceType
     var buttons: UInt32
     var modifiers: UInt32
+    /// Monotonic input timestamp when the platform exposes one.
+    /// Used for pressure-free speed-based nib dynamics.
+    var timestamp: TimeInterval
 
     init(
         position: SIMD2<Float>,
@@ -36,7 +39,8 @@ struct MosuanPointerEvent: Equatable {
         phase: Phase,
         deviceType: DeviceType,
         buttons: UInt32 = 0,
-        modifiers: UInt32 = 0
+        modifiers: UInt32 = 0,
+        timestamp: TimeInterval = 0
     ) {
         self.position = position
         self.pressure = pressure
@@ -46,5 +50,6 @@ struct MosuanPointerEvent: Equatable {
         self.deviceType = deviceType
         self.buttons = buttons
         self.modifiers = modifiers
+        self.timestamp = timestamp
     }
 }
