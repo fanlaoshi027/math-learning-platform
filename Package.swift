@@ -15,7 +15,8 @@ let package = Package(
                 "Metal/InkRenderer.swift",
                 "Core/GraphicObjectStore.swift",
                 "Core/GraphicObjectStoreFixed.swift",
-                "Core/GraphicObjectStoreV2.swift"
+                "Core/GraphicObjectStoreV2.swift",
+                "SMART_LINE_AND_ERASER.md"
             ],
             resources: [.process("Metal/InkShaders.metal")]
         )
