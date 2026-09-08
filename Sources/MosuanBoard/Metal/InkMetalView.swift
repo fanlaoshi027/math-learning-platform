@@ -24,11 +24,13 @@ final class InkMetalView: MTKView {
     private var lastRotationPoint = SIMD2<Float>(0, 0)
     private var smartLineDetected = false
     private var smartLineWorkItem: DispatchWorkItem?
+    private var polygonModel = PolygonToolModel()
 
     var isUserInteractionEnabledForTool = true
     var isSelectionTool = false
     var isLineTool = false
     var isSmartLineTool = false
+    var isPolygonTool = false
     var isEraserTool = false
     var backgroundPattern = 0 { didSet { renderer.setBackgroundPattern(backgroundPattern) } }
     var onHistoryChanged: (() -> Void)?
@@ -80,7 +82,14 @@ final class InkMetalView: MTKView {
         addSubview(marqueeOverlay)
     }
 
-    func loadPageState(_ state: CanvasPageState) { renderer.importPageState(state); onHistoryChanged?(); onSelectionChanged?(); draw() }
+    func loadPageState(_ state: CanvasPageState) {
+        polygonModel.cancel()
+        renderer.importPageState(state)
+        onHistoryChanged?()
+        onSelectionChanged?()
+        draw()
+    }
+
     func currentPageState() -> CanvasPageState { renderer.exportPageState() }
     func undo() { renderer.undo(); notifyState(); draw() }
     func redo() { renderer.redo(); notifyState(); draw() }
@@ -102,6 +111,13 @@ final class InkMetalView: MTKView {
         if event.buttonNumber == 2 { middleButtonHeld = true; panDrag = true; lastPoint = p; return }
         if spaceHeld { panDrag = true; lastPoint = p; return }
         if isEraserTool && !temporarySelectHeld { renderer.beginHistoryTransaction(); eraserPoints = [p]; return }
+
+        if isPolygonTool && !selectionModeActive {
+            handlePolygonClick(at: p)
+            return
+        }
+
+        guard !isPolygonTool else { return }
         if selectionModeActive {
             if let endpoint = renderer.lineEndpoint(at: p) { renderer.beginHistoryTransaction(); lineEndpointDrag = endpoint; return }
             if renderer.rotationCenterHandle(at: p) { renderer.beginHistoryTransaction(); rotationCenterDrag = true; return }
@@ -132,6 +148,7 @@ final class InkMetalView: MTKView {
         let p = makePoint(from: event)
         if panDrag { renderer.pan(by: p - lastPoint); lastPoint = p; draw(); return }
         if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); return }
+        if isPolygonTool { return }
         if selectionModeActive {
             if let endpoint = lineEndpointDrag { _ = renderer.moveSelectedLineEndpoint(id: endpoint.id, endpoint: endpoint.endpoint, to: p); onSelectionChanged?(); draw(); return }
             if rotationCenterDrag { renderer.setRotationCenter(to: p); onSelectionChanged?(); draw(); return }
@@ -157,6 +174,7 @@ final class InkMetalView: MTKView {
         let p = makePoint(from: event)
         if event.buttonNumber == 2 || middleButtonHeld { middleButtonHeld = false; panDrag = false; return }
         if panDrag { panDrag = false; return }
+        if isPolygonTool { return }
         if isEraserTool && !temporarySelectHeld {
             eraserPoints.append(p)
             eraseAlongPath(eraserPoints)
@@ -219,6 +237,13 @@ final class InkMetalView: MTKView {
 
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
+        if event.keyCode == 53 && isPolygonTool && polygonModel.isConstructing {
+            polygonModel.cancel()
+            renderer.setStroke([])
+            renderer.endHistoryTransaction()
+            draw()
+            return
+        }
         if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = true; return }
         if event.keyCode == 49 { spaceHeld = true; return }
         if selectionModeActive && event.keyCode == 51 { deleteSelected(); return }
@@ -245,9 +270,53 @@ final class InkMetalView: MTKView {
             points.removeAll(keepingCapacity: true)
             renderer.setStroke([])
             renderer.endHistoryTransaction()
+            polygonModel.cancel()
             marqueeOverlay.update(rect: .zero, visible: false)
             draw()
         default: break
+        }
+    }
+
+    private func handlePolygonClick(at viewPoint: SIMD2<Float>) {
+        let canvas = renderer.canvasPoint(from: viewPoint)
+        let point = CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y))
+        if !polygonModel.isConstructing {
+            polygonModel.begin(at: point)
+            renderer.beginHistoryTransaction()
+            renderer.setStroke([InkPoint(x: canvas.x, y: canvas.y, pressure: 1)])
+            draw()
+            return
+        }
+
+        if polygonModel.closeIfNearFirst(at: point) {
+            commitPolygon(polygonModel.previewVertices)
+            polygonModel.cancel()
+            renderer.setStroke([])
+            renderer.endHistoryTransaction()
+            notifyState()
+            draw()
+            return
+        }
+
+        if polygonModel.append(at: point) {
+            let preview = polygonModel.previewVertices.map { InkPoint(x: Float($0.x), y: Float($0.y), pressure: 1) }
+            renderer.setStroke(preview)
+            draw()
+        }
+    }
+
+    /// The first implementation stores polygon edges as structured line objects.
+    /// This keeps the construction vector-based and immediately editable while
+    /// the dedicated polygon/group object editor is added later.
+    private func commitPolygon(_ vertices: [CGPoint]) {
+        guard vertices.count >= 3 else { return }
+        for index in vertices.indices {
+            let next = vertices[(index + 1) % vertices.count]
+            let a = vertices[index]
+            renderer.commitLine(
+                from: SIMD2(Float(a.x), Float(a.y)),
+                to: SIMD2(Float(next.x), Float(next.y))
+            )
         }
     }
 

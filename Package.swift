@@ -12,6 +12,7 @@ let package = Package(
             exclude: [
                 "BoardScreen.swift",
                 "BoardScreenFixed.swift",
+                "BoardScreenV2.swift",
                 "Metal/InkRenderer.swift",
                 "Core/GraphicObjectStore.swift",
                 "Core/GraphicObjectStoreFixed.swift",
