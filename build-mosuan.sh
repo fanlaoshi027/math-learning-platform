@@ -15,7 +15,8 @@ mkdir -p "$BUILD_DIR"
 echo "==> Building $APP_NAME"
 swift build -c release
 
-BIN="$(swift build -c release --show-bin-path)/$PRODUCT"
+BIN_DIR="$(swift build -c release --show-bin-path)"
+BIN="$BIN_DIR/$PRODUCT"
 if [ ! -f "$BIN" ]; then
   echo "Build failed: executable not found: $BIN"
   exit 1
@@ -24,6 +25,17 @@ fi
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 cp "$BIN" "$APP_DIR/Contents/MacOS/$PRODUCT"
+
+# SwiftPM places processed resources (including the Metal library) in a resource bundle.
+# Copy that bundle into the app so Bundle.module can load the Metal shaders at runtime.
+RESOURCE_BUNDLE="$(find "$BIN_DIR" -maxdepth 1 -type d -name '*.bundle' -print -quit)"
+if [ -n "$RESOURCE_BUNDLE" ]; then
+  echo "==> Packaging resource bundle: $(basename "$RESOURCE_BUNDLE")"
+  cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
+else
+  echo "WARNING: SwiftPM resource bundle not found in $BIN_DIR"
+  echo "The app may build but Metal shader loading can fail at runtime."
+fi
 
 cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
