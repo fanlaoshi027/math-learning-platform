@@ -4,14 +4,13 @@ import simd
 
 final class InkMetalView: MTKView {
     private let renderer: InkRenderer
-    private let marqueeOverlay = MarqueeOverlayView()
+    private let lassoOverlay = LassoOverlayView()
     private var points: [InkPoint] = []
     private var eraserPoints: [SIMD2<Float>] = []
     private var active = false
     private var selectionDrag = false
-    private var marqueeActive = false
-    private var marqueeStart = SIMD2<Float>(0, 0)
-    private var marqueeCurrent = SIMD2<Float>(0, 0)
+    private var lassoActive = false
+    private var lassoPoints: [SIMD2<Float>] = []
     private var temporarySelectHeld = false
     private var resizeHandle: InkRenderer.SelectionHandle?
     private var lineEndpointDrag: (id: UUID, endpoint: Int)?
@@ -78,14 +77,17 @@ final class InkMetalView: MTKView {
         framebufferOnly = true
         colorPixelFormat = .bgra8Unorm
         clearColor = MTLClearColor(red: 1, green: 1, blue: 1, alpha: 1)
-        marqueeOverlay.isHidden = true
-        marqueeOverlay.autoresizingMask = [.width, .height]
-        addSubview(marqueeOverlay)
+        lassoOverlay.isHidden = true
+        lassoOverlay.autoresizingMask = [.width, .height]
+        addSubview(lassoOverlay)
     }
 
     func loadPageState(_ state: CanvasPageState) {
         polygonModel.cancel()
         polygonVertexDrag = nil
+        lassoActive = false
+        lassoPoints.removeAll(keepingCapacity: true)
+        lassoOverlay.update(points: [], visible: false)
         renderer.importPageState(state)
         onHistoryChanged?()
         onSelectionChanged?()
@@ -127,11 +129,10 @@ final class InkMetalView: MTKView {
             if renderer.rotationHandle(at: p) { renderer.beginHistoryTransaction(); rotationDrag = true; lastRotationPoint = p; return }
             if let handle = renderer.selectionHandle(at: p) { renderer.beginHistoryTransaction(); resizeHandle = handle; return }
             if renderer.selectObject(at: p) || renderer.selectStroke(at: p) { selectionDrag = true; lastPoint = p; onSelectionChanged?(); draw(); return }
-            marqueeActive = true
-            marqueeStart = p
-            marqueeCurrent = p
+            lassoActive = true
+            lassoPoints = [p]
             renderer.clearSelection()
-            marqueeOverlay.update(rect: marqueeRect(from: p, to: p), visible: true)
+            lassoOverlay.update(points: lassoPoints, visible: true)
             onSelectionChanged?()
             draw()
             return
@@ -158,7 +159,12 @@ final class InkMetalView: MTKView {
             if rotationCenterDrag { renderer.setRotationCenter(to: p); onSelectionChanged?(); draw(); return }
             if rotationDrag { renderer.rotateSelected(to: p, from: lastRotationPoint); lastRotationPoint = p; onSelectionChanged?(); draw(); return }
             if let handle = resizeHandle { renderer.resizeSelected(handle: handle, to: p); onSelectionChanged?(); draw(); return }
-            if marqueeActive { marqueeCurrent = p; marqueeOverlay.update(rect: marqueeRect(from: marqueeStart, to: p), visible: true); draw(); return }
+            if lassoActive {
+                appendLassoPoint(p)
+                lassoOverlay.update(points: lassoPoints, visible: true)
+                draw()
+                return
+            }
             guard selectionDrag else { return }
             let delta = renderer.canvasPoint(from: p) - renderer.canvasPoint(from: lastPoint)
             if simd_length_squared(delta) > 0 { renderer.moveSelected(by: delta); lastPoint = p; onSelectionChanged?(); draw() }
@@ -188,12 +194,17 @@ final class InkMetalView: MTKView {
             return
         }
         if selectionModeActive {
-            if marqueeActive {
-                marqueeCurrent = p
-                let r = marqueeRect(from: marqueeStart, to: marqueeCurrent)
-                if r.width > 4 || r.height > 4 { _ = renderer.selectObjects(in: r); _ = renderer.selectStrokes(in: r) } else { renderer.clearSelection() }
-                marqueeActive = false
-                marqueeOverlay.update(rect: .zero, visible: false)
+            if lassoActive {
+                appendLassoPoint(p)
+                let shouldSelect = lassoPoints.count >= 3 && lassoPathLength() >= 8
+                if shouldSelect {
+                    _ = renderer.selectLasso(in: lassoPoints)
+                } else {
+                    renderer.clearSelection()
+                }
+                lassoActive = false
+                lassoPoints.removeAll(keepingCapacity: true)
+                lassoOverlay.update(points: [], visible: false)
                 onSelectionChanged?()
                 draw()
                 return
@@ -278,7 +289,9 @@ final class InkMetalView: MTKView {
             polygonModel.cancel()
             polygonVertexDrag = nil
             lineEndpointDrag = nil
-            marqueeOverlay.update(rect: .zero, visible: false)
+            lassoActive = false
+            lassoPoints.removeAll(keepingCapacity: true)
+            lassoOverlay.update(points: [], visible: false)
             draw()
         default: break
         }
@@ -317,8 +330,21 @@ final class InkMetalView: MTKView {
         renderer.commitPolygon(points: vertices)
     }
 
-    private func marqueeRect(from a: SIMD2<Float>, to b: SIMD2<Float>) -> CGRect {
-        CGRect(x: CGFloat(min(a.x, b.x)), y: CGFloat(min(a.y, b.y)), width: CGFloat(abs(b.x - a.x)), height: CGFloat(abs(b.y - a.y)))
+    private func appendLassoPoint(_ point: SIMD2<Float>) {
+        guard let last = lassoPoints.last else {
+            lassoPoints.append(point)
+            return
+        }
+        if simd_distance(last, point) >= 2 {
+            lassoPoints.append(point)
+        }
+    }
+
+    private func lassoPathLength() -> Float {
+        guard lassoPoints.count >= 2 else { return 0 }
+        var total: Float = 0
+        for pair in zip(lassoPoints, lassoPoints.dropFirst()) { total += simd_distance(pair.0, pair.1) }
+        return total
     }
 
     private func scheduleSmartLineDetection() {
@@ -359,23 +385,35 @@ final class InkMetalView: MTKView {
     }
 }
 
-private final class MarqueeOverlayView: NSView {
-    private var rect = CGRect.zero
+private final class LassoOverlayView: NSView {
+    private var points: [SIMD2<Float>] = []
     private var visible = false
     override var isFlipped: Bool { true }
     override init(frame frameRect: NSRect) { super.init(frame: frameRect); wantsLayer = true }
     required init?(coder: NSCoder) { super.init(coder: coder); wantsLayer = true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    func update(rect: CGRect, visible: Bool) { self.rect = rect.standardized; self.visible = visible; isHidden = !visible; needsDisplay = true }
+
+    func update(points: [SIMD2<Float>], visible: Bool) {
+        self.points = points
+        self.visible = visible
+        isHidden = !visible
+        needsDisplay = true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        guard visible, rect.width > 0, rect.height > 0 else { return }
-        let path = NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5))
-        path.lineWidth = 1
+        guard visible, points.count >= 2 else { return }
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: CGFloat(points[0].x), y: CGFloat(points[0].y)))
+        for point in points.dropFirst() {
+            path.line(to: NSPoint(x: CGFloat(point.x), y: CGFloat(point.y)))
+        }
+        if points.count >= 3 { path.close() }
+        path.lineWidth = 1.2
         let dash: [CGFloat] = [5, 4]
         path.setLineDash(dash, count: dash.count, phase: 0)
         NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
         path.stroke()
-        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
-        rect.fill()
+        NSColor.controlAccentColor.withAlphaComponent(0.06).setFill()
+        path.fill()
     }
 }
