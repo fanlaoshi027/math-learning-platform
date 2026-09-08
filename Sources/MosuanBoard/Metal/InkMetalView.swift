@@ -115,6 +115,16 @@ final class InkMetalView: MTKView {
         pasteboard.setData(data, forType: Self.mosuanClipboardType)
     }
 
+    private func cutSelectionToPasteboard() {
+        guard renderer.hasSelection, let data = renderer.makeSelectionClipboardData() else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard pasteboard.setData(data, forType: Self.mosuanClipboardType) else { return }
+        renderer.deleteSelected()
+        notifyState()
+        draw()
+    }
+
     private func pasteSelectionFromPasteboard() {
         guard let data = NSPasteboard.general.data(forType: Self.mosuanClipboardType),
               renderer.pasteSelectionClipboardData(data) else { return }
@@ -260,6 +270,9 @@ final class InkMetalView: MTKView {
             switch key {
             case "c":
                 if renderer.hasSelection { copySelectionToPasteboard() }
+                return
+            case "x":
+                cutSelectionToPasteboard()
                 return
             case "v":
                 pasteSelectionFromPasteboard()
