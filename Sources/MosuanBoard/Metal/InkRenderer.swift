@@ -49,17 +49,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     }
 
     func setPenStyle(_ style: PenStyle) { penStyle = style; rebuildGeometry() }
-
-    func setBackgroundColor(_ color: SIMD4<Float>) {
-        backgroundColor = color
-        rebuildGeometry()
-    }
-
-    func setDisplayInverted(_ inverted: Bool) {
-        displayInverted = inverted
-        rebuildGeometry()
-    }
-
+    func setBackgroundColor(_ color: SIMD4<Float>) { backgroundColor = color; rebuildGeometry() }
+    func setDisplayInverted(_ inverted: Bool) { displayInverted = inverted; rebuildGeometry() }
     func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
 
     func commitStroke(_ points: [InkPoint]) {
@@ -71,15 +62,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         rebuildGeometry()
     }
 
-    func undo() {
-        guard let stroke = committedStrokes.popLast() else { return }
-        redoStrokes.append(stroke); selectedStrokeIndex = nil; rebuildGeometry()
-    }
-
-    func redo() {
-        guard let stroke = redoStrokes.popLast() else { return }
-        committedStrokes.append(stroke); selectedStrokeIndex = nil; rebuildGeometry()
-    }
+    func undo() { guard let stroke = committedStrokes.popLast() else { return }; redoStrokes.append(stroke); selectedStrokeIndex = nil; rebuildGeometry() }
+    func redo() { guard let stroke = redoStrokes.popLast() else { return }; committedStrokes.append(stroke); selectedStrokeIndex = nil; rebuildGeometry() }
 
     @discardableResult
     func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool {
@@ -236,9 +220,9 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         guard displayInverted else { return color }
         let brightness = max(color.x, max(color.y, color.z))
         let darkness = min(color.x, min(color.y, color.z))
-        // Eye-comfort inversion only swaps near-black and near-white; chromatic ink keeps its hue.
+        // 护眼深色背景：黑色墨迹变成白色；彩色墨迹保持原色；白色墨迹也保持白色。
         if brightness < 0.12 { color.x = 1; color.y = 1; color.z = 1 }
-        else if darkness > 0.88 { color.x = 0; color.y = 0; color.z = 0 }
+        else if darkness > 0.88 { color.x = 1; color.y = 1; color.z = 1 }
         return color
     }
 
