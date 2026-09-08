@@ -24,7 +24,7 @@ struct BoardView: View {
     }
 }
 
-enum BoardTool: Equatable { case select, pen, eraser }
+enum BoardTool: Equatable { case select, pen, line, smartLine, eraser }
 
 struct MetalInkCanvas: NSViewRepresentable {
     @Binding var tool: BoardTool
@@ -44,8 +44,10 @@ struct MetalInkCanvas: NSViewRepresentable {
     }
 
     private func configure(_ view: InkMetalView) {
-        view.isUserInteractionEnabledForTool = tool == .pen
+        view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine
         view.isSelectionTool = tool == .select
+        view.isLineTool = tool == .line
+        view.isSmartLineTool = tool == .smartLine
         view.isEraserTool = tool == .eraser
         view.penStyle = penStyle
     }
@@ -61,6 +63,8 @@ struct ToolbarView: View {
             Divider().frame(height: 24)
             ToolButton(title: "选择", systemImage: "cursorarrow", selected: selectedTool == .select) { selectedTool = .select }
             ToolButton(title: "画笔", systemImage: "pencil.tip", selected: selectedTool == .pen) { selectedTool = .pen }
+            ToolButton(title: "直线", systemImage: "line.diagonal", selected: selectedTool == .line) { selectedTool = .line }
+            ToolButton(title: "智能直线", systemImage: "scribble.variable", selected: selectedTool == .smartLine) { selectedTool = .smartLine }
             ToolButton(title: "橡皮", systemImage: "eraser", selected: selectedTool == .eraser) { selectedTool = .eraser }
             Divider().frame(height: 24)
             PenTray(selectedPresetID: $selectedPresetID)
