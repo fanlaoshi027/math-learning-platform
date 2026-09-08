@@ -4,6 +4,7 @@ import simd
 
 final class InkMetalView: MTKView {
     private let renderer: InkRenderer
+    private let marqueeOverlay = MarqueeOverlayView()
     private var points:[InkPoint]=[]
     private var eraserPoints:[SIMD2<Float>]=[]
     private var active=false
@@ -37,11 +38,12 @@ final class InkMetalView: MTKView {
     var boardBackground:SIMD4<Float>=SIMD4(1,1,1,1){didSet{renderer.setBackgroundColor(boardBackground)}}
     var displayInverted=false{didSet{renderer.setDisplayInverted(displayInverted)}}
     var canUndo:Bool{renderer.canUndo};var canRedo:Bool{renderer.canRedo};var hasSelection:Bool{renderer.hasSelection};var selectionCount:Int{renderer.selectionCount};var selectedRotationDegrees:Double{renderer.selectedRotationDegrees};var zoomPercent:Int{renderer.zoomPercent}
+    var selectionBoundsInView:CGRect?{renderer.selectionBoundsInView()}
     override var isFlipped:Bool{true};override var acceptsFirstResponder:Bool{true}
 
     init(frame frameRect:NSRect = .zero){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(frame:frameRect,device:device);configureMetal();renderer.setPenStyle(penStyle)}
     required init(coder:NSCoder){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(coder:coder);self.device=device;configureMetal();renderer.setPenStyle(penStyle)}
-    private func configureMetal(){delegate=renderer;isPaused=true;enableSetNeedsDisplay=true;framebufferOnly=true;colorPixelFormat=.bgra8Unorm;clearColor=MTLClearColor(red:1,green:1,blue:1,alpha:1)}
+    private func configureMetal(){delegate=renderer;isPaused=true;enableSetNeedsDisplay=true;framebufferOnly=true;colorPixelFormat=.bgra8Unorm;clearColor=MTLClearColor(red:1,green:1,blue:1,alpha:1);marqueeOverlay.isHidden=true;marqueeOverlay.autoresizingMask=[.width,.height];addSubview(marqueeOverlay)}
 
     func loadPageState(_ state:CanvasPageState){renderer.importPageState(state);onHistoryChanged?();onSelectionChanged?();draw()};func currentPageState()->CanvasPageState{renderer.exportPageState()}
     func undo(){renderer.undo();notifyState();draw()};func redo(){renderer.redo();notifyState();draw()};func deleteSelected(){renderer.deleteSelected();notifyState();draw()};func setSelectedRotationDegrees(_ d:Double){renderer.setSelectedRotationDegrees(d);notifyState();draw()}
@@ -60,7 +62,7 @@ final class InkMetalView: MTKView {
             if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return}
             if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return}
             if renderer.selectStroke(at:p){selectionDrag=true;lastPoint=p;onSelectionChanged?();draw();return}
-            marqueeActive=true;marqueeStart=p;marqueeCurrent=p;renderer.clearSelection();onSelectionChanged?();draw();return
+            marqueeActive=true;marqueeStart=p;marqueeCurrent=p;renderer.clearSelection();marqueeOverlay.update(rect:marqueeRect(from:p,to:p),visible:true);onSelectionChanged?();draw();return
         }
         guard isUserInteractionEnabledForTool else{return};renderer.beginHistoryTransaction();active=true;smartLineDetected=false;smartLineWorkItem?.cancel();let c=renderer.canvasPoint(from:p);points=[InkPoint(x:c.x,y:c.y,pressure:event.pressure>0 ? Float(event.pressure):1)];renderer.setStroke(points);draw()
     }
@@ -69,9 +71,9 @@ final class InkMetalView: MTKView {
         if selectionModeActive{
             if rotationCenterDrag{renderer.setRotationCenter(to:p);draw();return}
             if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return}
-            if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);draw();return}
-            if marqueeActive{marqueeCurrent=p;draw();return}
-            guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;draw()};return
+            if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);onSelectionChanged?();draw();return}
+            if marqueeActive{marqueeCurrent=p;marqueeOverlay.update(rect:marqueeRect(from:marqueeStart,to:p),visible:true);draw();return}
+            guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;onSelectionChanged?();draw()};return
         }
         guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points);scheduleSmartLineDetection();draw()
     }
@@ -79,7 +81,7 @@ final class InkMetalView: MTKView {
         if event.buttonNumber==2 || middleButtonHeld{middleButtonHeld=false;panDrag=false;return};if panDrag{panDrag=false;return}
         if isEraserTool && !temporarySelectHeld{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return}
         if selectionModeActive{
-            if marqueeActive{marqueeCurrent=p;let r=marqueeRect(from:marqueeStart,to:marqueeCurrent);if r.width>4 || r.height>4{renderer.selectStrokes(in:r)}else{renderer.clearSelection()};marqueeActive=false;onSelectionChanged?();draw();return}
+            if marqueeActive{marqueeCurrent=p;let r=marqueeRect(from:marqueeStart,to:marqueeCurrent);if r.width>4 || r.height>4{renderer.selectStrokes(in:r)}else{renderer.clearSelection()};marqueeActive=false;marqueeOverlay.update(rect:.zero,visible:false);onSelectionChanged?();draw();return}
             rotationCenterDrag=false;rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();draw();return
         }
         guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));let committed=(isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points;renderer.commitStroke(committed);renderer.endHistoryTransaction();points.removeAll(keepingCapacity:true);active=false;smartLineDetected=false;renderer.setStroke([]);notifyState();draw()
@@ -88,7 +90,7 @@ final class InkMetalView: MTKView {
     override func scrollWheel(with event:NSEvent){let p=makePoint(from:event);if event.modifierFlags.contains(.command){let factor=powf(1.0018,Float(event.scrollingDeltaY));renderer.zoom(by:factor,around:p);onZoomChanged?(renderer.zoomPercent);draw()}else{renderer.pan(by:SIMD2(Float(event.scrollingDeltaX),Float(event.scrollingDeltaY)));draw()}}
     override func keyDown(with event:NSEvent){if event.isARepeat{return};if event.keyCode==58 || event.keyCode==61{temporarySelectHeld=true;return};if event.keyCode==49{spaceHeld=true;return};if selectionModeActive && event.keyCode==51{deleteSelected();return};if event.modifierFlags.contains(.command) && event.keyCode==24{zoomIn();return};if event.modifierFlags.contains(.command) && event.keyCode==27{zoomOut();return};if event.modifierFlags.contains(.command) && event.keyCode==36{resetZoom();return};super.keyDown(with:event)}
     override func keyUp(with event:NSEvent){if event.keyCode==58 || event.keyCode==61{temporarySelectHeld=false;return};if event.keyCode==49{spaceHeld=false;panDrag=false;return};super.keyUp(with:event)}
-    override func tabletPoint(with event:NSEvent){switch event.phase{case .began:mouseDown(with:event);case .changed:mouseDragged(with:event);case .ended:mouseUp(with:event);case .cancelled:smartLineWorkItem?.cancel();active=false;points.removeAll(keepingCapacity:true);renderer.setStroke([]);renderer.endHistoryTransaction();draw();default:break}}
+    override func tabletPoint(with event:NSEvent){switch event.phase{case .began:mouseDown(with:event);case .changed:mouseDragged(with:event);case .ended:mouseUp(with:event);case .cancelled:smartLineWorkItem?.cancel();active=false;points.removeAll(keepingCapacity:true);renderer.setStroke([]);renderer.endHistoryTransaction();marqueeOverlay.update(rect:.zero,visible:false);draw();default:break}}
 
     private func marqueeRect(from a:SIMD2<Float>,to b:SIMD2<Float>)->CGRect{CGRect(x:CGFloat(min(a.x,b.x)),y:CGFloat(min(a.y,b.y)),width:CGFloat(abs(b.x-a.x)),height:CGFloat(abs(b.y-a.y)))}
     private func scheduleSmartLineDetection(){guard isSmartLineTool,points.count>=4 else{return};smartLineWorkItem?.cancel();let work=DispatchWorkItem{[weak self] in guard let self,self.active,self.isSmartLineTool,self.points.count>=4 else{return};if self.isLikelyStraightLine(self.points){self.smartLineDetected=true;self.renderer.setStroke(self.linePreview(from:self.points));self.draw()}};smartLineWorkItem=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.18,execute:work)}
@@ -97,4 +99,44 @@ final class InkMetalView: MTKView {
     private func eraseAlongPath(_ path:[SIMD2<Float>]){guard !path.isEmpty else{return};var deleted=false;for p in path{if renderer.selectStroke(at:p,tolerance:16){renderer.deleteSelected();deleted=true}};guard path.count>=8 else{if deleted{draw()};return};var minX=path[0].x,maxX=path[0].x,minY=path[0].y,maxY=path[0].y;for p in path{minX=min(minX,p.x);maxX=max(maxX,p.x);minY=min(minY,p.y);maxY=max(maxY,p.y)};let w=maxX-minX,h=maxY-minY;guard w>20,h>20 else{if deleted{draw()};return};var y=minY+6;while y<maxY{var x=minX+6;while x<maxX{let dx=(x-(minX+maxX)*0.5)/max(w*0.5,1),dy=(y-(minY+maxY)*0.5)/max(h*0.5,1);if dx*dx+dy*dy<=1.15,renderer.selectStroke(at:SIMD2(x,y),tolerance:10){renderer.deleteSelected();deleted=true};x+=12};y+=12};if deleted{draw()}}
     private func distanceToSegment(_ p:SIMD2<Float>,_ a:SIMD2<Float>,_ b:SIMD2<Float>)->Float{let ab=b-a,l=simd_length_squared(ab);if l<0.0001{return simd_distance(p,a)};let t=max(0,min(1,simd_dot(p-a,ab)/l));return simd_distance(p,a+ab*t)}
     private func makePoint(from event:NSEvent)->SIMD2<Float>{let p=convert(event.locationInWindow,from:nil);return SIMD2(Float(p.x),Float(p.y))}
+}
+
+private final class MarqueeOverlayView: NSView {
+    private var rect = CGRect.zero
+    private var visible = false
+
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        isOpaque = false
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        isOpaque = false
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func update(rect: CGRect, visible: Bool) {
+        self.rect = rect.standardized
+        self.visible = visible
+        isHidden = !visible
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard visible, rect.width > 0, rect.height > 0 else { return }
+        let path = NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5))
+        path.lineWidth = 1
+        let dash: [CGFloat] = [5, 4]
+        path.setLineDash(dash, count: dash.count, phase: 0)
+        NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
+        path.stroke()
+        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
+        rect.fill()
+    }
 }
