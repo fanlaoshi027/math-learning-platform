@@ -12,6 +12,8 @@ final class PageController: ObservableObject {
     var pages: [BoardPage] { document.pages }
     var currentIndex: Int { document.currentPageIndex }
 
+    var currentPage: BoardPage? { document.currentPage }
+
     func selectPage(_ index: Int) {
         guard document.pages.indices.contains(index) else { return }
         document.currentPageIndex = index
@@ -37,5 +39,15 @@ final class PageController: ObservableObject {
         guard document.pages.indices.contains(index) else { return }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         document.pages[index].title = trimmed.isEmpty ? "第 \(index + 1) 页" : trimmed
+    }
+
+    /// Called by the canvas whenever a real page mutation occurs.
+    /// Keeping this at document level makes page switching lossless.
+    func saveCurrentPageState(_ state: CanvasPageState) {
+        document.updateCurrentPageContent(state)
+    }
+
+    func savePageState(_ state: CanvasPageState, at index: Int) {
+        document.updatePageContent(state, at: index)
     }
 }
