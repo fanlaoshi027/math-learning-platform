@@ -12,7 +12,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MosuanBoard",
-            path: "Sources/MosuanBoard"
+            path: "Sources/MosuanBoard",
+            resources: [
+                .process("Metal")
+            ]
         )
     ]
 )
