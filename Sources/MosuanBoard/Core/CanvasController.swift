@@ -22,7 +22,7 @@ final class CanvasController: ObservableObject {
             self.hasSelection = canvas.hasSelection
             self.selectionCount = canvas.selectionCount
             self.rotationDegrees = canvas.selectedRotationDegrees
-            self.selectionFrame = canvas.selectionBoundsInView() ?? .zero
+            self.selectionFrame = canvas.selectionBoundsInView ?? .zero
         }
         refreshState()
     }
@@ -42,6 +42,6 @@ final class CanvasController: ObservableObject {
         hasSelection = canvas?.hasSelection ?? false
         selectionCount = canvas?.selectionCount ?? 0
         rotationDegrees = canvas?.selectedRotationDegrees ?? 0
-        selectionFrame = canvas?.selectionBoundsInView() ?? .zero
+        selectionFrame = canvas?.selectionBoundsInView ?? .zero
     }
 }
