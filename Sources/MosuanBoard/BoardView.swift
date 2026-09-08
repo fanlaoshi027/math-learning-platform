@@ -1,14 +1,52 @@
 import SwiftUI
 
 enum BoardTool: Equatable { case select, pen, line, smartLine, eraser }
+enum ToolbarDockPosition: String, CaseIterable, Codable { case top, bottom, leading, trailing
+    var isVertical: Bool { self == .leading || self == .trailing }
+    var title: String { switch self { case .top: "顶部"; case .bottom: "底部"; case .leading: "左侧"; case .trailing: "右侧" } }
+}
+
 enum BoardBackground: String, CaseIterable, Identifiable { case white, black, darkGray, lightGray, cream; var id:String{rawValue}; var title:String{switch self{case .white:"白色";case .black:"黑色";case .darkGray:"深灰";case .lightGray:"浅灰";case .cream:"米白"}}; var color:Color{switch self{case .white:.white;case .black:.black;case .darkGray:Color(white:0.18);case .lightGray:Color(white:0.92);case .cream:Color(red:0.98,green:0.96,blue:0.88)}}; var metal:SIMD4<Float>{switch self{case .white:SIMD4(1,1,1,1);case .black:SIMD4(0,0,0,1);case .darkGray:SIMD4(0.18,0.18,0.18,1);case .lightGray:SIMD4(0.92,0.92,0.92,1);case .cream:SIMD4(0.98,0.96,0.88,1)}} }
 enum BoardPattern:Int,CaseIterable,Identifiable{case blank=0,ruled=1,grid=2,dots=3,mathGrid=4;var id:Int{rawValue};var title:String{switch self{case .blank:"空白";case .ruled:"横线";case .grid:"方格";case .dots:"点阵";case .mathGrid:"数学方格"}}}
 enum EyeComfortBackground:String,CaseIterable,Identifiable{case black90,deepGreen,deepBlue,custom;var id:String{rawValue};var title:String{switch self{case .black90:"90%黑";case .deepGreen:"深绿";case .deepBlue:"深蓝";case .custom:"自定义色值"}};var color:SIMD4<Float>{switch self{case .black90:SIMD4(0.1,0.1,0.1,1);case .deepGreen:SIMD4(0.08,0.16,0.12,1);case .deepBlue:SIMD4(0.07,0.12,0.22,1);case .custom:SIMD4(0.1,0.1,0.1,1)}}}
 
 struct BoardView:View{
  @State private var selectedTool:BoardTool=.pen;@State private var selectedPresetID=PenPreset.defaults[0].id;@State private var zoomPercent=100
+ @State private var toolbarDock:ToolbarDockPosition = BoardView.loadToolbarDock()
  @StateObject private var canvasController=CanvasController();@StateObject private var pageController=PageController();@State private var pageStates:[UUID:CanvasPageState]=[:]
- var body:some View{VStack(spacing:0){ToolbarView(selectedTool:$selectedTool,selectedPresetID:$selectedPresetID,zoomPercent:$zoomPercent,onZoomOut:{zoomPercent=max(25,Int((Float(zoomPercent)/1.2).rounded()))},onZoomIn:{zoomPercent=min(400,Int((Float(zoomPercent)*1.2).rounded()))},onZoomReset:{zoomPercent=100});Divider();HStack(spacing:0){PageSidebar(controller:pageController);Divider();let page=pageController.document.currentPage;ZStack{Color(nsColor:.windowBackgroundColor);MetalInkCanvas(pageID:page?.id ?? UUID(),pageState:pageStates[page?.id ?? UUID()] ?? CanvasPageState(),tool:$selectedTool,penStyle:PenPreset.defaults.first(where:{$0.id==selectedPresetID})?.style ?? PenPreset.defaults[0].style,controller:canvasController,background:metalBackground(page?.background),pattern:BoardPattern(rawValue:page?.pattern ?? 0) ?? .blank,zoomPercent:$zoomPercent,onPageStateChanged:{state in if let id=pageController.document.currentPage?.id{pageStates[id]=state}}).padding(24)}}}}
+ private static func loadToolbarDock()->ToolbarDockPosition{guard let raw=UserDefaults.standard.string(forKey:"mosuan.toolbarDock"),let value=ToolbarDockPosition(rawValue:raw) else{return .top};return value}
+ private func saveToolbarDock(){UserDefaults.standard.set(toolbarDock.rawValue,forKey:"mosuan.toolbarDock")}
+ private func setToolbarDock(_ value:ToolbarDockPosition){toolbarDock=value;saveToolbarDock()}
+ var body:some View{
+   Group{
+     switch toolbarDock {
+     case .top: verticalLayout(toolbarAtTop:true)
+     case .bottom: verticalLayout(toolbarAtTop:false)
+     case .leading: horizontalLayout(toolbarOnLeading:true)
+     case .trailing: horizontalLayout(toolbarOnLeading:false)
+     }
+   }
+ }
+ @ViewBuilder private func verticalLayout(toolbarAtTop:Bool)->some View{
+   VStack(spacing:0){
+     if toolbarAtTop { toolbar(horizontal:true); Divider() }
+     mainContent
+     if !toolbarAtTop { Divider(); toolbar(horizontal:true) }
+   }
+ }
+ @ViewBuilder private func horizontalLayout(toolbarOnLeading:Bool)->some View{
+   HStack(spacing:0){
+     if toolbarOnLeading { toolbar(horizontal:false); Divider() }
+     mainContent
+     if !toolbarOnLeading { Divider(); toolbar(horizontal:false) }
+   }
+ }
+ private var mainContent:some View{
+   HStack(spacing:0){PageSidebar(controller:pageController);Divider();let page=pageController.document.currentPage;ZStack{Color(nsColor:.windowBackgroundColor);MetalInkCanvas(pageID:page?.id ?? UUID(),pageState:pageStates[page?.id ?? UUID()] ?? CanvasPageState(),tool:$selectedTool,penStyle:PenPreset.defaults.first(where:{$0.id==selectedPresetID})?.style ?? PenPreset.defaults[0].style,controller:canvasController,background:metalBackground(page?.background),pattern:BoardPattern(rawValue:page?.pattern ?? 0) ?? .blank,zoomPercent:$zoomPercent,onPageStateChanged:{state in if let id=pageController.document.currentPage?.id{pageStates[id]=state}}).padding(24)}}
+ }
+ @ViewBuilder private func toolbar(horizontal:Bool)->some View{
+   ToolbarView(selectedTool:$selectedTool,selectedPresetID:$selectedPresetID,zoomPercent:$zoomPercent,dock:toolbarDock,onDock:{setToolbarDock($0)},horizontal:horizontal,onZoomOut:{zoomPercent=max(25,Int((Float(zoomPercent)/1.2).rounded()))},onZoomIn:{zoomPercent=min(400,Int((Float(zoomPercent)*1.2).rounded()))},onZoomReset:{zoomPercent=100})
+ }
  private func metalBackground(_ value:String?)->SIMD4<Float>{switch value{case "black":SIMD4(0,0,0,1);case "darkGray":SIMD4(0.18,0.18,0.18,1);case "lightGray":SIMD4(0.92,0.92,0.92,1);case "cream":SIMD4(0.98,0.96,0.88,1);default:SIMD4(1,1,1,1)}}
 }
 
@@ -24,7 +62,16 @@ struct MetalInkCanvas:NSViewRepresentable{
  final class Coordinator{var loadedPageID:UUID?}
 }
 
-struct ToolbarView:View{@Binding var selectedTool:BoardTool;@Binding var selectedPresetID:UUID;@Binding var zoomPercent:Int;let onZoomOut:()->Void;let onZoomIn:()->Void;let onZoomReset:()->Void
- var body:some View{HStack(spacing:10){Text("Mosuan Board").font(.headline).padding(.horizontal,8);Divider().frame(height:24);ToolButton(title:"选择",systemImage:"cursorarrow",selected:selectedTool==.select){selectedTool=.select};ToolButton(title:"画笔",systemImage:"pencil.tip",selected:selectedTool==.pen){selectedTool=.pen};ToolButton(title:"直线",systemImage:"line.diagonal",selected:selectedTool==.line){selectedTool=.line};ToolButton(title:"智能直线",systemImage:"scribble.variable",selected:selectedTool==.smartLine){selectedTool=.smartLine};ToolButton(title:"橡皮",systemImage:"eraser",selected:selectedTool==.eraser){selectedTool=.eraser};Divider().frame(height:24);PenTray(selectedPresetID:$selectedPresetID);Spacer();HStack(spacing:2){Button(action:onZoomOut){Image(systemName:"minus.magnifyingglass")}.buttonStyle(.borderless);Button(action:onZoomReset){Text("\(zoomPercent)%").font(.system(size:12,weight:.medium)).frame(minWidth:44)}.buttonStyle(.borderless);Button(action:onZoomIn){Image(systemName:"plus.magnifyingglass")}.buttonStyle(.borderless)}.padding(.horizontal,6).help("缩放：⌘滚轮")}.padding(.horizontal,14).frame(height:52)}}
-struct PenTray:View{@Binding var selectedPresetID:UUID;var body:some View{HStack(spacing:5){ForEach(PenPreset.defaults){p in Button{selectedPresetID=p.id}label:{VStack(spacing:2){Circle().fill(Color(red:p.style.color.red,green:p.style.color.green,blue:p.style.color.blue)).frame(width:19,height:19).overlay{Circle().stroke(selectedPresetID==p.id ? Color.accentColor:.clear,lineWidth:2)};Text(p.name).font(.system(size:9)).lineLimit(1)}.frame(width:52,height:39)}.buttonStyle(.plain)}}}}
+struct ToolbarView:View{@Binding var selectedTool:BoardTool;@Binding var selectedPresetID:UUID;@Binding var zoomPercent:Int;let dock:ToolbarDockPosition;let onDock:(ToolbarDockPosition)->Void;let horizontal:Bool;let onZoomOut:()->Void;let onZoomIn:()->Void;let onZoomReset:()->Void
+ var body:some View{Group{if horizontal{horizontalBody}else{verticalBody}}.padding(horizontal ? .horizontal : .vertical,12).padding(horizontal ? .vertical : .horizontal,8).frame(height:horizontal ? 52 : nil).frame(width:horizontal ? nil : 76).background(.regularMaterial).contentShape(Rectangle())}
+ private var horizontalBody:some View{HStack(spacing:10){dragHandle;Text("Mosuan Board").font(.headline).padding(.horizontal,8);Divider().frame(height:24);tools;Divider().frame(height:24);PenTray(selectedPresetID:$selectedPresetID);Spacer();zoomControls;dockMenu}}
+ private var verticalBody:some View{VStack(spacing:10){dragHandle;Text("M").font(.headline);Divider().frame(width:36);ToolButton(title:"选择",systemImage:"cursorarrow",selected:selectedTool==.select){selectedTool=.select};ToolButton(title:"画笔",systemImage:"pencil.tip",selected:selectedTool==.pen){selectedTool=.pen};ToolButton(title:"直线",systemImage:"line.diagonal",selected:selectedTool==.line){selectedTool=.line};ToolButton(title:"智能",systemImage:"scribble.variable",selected:selectedTool==.smartLine){selectedTool=.smartLine};ToolButton(title:"橡皮",systemImage:"eraser",selected:selectedTool==.eraser){selectedTool=.eraser};Divider().frame(width:36);PenTray(selectedPresetID:$selectedPresetID,vertical:true);zoomControls;dockMenu}}
+ private var tools:some View{HStack(spacing:8){ToolButton(title:"选择",systemImage:"cursorarrow",selected:selectedTool==.select){selectedTool=.select};ToolButton(title:"画笔",systemImage:"pencil.tip",selected:selectedTool==.pen){selectedTool=.pen};ToolButton(title:"直线",systemImage:"line.diagonal",selected:selectedTool==.line){selectedTool=.line};ToolButton(title:"智能直线",systemImage:"scribble.variable",selected:selectedTool==.smartLine){selectedTool=.smartLine};ToolButton(title:"橡皮",systemImage:"eraser",selected:selectedTool==.eraser){selectedTool=.eraser}}
+ private var dragHandle:some View{Image(systemName:horizontal ? "line.3.horizontal" : "line.3.horizontal").foregroundStyle(.secondary).padding(6).contentShape(Rectangle()).help("工具栏拖动手柄；也可从右侧菜单选择停靠位置")}
+ private var zoomControls:some View{HStack(spacing:2){Button(action:onZoomOut){Image(systemName:"minus.magnifyingglass")}.buttonStyle(.borderless);Button(action:onZoomReset){Text("\(zoomPercent)%").font(.system(size:12,weight:.medium)).frame(minWidth:44)}.buttonStyle(.borderless);Button(action:onZoomIn){Image(systemName:"plus.magnifyingglass")}.buttonStyle(.borderless)}.padding(.horizontal,6).help("缩放：⌘滚轮")}
+ private var dockMenu:some View{Menu{ForEach(ToolbarDockPosition.allCases,id:\.self){position in Button{onDock(position)}label:{Label(position.title,systemImage:position == dock ? "checkmark" : (position.isVertical ? "rectangle.split.2x1" : "rectangle.split.1x2"))}}}label:{Image(systemName:"dock.rectangle").frame(width:24,height:24)}.menuStyle(.borderlessButton).help("工具栏停靠位置")}
+}
+
+struct PenTray:View{@Binding var selectedPresetID:UUID;var vertical=false;var body:some View{Group{if vertical{VStack(spacing:5){presets}}else{HStack(spacing:5){presets}}}.frame(maxWidth:vertical ? nil : .infinity)}
+ @ViewBuilder private var presets:some View{ForEach(PenPreset.defaults){p in Button{selectedPresetID=p.id}label:{VStack(spacing:2){Circle().fill(Color(red:p.style.color.red,green:p.style.color.green,blue:p.style.color.blue)).frame(width:19,height:19).overlay{Circle().stroke(selectedPresetID==p.id ? Color.accentColor:.clear,lineWidth:2)};if !vertical{Text(p.name).font(.system(size:9)).lineLimit(1)}}.frame(width:vertical ? 48 : 52,height:39)}.buttonStyle(.plain)}}}
 struct ToolButton:View{let title:String;let systemImage:String;let selected:Bool;let action:()->Void;var body:some View{Button(action:action){Label(title,systemImage:systemImage).padding(.horizontal,8)}.buttonStyle(.bordered).tint(selected ? .accentColor:.secondary)}}
