@@ -15,6 +15,7 @@ final class InkMetalView: MTKView {
     private var temporarySelectHeld = false
     private var resizeHandle: InkRenderer.SelectionHandle?
     private var lineEndpointDrag: (id: UUID, endpoint: Int)?
+    private var polygonVertexDrag: (id: UUID, vertexIndex: Int)?
     private var rotationDrag = false
     private var rotationCenterDrag = false
     private var panDrag = false
@@ -84,6 +85,7 @@ final class InkMetalView: MTKView {
 
     func loadPageState(_ state: CanvasPageState) {
         polygonModel.cancel()
+        polygonVertexDrag = nil
         renderer.importPageState(state)
         onHistoryChanged?()
         onSelectionChanged?()
@@ -119,6 +121,7 @@ final class InkMetalView: MTKView {
 
         guard !isPolygonTool else { return }
         if selectionModeActive {
+            if let vertex = renderer.polygonVertex(at: p) { renderer.beginHistoryTransaction(); polygonVertexDrag = vertex; return }
             if let endpoint = renderer.lineEndpoint(at: p) { renderer.beginHistoryTransaction(); lineEndpointDrag = endpoint; return }
             if renderer.rotationCenterHandle(at: p) { renderer.beginHistoryTransaction(); rotationCenterDrag = true; return }
             if renderer.rotationHandle(at: p) { renderer.beginHistoryTransaction(); rotationDrag = true; lastRotationPoint = p; return }
@@ -150,6 +153,7 @@ final class InkMetalView: MTKView {
         if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); return }
         if isPolygonTool { return }
         if selectionModeActive {
+            if let vertex = polygonVertexDrag { _ = renderer.moveSelectedPolygonVertex(id: vertex.id, vertexIndex: vertex.vertexIndex, to: p); onSelectionChanged?(); draw(); return }
             if let endpoint = lineEndpointDrag { _ = renderer.moveSelectedLineEndpoint(id: endpoint.id, endpoint: endpoint.endpoint, to: p); onSelectionChanged?(); draw(); return }
             if rotationCenterDrag { renderer.setRotationCenter(to: p); onSelectionChanged?(); draw(); return }
             if rotationDrag { renderer.rotateSelected(to: p, from: lastRotationPoint); lastRotationPoint = p; onSelectionChanged?(); draw(); return }
@@ -194,6 +198,7 @@ final class InkMetalView: MTKView {
                 draw()
                 return
             }
+            polygonVertexDrag = nil
             lineEndpointDrag = nil
             rotationCenterDrag = false
             rotationDrag = false
@@ -271,6 +276,8 @@ final class InkMetalView: MTKView {
             renderer.setStroke([])
             renderer.endHistoryTransaction()
             polygonModel.cancel()
+            polygonVertexDrag = nil
+            lineEndpointDrag = nil
             marqueeOverlay.update(rect: .zero, visible: false)
             draw()
         default: break
