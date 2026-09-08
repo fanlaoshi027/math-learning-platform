@@ -31,7 +31,10 @@ struct GraphicSelectionModel: Equatable {
     }
 
     mutating func set(_ ids: [UUID]) {
-        selectedIDs = Array(NSOrderedSet(array: ids)) as? [UUID] ?? ids
+        var unique: [UUID] = []
+        unique.reserveCapacity(ids.count)
+        for id in ids where !unique.contains(id) { unique.append(id) }
+        selectedIDs = unique
         rotationCenter = nil
     }
 
