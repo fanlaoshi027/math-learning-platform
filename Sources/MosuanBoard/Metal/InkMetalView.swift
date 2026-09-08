@@ -11,6 +11,7 @@ final class InkMetalView: MTKView {
     private var selectionDrag = false
     private var lassoActive = false
     private var lassoPoints: [SIMD2<Float>] = []
+    private var lassoOperation: SelectionOperation = .replace
     private var temporarySelectHeld = false
     private var resizeHandle: InkRenderer.SelectionHandle?
     private var lineEndpointDrag: (id: UUID, endpoint: Int)?
@@ -51,9 +52,7 @@ final class InkMetalView: MTKView {
     override var acceptsFirstResponder: Bool { true }
 
     init(frame frameRect: NSRect = .zero) {
-        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else {
-            fatalError("Metal is unavailable on this Mac")
-        }
+        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else { fatalError("Metal is unavailable on this Mac") }
         self.renderer = renderer
         super.init(frame: frameRect, device: device)
         configureMetal()
@@ -61,9 +60,7 @@ final class InkMetalView: MTKView {
     }
 
     required init(coder: NSCoder) {
-        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else {
-            fatalError("Metal is unavailable on this Mac")
-        }
+        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else { fatalError("Metal is unavailable on this Mac") }
         self.renderer = renderer
         super.init(coder: coder)
         configureMetal()
@@ -115,28 +112,36 @@ final class InkMetalView: MTKView {
         if event.buttonNumber == 2 { middleButtonHeld = true; panDrag = true; lastPoint = p; return }
         if spaceHeld { panDrag = true; lastPoint = p; return }
         if isEraserTool && !temporarySelectHeld { renderer.beginHistoryTransaction(); eraserPoints = [p]; return }
-
-        if isPolygonTool && !selectionModeActive {
-            handlePolygonClick(at: p)
-            return
-        }
-
+        if isPolygonTool && !selectionModeActive { handlePolygonClick(at: p); return }
         guard !isPolygonTool else { return }
+
         if selectionModeActive {
             if let vertex = renderer.polygonVertex(at: p) { renderer.beginHistoryTransaction(); polygonVertexDrag = vertex; return }
             if let endpoint = renderer.lineEndpoint(at: p) { renderer.beginHistoryTransaction(); lineEndpointDrag = endpoint; return }
             if renderer.rotationCenterHandle(at: p) { renderer.beginHistoryTransaction(); rotationCenterDrag = true; return }
             if renderer.rotationHandle(at: p) { renderer.beginHistoryTransaction(); rotationDrag = true; lastRotationPoint = p; return }
             if let handle = renderer.selectionHandle(at: p) { renderer.beginHistoryTransaction(); resizeHandle = handle; return }
-            if renderer.selectObject(at: p) || renderer.selectStroke(at: p) { selectionDrag = true; lastPoint = p; onSelectionChanged?(); draw(); return }
+
+            let operation = SelectionOperation.fromModifiers(event.modifierFlags)
+            renderer.beginHistoryTransaction()
+            if renderer.selectObject(at: p, operation: operation) || renderer.selectStroke(at: p, operation: operation) {
+                selectionDrag = true
+                lastPoint = p
+                onSelectionChanged?()
+                draw()
+                return
+            }
+
             lassoActive = true
+            lassoOperation = operation
             lassoPoints = [p]
-            renderer.clearSelection()
+            if operation == .replace { renderer.clearSelection() }
             lassoOverlay.update(points: lassoPoints, visible: true)
             onSelectionChanged?()
             draw()
             return
         }
+
         guard isUserInteractionEnabledForTool else { return }
         renderer.beginHistoryTransaction()
         active = true
@@ -159,12 +164,7 @@ final class InkMetalView: MTKView {
             if rotationCenterDrag { renderer.setRotationCenter(to: p); onSelectionChanged?(); draw(); return }
             if rotationDrag { renderer.rotateSelected(to: p, from: lastRotationPoint); lastRotationPoint = p; onSelectionChanged?(); draw(); return }
             if let handle = resizeHandle { renderer.resizeSelected(handle: handle, to: p); onSelectionChanged?(); draw(); return }
-            if lassoActive {
-                appendLassoPoint(p)
-                lassoOverlay.update(points: lassoPoints, visible: true)
-                draw()
-                return
-            }
+            if lassoActive { appendLassoPoint(p); lassoOverlay.update(points: lassoPoints, visible: true); draw(); return }
             guard selectionDrag else { return }
             let delta = renderer.canvasPoint(from: p) - renderer.canvasPoint(from: lastPoint)
             if simd_length_squared(delta) > 0 { renderer.moveSelected(by: delta); lastPoint = p; onSelectionChanged?(); draw() }
@@ -185,27 +185,19 @@ final class InkMetalView: MTKView {
         if event.buttonNumber == 2 || middleButtonHeld { middleButtonHeld = false; panDrag = false; return }
         if panDrag { panDrag = false; return }
         if isPolygonTool { return }
-        if isEraserTool && !temporarySelectHeld {
-            eraserPoints.append(p)
-            eraseAlongPath(eraserPoints)
-            eraserPoints.removeAll(keepingCapacity: true)
-            renderer.endHistoryTransaction()
-            notifyState()
-            return
-        }
+        if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); eraseAlongPath(eraserPoints); eraserPoints.removeAll(keepingCapacity: true); renderer.endHistoryTransaction(); notifyState(); return }
+
         if selectionModeActive {
             if lassoActive {
                 appendLassoPoint(p)
                 let shouldSelect = lassoPoints.count >= 3 && lassoPathLength() >= 8
-                if shouldSelect {
-                    _ = renderer.selectLasso(in: lassoPoints)
-                } else {
-                    renderer.clearSelection()
-                }
+                if shouldSelect { _ = renderer.selectLasso(in: lassoPoints, operation: lassoOperation) }
+                else if lassoOperation == .replace { renderer.clearSelection() }
                 lassoActive = false
                 lassoPoints.removeAll(keepingCapacity: true)
                 lassoOverlay.update(points: [], visible: false)
-                onSelectionChanged?()
+                renderer.endHistoryTransaction()
+                notifyState()
                 draw()
                 return
             }
@@ -220,6 +212,7 @@ final class InkMetalView: MTKView {
             draw()
             return
         }
+
         guard isUserInteractionEnabledForTool && active else { return }
         let c = renderer.canvasPoint(from: p)
         let pressure = event.pressure > 0 ? Float(event.pressure) : (points.last?.pressure ?? 1)
@@ -227,9 +220,7 @@ final class InkMetalView: MTKView {
         if isLineTool || (isSmartLineTool && smartLineDetected) {
             let line = linePreview(from: points)
             if line.count >= 2 { renderer.commitLine(from: SIMD2(line[0].x, line[0].y), to: SIMD2(line[1].x, line[1].y)) }
-        } else {
-            renderer.commitStroke(points)
-        }
+        } else { renderer.commitStroke(points) }
         renderer.endHistoryTransaction()
         points.removeAll(keepingCapacity: true)
         active = false
@@ -241,26 +232,14 @@ final class InkMetalView: MTKView {
 
     override func scrollWheel(with event: NSEvent) {
         let p = makePoint(from: event)
-        if event.modifierFlags.contains(.command) {
-            renderer.zoom(by: powf(1.0018, Float(event.scrollingDeltaY)), around: p)
-            onZoomChanged?(renderer.zoomPercent)
-            draw()
-        } else {
-            renderer.pan(by: SIMD2(Float(event.scrollingDeltaX), Float(event.scrollingDeltaY)))
-            draw()
-        }
+        if event.modifierFlags.contains(.command) { renderer.zoom(by: powf(1.0018, Float(event.scrollingDeltaY)), around: p); onZoomChanged?(renderer.zoomPercent); draw() }
+        else { renderer.pan(by: SIMD2(Float(event.scrollingDeltaX), Float(event.scrollingDeltaY))); draw() }
     }
 
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
-        if event.keyCode == 53 && isPolygonTool && polygonModel.isConstructing {
-            polygonModel.cancel()
-            renderer.setStroke([])
-            renderer.endHistoryTransaction()
-            draw()
-            return
-        }
-        if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = true; return }
+        if event.keyCode == 53 && isPolygonTool && polygonModel.isConstructing { polygonModel.cancel(); renderer.setStroke([]); renderer.endHistoryTransaction(); draw(); return }
+        if event.keyCode == 56 || event.keyCode == 60 { temporarySelectHeld = true; return }
         if event.keyCode == 49 { spaceHeld = true; return }
         if selectionModeActive && event.keyCode == 51 { deleteSelected(); return }
         if event.modifierFlags.contains(.command) && event.keyCode == 24 { zoomIn(); return }
@@ -270,7 +249,7 @@ final class InkMetalView: MTKView {
     }
 
     override func keyUp(with event: NSEvent) {
-        if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = false; return }
+        if event.keyCode == 56 || event.keyCode == 60 { temporarySelectHeld = false; return }
         if event.keyCode == 49 { spaceHeld = false; panDrag = false; return }
         super.keyUp(with: event)
     }
@@ -300,89 +279,29 @@ final class InkMetalView: MTKView {
     private func handlePolygonClick(at viewPoint: SIMD2<Float>) {
         let canvas = renderer.canvasPoint(from: viewPoint)
         let point = CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y))
-        if !polygonModel.isConstructing {
-            polygonModel.begin(at: point)
-            renderer.beginHistoryTransaction()
-            renderer.setStroke([InkPoint(x: canvas.x, y: canvas.y, pressure: 1)])
-            draw()
-            return
-        }
-
-        if polygonModel.closeIfNearFirst(at: point) {
-            commitPolygon(polygonModel.previewVertices)
-            polygonModel.cancel()
-            renderer.setStroke([])
-            renderer.endHistoryTransaction()
-            notifyState()
-            draw()
-            return
-        }
-
-        if polygonModel.append(at: point) {
-            let preview = polygonModel.previewVertices.map { InkPoint(x: Float($0.x), y: Float($0.y), pressure: 1) }
-            renderer.setStroke(preview)
-            draw()
-        }
+        if !polygonModel.isConstructing { polygonModel.begin(at: point); renderer.beginHistoryTransaction(); renderer.setStroke([InkPoint(x: canvas.x, y: canvas.y, pressure: 1)]); draw(); return }
+        if polygonModel.closeIfNearFirst(at: point) { commitPolygon(polygonModel.previewVertices); polygonModel.cancel(); renderer.setStroke([]); renderer.endHistoryTransaction(); notifyState(); draw(); return }
+        if polygonModel.append(at: point) { let preview = polygonModel.previewVertices.map { InkPoint(x: Float($0.x), y: Float($0.y), pressure: 1) }; renderer.setStroke(preview); draw() }
     }
 
-    private func commitPolygon(_ vertices: [CGPoint]) {
-        guard vertices.count >= 3 else { return }
-        renderer.commitPolygon(points: vertices)
-    }
-
-    private func appendLassoPoint(_ point: SIMD2<Float>) {
-        guard let last = lassoPoints.last else {
-            lassoPoints.append(point)
-            return
-        }
-        if simd_distance(last, point) >= 2 {
-            lassoPoints.append(point)
-        }
-    }
-
-    private func lassoPathLength() -> Float {
-        guard lassoPoints.count >= 2 else { return 0 }
-        var total: Float = 0
-        for pair in zip(lassoPoints, lassoPoints.dropFirst()) { total += simd_distance(pair.0, pair.1) }
-        return total
-    }
+    private func commitPolygon(_ vertices: [CGPoint]) { guard vertices.count >= 3 else { return }; renderer.commitPolygon(points: vertices) }
+    private func appendLassoPoint(_ point: SIMD2<Float>) { guard let last = lassoPoints.last else { lassoPoints.append(point); return }; if simd_distance(last, point) >= 2 { lassoPoints.append(point) } }
+    private func lassoPathLength() -> Float { guard lassoPoints.count >= 2 else { return 0 }; var total: Float = 0; for pair in zip(lassoPoints, lassoPoints.dropFirst()) { total += simd_distance(pair.0, pair.1) }; return total }
 
     private func scheduleSmartLineDetection() {
         guard isSmartLineTool, points.count >= 4 else { return }
         smartLineWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.active, self.isSmartLineTool, self.points.count >= 4 else { return }
-            if LineGeometry.isLikelyStraight(points: self.points, tolerance: 8, minimumLength: 30) {
-                self.smartLineDetected = true
-                self.renderer.setStroke(self.linePreview(from: self.points))
-                self.draw()
-            }
+            if LineGeometry.isLikelyStraight(points: self.points, tolerance: 8, minimumLength: 30) { self.smartLineDetected = true; self.renderer.setStroke(self.linePreview(from: self.points)); self.draw() }
         }
         smartLineWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
 
-    private func linePreview(from p: [InkPoint]) -> [InkPoint] {
-        guard let first = p.first, let last = p.last else { return p }
-        return [first, last]
-    }
-
-    private func eraseAlongPath(_ path: [SIMD2<Float>]) {
-        guard !path.isEmpty else { return }
-        var deleted = renderer.eraseObjectsByScribble(path, tolerance: 14)
-        for p in path {
-            if renderer.selectStroke(at: p, tolerance: 16) {
-                renderer.deleteSelected()
-                deleted = true
-            }
-        }
-        if deleted { draw() }
-    }
-
-    private func makePoint(from event: NSEvent) -> SIMD2<Float> {
-        let p = convert(event.locationInWindow, from: nil)
-        return SIMD2(Float(p.x), Float(p.y))
-    }
+    private func linePreview(from p: [InkPoint]) -> [InkPoint] { guard let first = p.first, let last = p.last else { return p }; return [first, last] }
+    private func eraseAlongPath(_ path: [SIMD2<Float>]) { guard !path.isEmpty else { return }; var deleted = renderer.eraseObjectsByScribble(path, tolerance: 14); for p in path { if renderer.selectStroke(at: p, tolerance: 16) { renderer.deleteSelected(); deleted = true } }; if deleted { draw() } }
+    private func makePoint(from event: NSEvent) -> SIMD2<Float> { let p = convert(event.locationInWindow, from: nil); return SIMD2(Float(p.x), Float(p.y)) }
 }
 
 private final class LassoOverlayView: NSView {
@@ -392,21 +311,12 @@ private final class LassoOverlayView: NSView {
     override init(frame frameRect: NSRect) { super.init(frame: frameRect); wantsLayer = true }
     required init?(coder: NSCoder) { super.init(coder: coder); wantsLayer = true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    func update(points: [SIMD2<Float>], visible: Bool) {
-        self.points = points
-        self.visible = visible
-        isHidden = !visible
-        needsDisplay = true
-    }
-
+    func update(points: [SIMD2<Float>], visible: Bool) { self.points = points; self.visible = visible; isHidden = !visible; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
         guard visible, points.count >= 2 else { return }
         let path = NSBezierPath()
         path.move(to: NSPoint(x: CGFloat(points[0].x), y: CGFloat(points[0].y)))
-        for point in points.dropFirst() {
-            path.line(to: NSPoint(x: CGFloat(point.x), y: CGFloat(point.y)))
-        }
+        for point in points.dropFirst() { path.line(to: NSPoint(x: CGFloat(point.x), y: CGFloat(point.y))) }
         if points.count >= 3 { path.close() }
         path.lineWidth = 1.2
         let dash: [CGFloat] = [5, 4]
