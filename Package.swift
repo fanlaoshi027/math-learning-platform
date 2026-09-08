@@ -17,6 +17,7 @@ let package = Package(
                 "Core/GraphicObjectStoreFixed.swift",
                 "Core/GraphicObjectStoreV2.swift",
                 "Core/GraphicObjectStoreV3.swift",
+                "Platform/iPadOS",
                 "SMART_LINE_AND_ERASER.md"
             ],
             resources: [.process("Metal/InkShaders.metal")]
