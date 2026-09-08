@@ -35,63 +35,30 @@ final class InkMetalView: MTKView {
     var onPageStateChanged:((CanvasPageState)->Void)?
     var onZoomChanged:((Int)->Void)?
     var penStyle=PenStyle(){didSet{renderer.setPenStyle(penStyle)}}
-    var boardBackground:SIMD4<Float>=SIMD4(1,1,1,1){didSet{renderer.setBackgroundColor(boardBackground)}}
+    var boardBackground=SIMD4<Float>(1,1,1,1){didSet{renderer.setBackgroundColor(boardBackground)}}
     var displayInverted=false{didSet{renderer.setDisplayInverted(displayInverted)}}
-    var canUndo:Bool{renderer.canUndo};var canRedo:Bool{renderer.canRedo};var hasSelection:Bool{renderer.hasSelection};var selectionCount:Int{renderer.selectionCount};var selectedRotationDegrees:Double{renderer.selectedRotationDegrees};var zoomPercent:Int{renderer.zoomPercent}
-    var selectionBoundsInView:CGRect?{renderer.selectionBoundsInView()}
+    var canUndo:Bool{renderer.canUndo};var canRedo:Bool{renderer.canRedo};var hasSelection:Bool{renderer.hasSelection};var selectionCount:Int{renderer.selectionCount};var selectedRotationDegrees:Double{renderer.selectedRotationDegrees};var zoomPercent:Int{renderer.zoomPercent};var selectionBoundsInView:CGRect?{renderer.selectionBoundsInView()}
     override var isFlipped:Bool{true};override var acceptsFirstResponder:Bool{true}
 
-    init(frame frameRect:NSRect = .zero){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(frame:frameRect,device:device);configureMetal();renderer.setPenStyle(penStyle)}
-    required init(coder:NSCoder){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(coder:coder);self.device=device;configureMetal();renderer.setPenStyle(penStyle)}
+    init(frame frameRect:NSRect=.zero){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(frame:frameRect,device:device);configureMetal();renderer.setPenStyle(penStyle)}
+    required init(coder:NSCoder){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(coder:coder);configureMetal();renderer.setPenStyle(penStyle)}
     private func configureMetal(){delegate=renderer;isPaused=true;enableSetNeedsDisplay=true;framebufferOnly=true;colorPixelFormat=.bgra8Unorm;clearColor=MTLClearColor(red:1,green:1,blue:1,alpha:1);marqueeOverlay.isHidden=true;marqueeOverlay.autoresizingMask=[.width,.height];addSubview(marqueeOverlay)}
 
     func loadPageState(_ state:CanvasPageState){renderer.importPageState(state);onHistoryChanged?();onSelectionChanged?();draw()};func currentPageState()->CanvasPageState{renderer.exportPageState()}
     func undo(){renderer.undo();notifyState();draw()};func redo(){renderer.redo();notifyState();draw()};func deleteSelected(){renderer.deleteSelected();notifyState();draw()};func setSelectedRotationDegrees(_ d:Double){renderer.setSelectedRotationDegrees(d);notifyState();draw()}
-    func scaleSelected(by factor:Float){renderer.beginHistoryTransaction();renderer.scaleSelected(by:factor);renderer.endHistoryTransaction();notifyState();draw()}
-    func reflectSelected(horizontal:Bool){renderer.beginHistoryTransaction();renderer.reflectSelected(horizontal:horizontal);renderer.endHistoryTransaction();notifyState();draw()}
-    func setRotationCenterToSelectionCenter(){if let c=renderer.selectionCenter(){setRotationCenter(view:renderer.viewPoint(from:c))}}
-    func setRotationCenter(view point:SIMD2<Float>){renderer.beginHistoryTransaction();renderer.setRotationCenter(to:point);renderer.endHistoryTransaction();notifyState();draw()}
+    func scaleSelected(by factor:Float){renderer.beginHistoryTransaction();renderer.scaleSelected(by:factor);renderer.endHistoryTransaction();notifyState();draw()};func reflectSelected(horizontal:Bool){renderer.beginHistoryTransaction();renderer.reflectSelected(horizontal:horizontal);renderer.endHistoryTransaction();notifyState();draw()}
+    func setRotationCenterToSelectionCenter(){if let c=renderer.selectionCenter(){renderer.setRotationCenter(to:renderer.viewPoint(from:c));onSelectionChanged?();draw()}}
+    func setRotationCenter(view point:SIMD2<Float>){renderer.setRotationCenter(to:point);onSelectionChanged?();draw()}
     func resetZoom(){renderer.resetZoom(centeredIn:bounds.size);onZoomChanged?(renderer.zoomPercent);draw()};func zoomIn(){renderer.zoom(by:1.2,around:SIMD2(Float(bounds.midX),Float(bounds.midY)));onZoomChanged?(renderer.zoomPercent);draw()};func zoomOut(){renderer.zoom(by:1/1.2,around:SIMD2(Float(bounds.midX),Float(bounds.midY)));onZoomChanged?(renderer.zoomPercent);draw()}
     private func notifyState(){onHistoryChanged?();onSelectionChanged?();onPageStateChanged?(renderer.exportPageState())};private var selectionModeActive:Bool{isSelectionTool || temporarySelectHeld}
 
-    override func mouseDown(with event:NSEvent){window?.makeFirstResponder(self);let p=makePoint(from:event)
-        if event.buttonNumber==2{middleButtonHeld=true;panDrag=true;lastPoint=p;return};if spaceHeld{panDrag=true;lastPoint=p;return}
-        if isEraserTool && !temporarySelectHeld{renderer.beginHistoryTransaction();eraserPoints=[p];return}
-        if selectionModeActive{
-            if renderer.rotationCenterHandle(at:p){renderer.beginHistoryTransaction();rotationCenterDrag=true;return}
-            if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return}
-            if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return}
-            if renderer.selectStroke(at:p){selectionDrag=true;lastPoint=p;onSelectionChanged?();draw();return}
-            marqueeActive=true;marqueeStart=p;marqueeCurrent=p;renderer.clearSelection();marqueeOverlay.update(rect:marqueeRect(from:p,to:p),visible:true);onSelectionChanged?();draw();return
-        }
-        guard isUserInteractionEnabledForTool else{return};renderer.beginHistoryTransaction();active=true;smartLineDetected=false;smartLineWorkItem?.cancel();let c=renderer.canvasPoint(from:p);points=[InkPoint(x:c.x,y:c.y,pressure:event.pressure>0 ? Float(event.pressure):1)];renderer.setStroke(points);draw()
-    }
-    override func mouseDragged(with event:NSEvent){let p=makePoint(from:event)
-        if panDrag{renderer.pan(by:p-lastPoint);lastPoint=p;draw();return};if isEraserTool && !temporarySelectHeld{eraserPoints.append(p);return}
-        if selectionModeActive{
-            if rotationCenterDrag{renderer.setRotationCenter(to:p);draw();return}
-            if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return}
-            if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);onSelectionChanged?();draw();return}
-            if marqueeActive{marqueeCurrent=p;marqueeOverlay.update(rect:marqueeRect(from:marqueeStart,to:p),visible:true);draw();return}
-            guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;onSelectionChanged?();draw()};return
-        }
-        guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points);scheduleSmartLineDetection();draw()
-    }
-    override func mouseUp(with event:NSEvent){smartLineWorkItem?.cancel();let p=makePoint(from:event)
-        if event.buttonNumber==2 || middleButtonHeld{middleButtonHeld=false;panDrag=false;return};if panDrag{panDrag=false;return}
-        if isEraserTool && !temporarySelectHeld{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return}
-        if selectionModeActive{
-            if marqueeActive{marqueeCurrent=p;let r=marqueeRect(from:marqueeStart,to:marqueeCurrent);if r.width>4 || r.height>4{renderer.selectStrokes(in:r)}else{renderer.clearSelection()};marqueeActive=false;marqueeOverlay.update(rect:.zero,visible:false);onSelectionChanged?();draw();return}
-            rotationCenterDrag=false;rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();draw();return
-        }
-        guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));let committed=(isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points;renderer.commitStroke(committed);renderer.endHistoryTransaction();points.removeAll(keepingCapacity:true);active=false;smartLineDetected=false;renderer.setStroke([]);notifyState();draw()
-    }
-
+    override func mouseDown(with event:NSEvent){window?.makeFirstResponder(self);let p=makePoint(from:event);if event.buttonNumber==2{middleButtonHeld=true;panDrag=true;lastPoint=p;return};if spaceHeld{panDrag=true;lastPoint=p;return};if isEraserTool && !temporarySelectHeld{renderer.beginHistoryTransaction();eraserPoints=[p];return};if selectionModeActive{if renderer.rotationCenterHandle(at:p){renderer.beginHistoryTransaction();rotationCenterDrag=true;return};if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return};if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return};if renderer.selectStroke(at:p){selectionDrag=true;lastPoint=p;onSelectionChanged?();draw();return};marqueeActive=true;marqueeStart=p;marqueeCurrent=p;renderer.clearSelection();marqueeOverlay.update(rect:marqueeRect(from:p,to:p),visible:true);onSelectionChanged?();draw();return};guard isUserInteractionEnabledForTool else{return};renderer.beginHistoryTransaction();active=true;smartLineDetected=false;smartLineWorkItem?.cancel();let c=renderer.canvasPoint(from:p);points=[InkPoint(x:c.x,y:c.y,pressure:event.pressure>0 ? Float(event.pressure):1)];renderer.setStroke(points);draw()}
+    override func mouseDragged(with event:NSEvent){let p=makePoint(from:event);if panDrag{renderer.pan(by:p-lastPoint);lastPoint=p;draw();return};if isEraserTool && !temporarySelectHeld{eraserPoints.append(p);return};if selectionModeActive{if rotationCenterDrag{renderer.setRotationCenter(to:p);onSelectionChanged?();draw();return};if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return};if let h=resizeHandle{renderer.resizeSelected(handle:h,to:p);onSelectionChanged?();draw();return};if marqueeActive{marqueeCurrent=p;marqueeOverlay.update(rect:marqueeRect(from:marqueeStart,to:p),visible:true);draw();return};guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;onSelectionChanged?();draw()};return};guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points);scheduleSmartLineDetection();draw()}
+    override func mouseUp(with event:NSEvent){smartLineWorkItem?.cancel();let p=makePoint(from:event);if event.buttonNumber==2 || middleButtonHeld{middleButtonHeld=false;panDrag=false;return};if panDrag{panDrag=false;return};if isEraserTool && !temporarySelectHeld{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return};if selectionModeActive{if marqueeActive{marqueeCurrent=p;let r=marqueeRect(from:marqueeStart,to:marqueeCurrent);if r.width>4 || r.height>4{renderer.selectStrokes(in:r)}else{renderer.clearSelection()};marqueeActive=false;marqueeOverlay.update(rect:.zero,visible:false);onSelectionChanged?();draw();return};rotationCenterDrag=false;rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();draw();return};guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));let committed=(isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points;renderer.commitStroke(committed);renderer.endHistoryTransaction();points.removeAll(keepingCapacity:true);active=false;smartLineDetected=false;renderer.setStroke([]);notifyState();draw()}
     override func scrollWheel(with event:NSEvent){let p=makePoint(from:event);if event.modifierFlags.contains(.command){let factor=powf(1.0018,Float(event.scrollingDeltaY));renderer.zoom(by:factor,around:p);onZoomChanged?(renderer.zoomPercent);draw()}else{renderer.pan(by:SIMD2(Float(event.scrollingDeltaX),Float(event.scrollingDeltaY)));draw()}}
     override func keyDown(with event:NSEvent){if event.isARepeat{return};if event.keyCode==58 || event.keyCode==61{temporarySelectHeld=true;return};if event.keyCode==49{spaceHeld=true;return};if selectionModeActive && event.keyCode==51{deleteSelected();return};if event.modifierFlags.contains(.command) && event.keyCode==24{zoomIn();return};if event.modifierFlags.contains(.command) && event.keyCode==27{zoomOut();return};if event.modifierFlags.contains(.command) && event.keyCode==36{resetZoom();return};super.keyDown(with:event)}
     override func keyUp(with event:NSEvent){if event.keyCode==58 || event.keyCode==61{temporarySelectHeld=false;return};if event.keyCode==49{spaceHeld=false;panDrag=false;return};super.keyUp(with:event)}
     override func tabletPoint(with event:NSEvent){switch event.phase{case .began:mouseDown(with:event);case .changed:mouseDragged(with:event);case .ended:mouseUp(with:event);case .cancelled:smartLineWorkItem?.cancel();active=false;points.removeAll(keepingCapacity:true);renderer.setStroke([]);renderer.endHistoryTransaction();marqueeOverlay.update(rect:.zero,visible:false);draw();default:break}}
-
     private func marqueeRect(from a:SIMD2<Float>,to b:SIMD2<Float>)->CGRect{CGRect(x:CGFloat(min(a.x,b.x)),y:CGFloat(min(a.y,b.y)),width:CGFloat(abs(b.x-a.x)),height:CGFloat(abs(b.y-a.y)))}
     private func scheduleSmartLineDetection(){guard isSmartLineTool,points.count>=4 else{return};smartLineWorkItem?.cancel();let work=DispatchWorkItem{[weak self] in guard let self,self.active,self.isSmartLineTool,self.points.count>=4 else{return};if self.isLikelyStraightLine(self.points){self.smartLineDetected=true;self.renderer.setStroke(self.linePreview(from:self.points));self.draw()}};smartLineWorkItem=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.18,execute:work)}
     private func isLikelyStraightLine(_ p:[InkPoint])->Bool{guard let f=p.first,let l=p.last else{return false};let a=SIMD2(f.x,f.y),b=SIMD2(l.x,l.y),len=simd_distance(a,b);guard len>30 else{return false};let tol=max(7,len*0.075);return p.dropFirst().dropLast().allSatisfy{distanceToSegment(SIMD2($0.x,$0.y),a,b)<=tol}}
@@ -101,42 +68,12 @@ final class InkMetalView: MTKView {
     private func makePoint(from event:NSEvent)->SIMD2<Float>{let p=convert(event.locationInWindow,from:nil);return SIMD2(Float(p.x),Float(p.y))}
 }
 
-private final class MarqueeOverlayView: NSView {
-    private var rect = CGRect.zero
-    private var visible = false
-
-    override var isFlipped: Bool { true }
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        isOpaque = false
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        wantsLayer = true
-        isOpaque = false
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    func update(rect: CGRect, visible: Bool) {
-        self.rect = rect.standardized
-        self.visible = visible
-        isHidden = !visible
-        needsDisplay = true
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard visible, rect.width > 0, rect.height > 0 else { return }
-        let path = NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5))
-        path.lineWidth = 1
-        let dash: [CGFloat] = [5, 4]
-        path.setLineDash(dash, count: dash.count, phase: 0)
-        NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
-        path.stroke()
-        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
-        rect.fill()
-    }
+private final class MarqueeOverlayView:NSView{
+    private var rect=CGRect.zero;private var visible=false
+    override var isFlipped:Bool{true}
+    override init(frame frameRect:NSRect){super.init(frame:frameRect);wantsLayer=true;isOpaque=false}
+    required init?(coder:NSCoder){super.init(coder:coder);wantsLayer=true;isOpaque=false}
+    override func hitTest(_ point:NSPoint)->NSView?{nil}
+    func update(rect:CGRect,visible:Bool){self.rect=rect.standardized;self.visible=visible;isHidden=!visible;needsDisplay=true}
+    override func draw(_ dirtyRect:NSRect){guard visible,rect.width>0,rect.height>0 else{return};let path=NSBezierPath(rect:rect.insetBy(dx:0.5,dy:0.5));path.lineWidth=1;let dash:[CGFloat]=[5,4];path.setLineDash(dash,count:dash.count,phase:0);NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke();path.stroke();NSColor.controlAccentColor.withAlphaComponent(0.08).setFill();rect.fill()}
 }
