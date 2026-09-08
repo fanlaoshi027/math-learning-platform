@@ -5,31 +5,22 @@ enum BoardTool: Equatable { case select, pen, line, smartLine, eraser }
 enum BoardBackground: String, CaseIterable, Identifiable {
     case white, black, darkGray, lightGray, cream
     var id: String { rawValue }
-    var title: String {
-        switch self { case .white: "白色"; case .black: "黑色"; case .darkGray: "深灰"; case .lightGray: "浅灰"; case .cream: "米白" }
-    }
-    var color: Color {
-        switch self { case .white: .white; case .black: .black; case .darkGray: Color(white: 0.18); case .lightGray: Color(white: 0.92); case .cream: Color(red: 0.98, green: 0.96, blue: 0.88) }
-    }
-    var metal: SIMD4<Float> {
-        switch self { case .white: SIMD4(1,1,1,1); case .black: SIMD4(0,0,0,1); case .darkGray: SIMD4(0.18,0.18,0.18,1); case .lightGray: SIMD4(0.92,0.92,0.92,1); case .cream: SIMD4(0.98,0.96,0.88,1) }
-    }
+    var title: String { switch self { case .white: "白色"; case .black: "黑色"; case .darkGray: "深灰"; case .lightGray: "浅灰"; case .cream: "米白" } }
+    var color: Color { switch self { case .white: .white; case .black: .black; case .darkGray: Color(white: 0.18); case .lightGray: Color(white: 0.92); case .cream: Color(red: 0.98, green: 0.96, blue: 0.88) } }
+    var metal: SIMD4<Float> { switch self { case .white: SIMD4(1,1,1,1); case .black: SIMD4(0,0,0,1); case .darkGray: SIMD4(0.18,0.18,0.18,1); case .lightGray: SIMD4(0.92,0.92,0.92,1); case .cream: SIMD4(0.98,0.96,0.88,1) } }
+}
+
+enum BoardPattern: Int, CaseIterable, Identifiable {
+    case blank = 0, ruled = 1, grid = 2, dots = 3, mathGrid = 4
+    var id: Int { rawValue }
+    var title: String { switch self { case .blank: "空白"; case .ruled: "横线"; case .grid: "方格"; case .dots: "点阵"; case .mathGrid: "数学方格" } }
 }
 
 enum EyeComfortBackground: String, CaseIterable, Identifiable {
     case black90, deepGreen, deepBlue, custom
     var id: String { rawValue }
-    var title: String {
-        switch self { case .black90: "90%黑"; case .deepGreen: "深绿"; case .deepBlue: "深蓝"; case .custom: "自定义色值" }
-    }
-    var color: SIMD4<Float> {
-        switch self {
-        case .black90: SIMD4(0.10, 0.10, 0.10, 1)
-        case .deepGreen: SIMD4(0.08, 0.16, 0.12, 1)
-        case .deepBlue: SIMD4(0.07, 0.12, 0.22, 1)
-        case .custom: SIMD4(0.10, 0.10, 0.10, 1)
-        }
-    }
+    var title: String { switch self { case .black90: "90%黑"; case .deepGreen: "深绿"; case .deepBlue: "深蓝"; case .custom: "自定义色值" } }
+    var color: SIMD4<Float> { switch self { case .black90: SIMD4(0.10,0.10,0.10,1); case .deepGreen: SIMD4(0.08,0.16,0.12,1); case .deepBlue: SIMD4(0.07,0.12,0.22,1); case .custom: SIMD4(0.10,0.10,0.10,1) } }
 }
 
 struct BoardView: View {
@@ -51,12 +42,13 @@ struct MetalInkCanvas: NSViewRepresentable {
     @ObservedObject var controller: CanvasController
     var background: SIMD4<Float> = SIMD4(1,1,1,1)
     var inverted: Bool = false
+    var pattern: BoardPattern = .blank
     func makeNSView(context: Context) -> InkMetalView { let view = InkMetalView(); configure(view); controller.attach(view); return view }
     func updateNSView(_ nsView: InkMetalView, context: Context) { configure(nsView); controller.attach(nsView) }
     private func configure(_ view: InkMetalView) {
         view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine
         view.isSelectionTool = tool == .select; view.isLineTool = tool == .line; view.isSmartLineTool = tool == .smartLine; view.isEraserTool = tool == .eraser
-        view.penStyle = penStyle; view.boardBackground = background; view.displayInverted = inverted
+        view.penStyle = penStyle; view.boardBackground = background; view.displayInverted = inverted; view.backgroundPattern = pattern.rawValue
     }
 }
 
