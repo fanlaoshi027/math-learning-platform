@@ -39,6 +39,15 @@ final class GraphicObjectStore {
         objects.removeAll { $0.id == id }
     }
 
+    func transformedPoints(of object: GraphicObject) -> [CGPoint] {
+        object.geometry.points.map { transformedPoint($0, in: object) }
+    }
+
+    func transformedPoints(of id: UUID) -> [CGPoint]? {
+        guard let object = object(with: id) else { return nil }
+        return transformedPoints(of: object)
+    }
+
     /// Returns the nearest structured line endpoint within the supplied radius.
     func nearestLineEndpoint(to point: CGPoint, tolerance: CGFloat = 12) -> (id: UUID, endpoint: Int, distance: CGFloat)? {
         var best: (id: UUID, endpoint: Int, distance: CGFloat)?
@@ -93,6 +102,14 @@ final class GraphicObjectStore {
         return nil
     }
 
+    func objectsIntersecting(_ rect: CGRect, fullyContained: Bool = false) -> [UUID] {
+        objects.compactMap { object in
+            guard let bounds = bounds(of: object) else { return nil }
+            let hit = fullyContained ? rect.contains(bounds) : rect.intersects(bounds)
+            return hit ? object.id : nil
+        }
+    }
+
     /// Finds objects touched by a freehand scribble. This is intentionally an
     /// object-level operation: a line, polygon, or future math object can be
     /// deleted as one unit rather than requiring the user to hit a tiny segment.
@@ -114,28 +131,6 @@ final class GraphicObjectStore {
         guard !ids.isEmpty else { return [] }
         objects.removeAll { ids.contains($0.id) }
         return Array(ids)
-    }
-
-    private func hitTest(_ object: GraphicObject, at point: CGPoint, tolerance: CGFloat) -> Bool {
-        switch object.kind {
-        case .line, .arrow:
-            guard object.geometry.points.count >= 2 else { return false }
-            let a = transformedPoint(object.geometry.points[0], in: object)
-            let b = transformedPoint(object.geometry.points[1], in: object)
-            return distance(point, toSegment: a, b) <= tolerance + object.style.strokeWidth
-        case .polygon:
-            guard object.geometry.points.count >= 2 else { return false }
-            let transformed = object.geometry.points.map { transformedPoint($0, in: object) }
-            return zip(transformed, transformed.dropFirst()).contains { distance(point, toSegment: $0, $1) <= tolerance + object.style.strokeWidth }
-        case .rectangle, .ellipse, .coordinateSystem, .functionGraph:
-            return bounds(of: object)?.insetBy(dx: -tolerance, dy: -tolerance).contains(point) == true
-        case .freehandStroke:
-            guard object.geometry.points.count >= 2 else { return false }
-            let points = object.geometry.points.map { transformedPoint($0, in: object) }
-            return zip(points, points.dropFirst()).contains { distance(point, toSegment: $0, $1) <= tolerance + object.style.strokeWidth }
-        case .group:
-            return object.children.contains { hitTest($0, at: point, tolerance: tolerance) }
-        }
     }
 
     /// Moves one endpoint of a structured line while preserving the other endpoint.
