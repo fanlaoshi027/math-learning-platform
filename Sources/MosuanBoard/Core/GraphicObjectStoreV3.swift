@@ -20,7 +20,6 @@ final class GraphicObjectStore {
     private func hitTest(_ o:GraphicObject,at point:CGPoint,tolerance:CGFloat)->Bool{let t=tolerance+o.style.strokeWidth;switch o.kind{case .line,.arrow:let p=transformedPoints(of:o);return p.count>=2 && distance(point,to:p[0],segment:p[1])<=t;case .polygon:let p=transformedPoints(of:o);guard p.count>=3 else{return false};if pointInPolygon(point,p){return true};var edges=Array(p.dropFirst());edges.append(p[0]);return zip(p,edges).contains{distance(point,to:$0.0,segment:$0.1)<=t};case .rectangle:guard let r=bounds(of:o) else{return false};return r.insetBy(dx:-t,dy:-t).contains(point);case .ellipse:guard let r=bounds(of:o) else{return false};let rx=max(r.width/2,0.001),ry=max(r.height/2,0.001);return pow((point.x-r.midX)/rx,2)+pow((point.y-r.midY)/ry,2)<=1+t/max(rx,ry);case .freehandStroke:let p=transformedPoints(of:o);return zip(p,p.dropFirst()).contains{distance(point,to:$0.0,segment:$0.1)<=t};case .coordinateSystem,.functionGraph:return bounds(of:o)?.insetBy(dx:-t,dy:-t).contains(point) ?? false;case .group:return o.children.contains{hitTest($0,at:point,tolerance:tolerance)}}}
     func objectsIntersecting(_ rect:CGRect,fullyContained:Bool=false)->[UUID]{objects.compactMap{guard let b=bounds(of:$0) else{return nil};return (fullyContained ? rect.contains(b) : rect.intersects(b)) ? $0.id : nil}}
     /// Returns structured objects touched by a freeform closed lasso.
-    /// Geometry is tested rather than relying only on object bounding boxes.
     func objectsIntersectingLasso(_ lasso:[CGPoint])->[UUID]{
         guard lasso.count >= 3, let lassoBounds = bounds(ofPoints: lasso) else { return [] }
         return objects.compactMap { object in
@@ -29,8 +28,10 @@ final class GraphicObjectStore {
             let geometry = transformedPoints(of: object)
             if geometry.contains(where: { pointInPolygon($0, lasso) }) { return object.id }
             if geometry.count >= 2 {
-                let pairs = object.kind == .polygon ? zip(geometry, geometry.dropFirst() + [geometry[0]]) : zip(geometry, geometry.dropFirst())
-                if pairs.contains(where: { segmentIntersectsPolygon($0.0, $0.1, lasso) }) { return object.id }
+                for i in 0..<(geometry.count - 1) {
+                    if segmentIntersectsPolygon(geometry[i], geometry[i + 1], lasso) { return object.id }
+                }
+                if object.kind == .polygon, segmentIntersectsPolygon(geometry[geometry.count - 1], geometry[0], lasso) { return object.id }
             }
             if object.kind == .polygon, geometry.count >= 3, pointInPolygon(lasso[0], geometry) { return object.id }
             if object.kind == .rectangle || object.kind == .ellipse || object.kind == .coordinateSystem || object.kind == .functionGraph {
