@@ -11,17 +11,36 @@ struct BoardScreen: View {
     @State private var dragLocation = CGPoint.zero
     @State private var background: BoardBackground = .white
     @State private var inverted = false
+    @State private var eyeComfortBackground: EyeComfortBackground = .black90
+    @State private var customHex = "1A1A1A"
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var rotationBinding: Binding<String> { Binding(get: { rotationText }, set: { rotationText = $0 }) }
     private var toolbarIsVertical: Bool { toolbarDock == .left || toolbarDock == .right }
 
+    private var customColor: SIMD4<Float> {
+        let value = customHex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
+        guard value.count == 6, let rgb = UInt64(value, radix: 16) else { return EyeComfortBackground.black90.color }
+        return SIMD4(Float((rgb >> 16) & 0xFF) / 255, Float((rgb >> 8) & 0xFF) / 255, Float(rgb & 0xFF) / 255, 1)
+    }
+
+    private var effectiveBackground: SIMD4<Float> {
+        if inverted && background == .white {
+            return eyeComfortBackground == .custom ? customColor : eyeComfortBackground.color
+        }
+        return background.metal
+    }
+
+    private var effectiveBackgroundColor: Color {
+        Color(red: Double(effectiveBackground.x), green: Double(effectiveBackground.y), blue: Double(effectiveBackground.z))
+    }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                background.color.ignoresSafeArea()
-                MetalInkCanvas(tool: $tool, penStyle: preset.style, controller: controller, background: background, inverted: inverted)
-                    .background(background.color).padding(24)
+                effectiveBackgroundColor.ignoresSafeArea()
+                MetalInkCanvas(tool: $tool, penStyle: preset.style, controller: controller, background: effectiveBackground, inverted: inverted)
+                    .background(effectiveBackgroundColor).padding(24)
                 if isDraggingToolbar { dockingGuides(for: proxy.size) }
                 toolbar(in: proxy.size)
                     .frame(maxWidth: toolbarIsVertical ? 82 : .infinity, maxHeight: toolbarIsVertical ? .infinity : 72)
@@ -36,10 +55,14 @@ struct BoardScreen: View {
             .animation(.easeInOut(duration: 0.18), value: toolbarDock)
             .onAppear {
                 if let raw = UserDefaults.standard.string(forKey: "mosuan.toolbarDock"), let saved = ToolbarDock(rawValue: raw) { toolbarDock = saved }
+                if let raw = UserDefaults.standard.string(forKey: "mosuan.eyeComfortBackground"), let saved = EyeComfortBackground(rawValue: raw) { eyeComfortBackground = saved }
+                if let saved = UserDefaults.standard.string(forKey: "mosuan.customHex"), saved.count == 6 { customHex = saved }
             }
             .onChange(of: controller.rotationDegrees) { _, value in rotationText = String(format: "%.1f", value) }
             .onChange(of: controller.hasSelection) { _, selected in rotationText = selected ? String(format: "%.1f", controller.rotationDegrees) : "0" }
             .onChange(of: toolbarDock) { _, value in UserDefaults.standard.set(value.rawValue, forKey: "mosuan.toolbarDock") }
+            .onChange(of: eyeComfortBackground) { _, value in UserDefaults.standard.set(value.rawValue, forKey: "mosuan.eyeComfortBackground") }
+            .onChange(of: customHex) { _, value in UserDefaults.standard.set(value, forKey: "mosuan.customHex") }
         }
         .frame(minWidth: 1100, minHeight: 700)
     }
@@ -60,16 +83,57 @@ struct BoardScreen: View {
         Divider().frame(height: toolbarIsVertical ? nil : 24)
         ForEach(PenPreset.defaults) { item in Button { presetID = item.id; tool = .pen } label: { Circle().fill(Color(red: item.style.color.red, green: item.style.color.green, blue: item.style.color.blue)).frame(width: 18, height: 18).overlay { Circle().stroke(presetID == item.id ? Color.accentColor : .clear, lineWidth: 2) } }.buttonStyle(.plain).help(item.name) }
         Divider().frame(height: toolbarIsVertical ? nil : 24)
-        Menu {
-            ForEach(BoardBackground.allCases) { item in Button { background = item } label: { Label(item.title, systemImage: background == item ? "checkmark" : "square") } }
-        } label: { Label("背景", systemImage: "rectangle.fill") }.menuStyle(.borderlessButton)
-        Toggle(isOn: $inverted) { Label("反色", systemImage: "circle.lefthalf.filled") }.toggleStyle(.checkbox).help("白色与黑色背景/墨迹互换，彩色墨迹保持颜色")
+        backgroundMenu
+        if background == .white {
+            Toggle(isOn: $inverted) { Label("反色", systemImage: "circle.lefthalf.filled") }
+                .toggleStyle(.checkbox)
+                .help("白色背景切换为护眼深色背景")
+            if inverted { eyeComfortMenu }
+        }
         if controller.hasSelection {
             HStack(spacing: 5) { Image(systemName: "rotate.right"); TextField("角度", text: rotationBinding).frame(width: 62).textFieldStyle(.roundedBorder).onSubmit { applyRotation() }; Text("°") }.help("输入旋转角度")
         }
         Button { controller.deleteSelected() } label: { Label("删除", systemImage: "trash") }.disabled(!controller.hasSelection)
         Button { controller.undo() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }.keyboardShortcut("z", modifiers: .command).disabled(!controller.canUndo)
         Button { controller.redo() } label: { Label("重做", systemImage: "arrow.uturn.forward") }.keyboardShortcut("z", modifiers: [.command, .shift]).disabled(!controller.canRedo)
+    }
+
+    @ViewBuilder private var backgroundMenu: some View {
+        Menu {
+            ForEach(BoardBackground.allCases) { item in Button { background = item; if item != .white { inverted = false } } label: { Label(item.title, systemImage: background == item ? "checkmark" : "square") } }
+        } label: { Label("背景", systemImage: "rectangle.fill") }.menuStyle(.borderlessButton)
+    }
+
+    @ViewBuilder private var eyeComfortMenu: some View {
+        Menu {
+            ForEach(EyeComfortBackground.allCases) { item in
+                Button { eyeComfortBackground = item } label: {
+                    Label(item.title, systemImage: eyeComfortBackground == item ? "checkmark" : "circle")
+                }
+            }
+            Divider()
+            HStack(spacing: 6) {
+                Text("色值")
+                TextField("RRGGBB", text: $customHex).frame(width: 78).textFieldStyle(.roundedBorder)
+                ColorPicker("", selection: customColorBinding).labelsHidden()
+            }
+            .padding(.horizontal, 8)
+        } label: {
+            Label(eyeComfortBackground == .custom ? "护眼色" : eyeComfortBackground.title, systemImage: "moon.fill")
+        }
+        .menuStyle(.borderlessButton)
+    }
+
+    private var customColorBinding: Binding<Color> {
+        Binding(
+            get: { Color(red: Double(customColor.x), green: Double(customColor.y), blue: Double(customColor.z)) },
+            set: { color in
+                let ns = NSColor(color).usingColorSpace(.deviceRGB) ?? NSColor.black
+                let r = Int(round(ns.redComponent * 255)), g = Int(round(ns.greenComponent * 255)), b = Int(round(ns.blueComponent * 255))
+                customHex = String(format: "%02X%02X%02X", r, g, b)
+                eyeComfortBackground = .custom
+            }
+        )
     }
 
     private func dragHandle(in size: CGSize) -> some View {
