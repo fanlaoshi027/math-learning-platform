@@ -22,6 +22,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var displayInverted = false
     private var backgroundPattern = 0
     private var panOffset = SIMD2<Float>(0, 0)
+    private var zoomScale: Float = 1
     private var undoStack: [HistoryState] = []
     private var redoStack: [HistoryState] = []
     private var transactionStart: HistoryState?
@@ -52,15 +53,42 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return 0 }
         return Double(committedStrokes[index].rotation * 180 / .pi)
     }
+    var zoomPercent: Int { Int((zoomScale * 100).rounded()) }
 
     func setPenStyle(_ style: PenStyle) { penStyle = style; rebuildGeometry() }
     func setBackgroundColor(_ color: SIMD4<Float>) { backgroundColor = color; rebuildGeometry() }
     func setDisplayInverted(_ inverted: Bool) { displayInverted = inverted; rebuildGeometry() }
     func setBackgroundPattern(_ pattern: Int) { backgroundPattern = pattern; rebuildGeometry() }
     func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
-    func canvasPoint(from viewPoint: SIMD2<Float>) -> SIMD2<Float> { viewPoint - panOffset }
+
+    func canvasPoint(from viewPoint: SIMD2<Float>) -> SIMD2<Float> { (viewPoint - panOffset) / zoomScale }
+    func viewPoint(from canvasPoint: SIMD2<Float>) -> SIMD2<Float> { canvasPoint * zoomScale + panOffset }
     func pan(by delta: SIMD2<Float>) { panOffset += delta; rebuildGeometry() }
-    func resetPan() { panOffset = .zero; rebuildGeometry() }
+
+    func zoom(by factor: Float, around viewPoint: SIMD2<Float>) {
+        let oldZoom = zoomScale
+        let newZoom = min(max(oldZoom * factor, 0.25), 4.0)
+        guard abs(newZoom - oldZoom) > 0.0001 else { return }
+        let canvas = canvasPoint(from: viewPoint)
+        zoomScale = newZoom
+        panOffset = viewPoint - canvas * zoomScale
+        rebuildGeometry()
+    }
+
+    func setZoom(_ value: Float, around viewPoint: SIMD2<Float>) {
+        let newZoom = min(max(value, 0.25), 4.0)
+        guard abs(newZoom - zoomScale) > 0.0001 else { return }
+        let canvas = canvasPoint(from: viewPoint)
+        zoomScale = newZoom
+        panOffset = viewPoint - canvas * zoomScale
+        rebuildGeometry()
+    }
+
+    func resetZoom(centeredIn size: CGSize) {
+        zoomScale = 1
+        panOffset = SIMD2(Float(size.width * 0.5), Float(size.height * 0.5))
+        rebuildGeometry()
+    }
 
     func exportPageState() -> CanvasPageState {
         CanvasPageState(strokes: committedStrokes.map { CanvasStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) })
@@ -73,24 +101,14 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         rebuildGeometry()
     }
 
-    func beginHistoryTransaction() {
-        if transactionStart == nil { transactionStart = captureState() }
-    }
-
+    func beginHistoryTransaction() { if transactionStart == nil { transactionStart = captureState() } }
     func endHistoryTransaction() {
         guard let before = transactionStart else { return }
         transactionStart = nil
         let after = captureState()
-        if before.strokes != after.strokes || before.selection != after.selection {
-            undoStack.append(before); redoStack.removeAll(keepingCapacity: true)
-        }
+        if before.strokes != after.strokes || before.selection != after.selection { undoStack.append(before); redoStack.removeAll(keepingCapacity: true) }
     }
-
-    private func recordMutation() {
-        guard transactionStart == nil else { return }
-        undoStack.append(captureState()); redoStack.removeAll(keepingCapacity: true)
-    }
-
+    private func recordMutation() { guard transactionStart == nil else { return }; undoStack.append(captureState()); redoStack.removeAll(keepingCapacity: true) }
     private func captureState() -> HistoryState { HistoryState(strokes: committedStrokes, selection: selectedStrokeIndex) }
     private func restore(_ state: HistoryState) { committedStrokes = state.strokes; selectedStrokeIndex = state.selection; rebuildGeometry() }
 
@@ -107,12 +125,13 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     @discardableResult
     func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool {
         let canvas = canvasPoint(from: point)
-        var bestIndex: Int?; var bestDistance = tolerance
+        let canvasTolerance = tolerance / zoomScale
+        var bestIndex: Int?; var bestDistance = canvasTolerance
         for index in committedStrokes.indices.reversed() {
             let stroke = committedStrokes[index].points
             guard stroke.count >= 2 else { continue }
             for segment in 0..<(stroke.count - 1) {
-                let a = SIMD2<Float>(stroke[segment].x, stroke[segment].y), b = SIMD2<Float>(stroke[segment + 1].x, stroke[segment + 1].y)
+                let a = SIMD2(stroke[segment].x, stroke[segment].y), b = SIMD2(stroke[segment + 1].x, stroke[segment + 1].y)
                 let distance = distanceFromPoint(canvas, toSegment: a, b)
                 if distance <= bestDistance { bestDistance = distance; bestIndex = index; break }
             }
@@ -124,15 +143,15 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? {
         guard let bounds = selectedBounds() else { return nil }
-        let p = canvasPoint(from: point)
+        let p = canvasPoint(from: point), t = tolerance / zoomScale
         let handles: [(SelectionHandle, SIMD2<Float>)] = [(.topLeft, SIMD2(bounds.minX,bounds.minY)),(.topRight,SIMD2(bounds.maxX,bounds.minY)),(.bottomLeft,SIMD2(bounds.minX,bounds.maxY)),(.bottomRight,SIMD2(bounds.maxX,bounds.maxY))]
-        return handles.first { simd_distance(p, $0.1) <= tolerance }?.0
+        return handles.first { simd_distance(p, $0.1) <= t }?.0
     }
 
     func rotationHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool {
         guard let bounds = selectedBounds() else { return false }
         let p = canvasPoint(from: point); let center = SIMD2((bounds.minX+bounds.maxX)*0.5, bounds.minY-28)
-        return simd_distance(p, center) <= tolerance
+        return simd_distance(p, center) <= tolerance / zoomScale
     }
 
     func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) {
@@ -147,7 +166,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     func rotateSelected(to point: SIMD2<Float>, from previous: SIMD2<Float>) {
         guard let bounds = selectedBounds() else { return }
-        let p = canvasPoint(from: point), q = canvasPoint(from: previous); let center = SIMD2((bounds.minX+bounds.maxX)*0.5,(bounds.minY+bounds.maxY)*0.5)
+        let p = canvasPoint(from: point), q = canvasPoint(from: previous), center = SIMD2((bounds.minX+bounds.maxX)*0.5,(bounds.minY+bounds.maxY)*0.5)
         rotateSelected(by: atan2(p.y-center.y,p.x-center.x)-atan2(q.y-center.y,q.x-center.x))
     }
 
@@ -183,6 +202,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         encoder.endEncoding(); commandBuffer.present(drawable); commandBuffer.commit()
     }
 
+    private func viewPosition(_ point: SIMD2<Float>) -> SIMD2<Float> { point * zoomScale + panOffset }
+
     private func rebuildGeometry() {
         var output:[InkVertex]=[]
         appendBackgroundPattern(to:&output)
@@ -194,16 +215,15 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func appendBackgroundPattern(to output: inout [InkVertex]) {
         guard backgroundPattern != 0 else { return }
         let color = displayInverted ? SIMD4<Float>(0.24,0.24,0.24,0.55) : SIMD4<Float>(0.82,0.84,0.88,0.55)
-        let step: Float = backgroundPattern == 3 ? 24 : 32
-        let extent: Float = 4000
-        if backgroundPattern == 1 { var y:Float = -extent; while y <= extent { appendLineQuad(SIMD2(-extent,y),SIMD2(extent,y),width:0.55,color:color,to:output); y += step } }
-        else if backgroundPattern == 3 { var y:Float = -extent; while y <= extent { var x:Float = -extent; while x <= extent { appendDisk(center:SIMD2(x,y),radius:1.1,color:color,to:output); x += step }; y += step } }
-        else { var x:Float = -extent; while x <= extent { appendLineQuad(SIMD2(x,-extent),SIMD2(x,extent),width:0.45,color:color,to:output); x += step }; var y:Float = -extent; while y <= extent { appendLineQuad(SIMD2(-extent,y),SIMD2(extent,y),width:0.45,color:color,to:output); y += step } }
+        let step: Float = (backgroundPattern == 3 ? 24 : 32), extent: Float = 4000
+        if backgroundPattern == 1 { var y:Float = -extent; while y <= extent { appendLineQuad(viewPosition(SIMD2(-extent,y)),viewPosition(SIMD2(extent,y)),width:0.55*zoomScale,color:color,to:output); y += step } }
+        else if backgroundPattern == 3 { var y:Float = -extent; while y <= extent { var x:Float = -extent; while x <= extent { appendDisk(center:viewPosition(SIMD2(x,y)),radius:1.1*zoomScale,color:color,to:output); x += step }; y += step } }
+        else { var x:Float = -extent; while x <= extent { appendLineQuad(viewPosition(SIMD2(x,-extent)),viewPosition(SIMD2(x,extent)),width:0.45*zoomScale,color:color,to:output); x += step }; var y:Float = -extent; while y <= extent { appendLineQuad(viewPosition(SIMD2(-extent,y)),viewPosition(SIMD2(extent,y)),width:0.45*zoomScale,color:color,to:output); y += step } }
     }
 
     private func selectedBounds() -> (minX:Float,maxX:Float,minY:Float,maxY:Float)? { guard let i=selectedStrokeIndex,committedStrokes.indices.contains(i),let first=committedStrokes[i].points.first else{return nil}; var minX=first.x,maxX=first.x,minY=first.y,maxY=first.y; for p in committedStrokes[i].points { minX=min(minX,p.x);maxX=max(maxX,p.x);minY=min(minY,p.y);maxY=max(maxY,p.y) }; return(minX,maxX,minY,maxY) }
-    private func appendStrokeGeometry(_ stroke:[InkPoint],style:PenStyle,to output:inout [InkVertex]) { guard let first=stroke.first else{return}; let color=metalColor(style); for i in 0..<(max(stroke.count-1,0)) { let p0=stroke[i],p1=stroke[i+1],dx=p1.x-p0.x,dy=p1.y-p0.y,length=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/length,ny=dx/length,w0=strokeWidth(p0.pressure,style:style),w1=strokeWidth(p1.pressure,style:style); let a=SIMD2(p0.x+nx*w0+panOffset.x,p0.y+ny*w0+panOffset.y),b=SIMD2(p0.x-nx*w0+panOffset.x,p0.y-ny*w0+panOffset.y),c=SIMD2(p1.x+nx*w1+panOffset.x,p1.y+ny*w1+panOffset.y),d=SIMD2(p1.x-nx*w1+panOffset.x,p1.y-ny*w1+panOffset.y); appendTriangle(a,b,c,color:color,to:&output);appendTriangle(c,b,d,color:color,to:&output) }; appendDisk(center:SIMD2(first.x+panOffset.x,first.y+panOffset.y),radius:strokeWidth(first.pressure,style:style),color:color,to:&output); if let last=stroke.last { appendDisk(center:SIMD2(last.x+panOffset.x,last.y+panOffset.y),radius:strokeWidth(last.pressure,style:style),color:color,to:&output) }; if stroke.count>2 { for p in stroke.dropFirst().dropLast(){appendDisk(center:SIMD2(p.x+panOffset.x,p.y+panOffset.y),radius:strokeWidth(p.pressure,style:style),color:color,to:&output)} } }
-    private func appendSelectionBounds(_ stroke:[InkPoint],color:SIMD4<Float>,to output:inout[InkVertex]) { guard let b=selectedBounds() else{return}; let pad:Float=8,x0=b.minX-pad+panOffset.x,x1=b.maxX+pad+panOffset.x,y0=b.minY-pad+panOffset.y,y1=b.maxY+pad+panOffset.y,a=SIMD2(x0,y0),bb=SIMD2(x1,y0),c=SIMD2(x1,y1),d=SIMD2(x0,y1); appendLineQuad(a,bb,width:1.5,color:color,to:&output);appendLineQuad(bb,c,width:1.5,color:color,to:&output);appendLineQuad(c,d,width:1.5,color:color,to:&output);appendLineQuad(d,a,width:1.5,color:color,to:&output); for p in [a,bb,c,d]{appendDisk(center:p,radius:5,color:color,to:&output);appendDisk(center:p,radius:2.5,color:SIMD4(1,1,1,1),to:&output)}; let r=SIMD2((x0+x1)*0.5,y0-28);appendLineQuad(SIMD2((x0+x1)*0.5,y0),r,width:1,color:color,to:&output);appendDisk(center:r,radius:7,color:color,to:&output);appendDisk(center:r,radius:3,color:SIMD4(1,1,1,1),to:&output) }
+    private func appendStrokeGeometry(_ stroke:[InkPoint],style:PenStyle,to output:inout[InkVertex]) { guard let first=stroke.first else{return}; let color=metalColor(style); for i in 0..<(max(stroke.count-1,0)) { let p0=stroke[i],p1=stroke[i+1],dx=p1.x-p0.x,dy=p1.y-p0.y,length=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/length,ny=dx/length,w0=strokeWidth(p0.pressure,style:style)*zoomScale,w1=strokeWidth(p1.pressure,style:style)*zoomScale; let a=viewPosition(SIMD2(p0.x+nx*strokeWidth(p0.pressure,style:style),p0.y+ny*strokeWidth(p0.pressure,style:style))),b=viewPosition(SIMD2(p0.x-nx*strokeWidth(p0.pressure,style:style),p0.y-ny*strokeWidth(p0.pressure,style:style))),c=viewPosition(SIMD2(p1.x+nx*strokeWidth(p1.pressure,style:style),p1.y+ny*strokeWidth(p1.pressure,style:style))),d=viewPosition(SIMD2(p1.x-nx*strokeWidth(p1.pressure,style:style),p1.y-ny*strokeWidth(p1.pressure,style:style))); appendTriangle(a,b,c,color:color,to:&output);appendTriangle(c,b,d,color:color,to:&output) }; appendDisk(center:viewPosition(SIMD2(first.x,first.y)),radius:strokeWidth(first.pressure,style:style)*zoomScale,color:color,to:&output); if let last=stroke.last { appendDisk(center:viewPosition(SIMD2(last.x,last.y)),radius:strokeWidth(last.pressure,style:style)*zoomScale,color:color,to:&output) }; if stroke.count>2 { for p in stroke.dropFirst().dropLast(){appendDisk(center:viewPosition(SIMD2(p.x,p.y)),radius:strokeWidth(p.pressure,style:style)*zoomScale,color:color,to:&output)} } }
+    private func appendSelectionBounds(_ stroke:[InkPoint],color:SIMD4<Float>,to output:inout[InkVertex]) { guard let b=selectedBounds() else{return}; let pad:Float=8,x0=(b.minX-pad)*zoomScale+panOffset.x,x1=(b.maxX+pad)*zoomScale+panOffset.x,y0=(b.minY-pad)*zoomScale+panOffset.y,y1=(b.maxY+pad)*zoomScale+panOffset.y,a=SIMD2(x0,y0),bb=SIMD2(x1,y0),c=SIMD2(x1,y1),d=SIMD2(x0,y1); appendLineQuad(a,bb,width:1.5,color:color,to:&output);appendLineQuad(bb,c,width:1.5,color:color,to:&output);appendLineQuad(c,d,width:1.5,color:color,to:&output);appendLineQuad(d,a,width:1.5,color:color,to:&output); for p in [a,bb,c,d]{appendDisk(center:p,radius:5,color:color,to:&output);appendDisk(center:p,radius:2.5,color:SIMD4(1,1,1,1),to:&output)}; let r=SIMD2((x0+x1)*0.5,y0-28);appendLineQuad(SIMD2((x0+x1)*0.5,y0),r,width:1,color:color,to:&output);appendDisk(center:r,radius:7,color:color,to:&output);appendDisk(center:r,radius:3,color:SIMD4(1,1,1,1),to:&output) }
     private func appendLineQuad(_ a:SIMD2<Float>,_ b:SIMD2<Float>,width:Float,color:SIMD4<Float>,to output:inout[InkVertex]) { let d=b-a,l=max(simd_length(d),0.001),n=SIMD2(-d.y/l,d.x/l)*width;appendTriangle(a+n,a-n,b+n,color:color,to:&output);appendTriangle(b+n,a-n,b-n,color:color,to:&output) }
     private func distanceFromPoint(_ p:SIMD2<Float>,toSegment a:SIMD2<Float>,_ b:SIMD2<Float>)->Float { let ab=b-a,l=simd_length_squared(ab);if l<0.0001{return simd_distance(p,a)};let t=max(0,min(1,simd_dot(p-a,ab)/l));return simd_distance(p,a+ab*t) }
     private func strokeWidth(_ pressure:Float,style:PenStyle)->Float { let p=max(0,min(1,pressure)),c=style.pressureEnabled ? pow(p,max(0.25,Float(style.pressureCurve))):0.75;return Float(style.width)*(0.45+0.75*c) }
