@@ -12,6 +12,9 @@ final class MosuanPencilCanvasView: UIView {
         case fingerNavigation
     }
 
+    /// Shared anti-palm policy. Strong is the default teacher mode.
+    var inputMode = MosuanPencilInputMode()
+
     var onPointerEvent: ((MosuanPointerEvent) -> Void)?
     /// Temporary predicted samples. The renderer must discard/replace these when
     /// the next real event arrives; they must never enter saved page content.
@@ -43,29 +46,37 @@ final class MosuanPencilCanvasView: UIView {
         guard let touch = touches.first else { return }
 
         if touch.type == .pencil {
+            guard inputMode.acceptsWriting(.pen) else { return }
             activePencilTouch = touch
             gestureMode = .pencilWriting
+            lastNavigationPoint = nil
             emitActualSamples(for: touch, event: event, fallbackPhase: .began)
             emitPredictedSamples(for: touch, event: event)
             return
         }
 
-        guard activePencilTouch == nil else { return }
+        // In strong/extreme modes, a finger that lands while Pencil is down is
+        // ignored completely. This is the important palm/hand rejection path.
+        guard activePencilTouch == nil,
+              inputMode.acceptsNavigation(.touch, pencilActive: false) else { return }
         gestureMode = .fingerNavigation
         lastNavigationPoint = averageLocation(of: touches)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         if let pencil = activePencilTouch, touches.contains(pencil) {
-            // UIKit can provide up to 240 Hz input while ordinary delivery is
-            // commonly around 60 Hz. Coalesced touches recover the missing path.
+            // UIKit can provide high-frequency input while ordinary delivery is
+            // commonly lower frequency. Coalesced touches recover the path.
             emitActualSamples(for: pencil, event: event, fallbackPhase: .changed)
             emitPredictedSamples(for: pencil, event: event)
             return
         }
 
         let points = touches.filter { $0.type != .pencil }
-        guard !points.isEmpty, activePencilTouch == nil else { return }
+        guard !points.isEmpty,
+              activePencilTouch == nil,
+              inputMode.acceptsNavigation(.touch, pencilActive: false) else { return }
+
         let current = averageLocation(of: points)
         if let previous = lastNavigationPoint {
             onPan?(current - previous)
@@ -77,6 +88,8 @@ final class MosuanPencilCanvasView: UIView {
         if let pencil = activePencilTouch, touches.contains(pencil) {
             emitActualSamples(for: pencil, event: event, fallbackPhase: .ended)
             activePencilTouch = nil
+            gestureMode = .fingerNavigation
+            lastNavigationPoint = nil
             return
         }
         lastNavigationPoint = nil
@@ -86,6 +99,7 @@ final class MosuanPencilCanvasView: UIView {
         if let pencil = activePencilTouch, touches.contains(pencil) {
             emitActualSamples(for: pencil, event: event, fallbackPhase: .cancelled)
             activePencilTouch = nil
+            gestureMode = .fingerNavigation
         }
         lastNavigationPoint = nil
     }
@@ -100,8 +114,7 @@ final class MosuanPencilCanvasView: UIView {
             return
         }
 
-        // Do not mix the normal touch with coalesced touches: the coalesced array
-        // already includes the latest reported touch.
+        // The coalesced array already contains the latest reported touch.
         let samples = event.coalescedTouches(for: touch) ?? [touch]
         for sample in samples {
             let phase: MosuanPointerEvent.Phase
