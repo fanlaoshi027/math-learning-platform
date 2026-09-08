@@ -2,8 +2,8 @@ import MetalKit
 import UIKit
 import simd
 
-/// iPad Metal canvas shell with separate committed, active and predicted layers.
-/// Predicted samples are transient and are never persisted or sent to history.
+/// iPad Metal canvas with a CPU-generated brush mesh and transient prediction layer.
+/// Actual samples are persisted; predicted samples are display-only.
 final class MosuanMetalCanvasView: MTKView {
     private struct Vertex {
         var position: SIMD2<Float>
@@ -40,6 +40,7 @@ final class MosuanMetalCanvasView: MTKView {
         isMultipleTouchEnabled = true
         colorPixelFormat = .bgra8Unorm
         preferredFramesPerSecond = 120
+        sampleCount = 4
 
         guard let device else { return }
         commandQueue = device.makeCommandQueue()
@@ -51,11 +52,20 @@ final class MosuanMetalCanvasView: MTKView {
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
         descriptor.colorAttachments[0].pixelFormat = colorPixelFormat
+        descriptor.sampleCount = sampleCount
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].rgbBlendOperation = .add
+        descriptor.colorAttachments[0].alphaBlendOperation = .add
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         pipeline = try? device.makeRenderPipelineState(descriptor: descriptor)
         delegate = self
     }
 
     func connect(to input: MosuanPencilCanvasView) {
+        inputMode = input.inputMode
         input.onPointerEvent = { [weak self] event in self?.receiveActual(event) }
         input.onPredictedPointerEvent = { [weak self] event in self?.receivePredicted(event) }
         input.onPan = { [weak self] delta in self?.pan(delta) }
@@ -63,7 +73,6 @@ final class MosuanMetalCanvasView: MTKView {
     }
 
     private func receiveActual(_ event: MosuanPointerEvent) {
-        // A real sample supersedes every prediction generated before it.
         predicted.removeAll(keepingCapacity: true)
 
         switch event.phase {
@@ -97,8 +106,6 @@ final class MosuanMetalCanvasView: MTKView {
         let committer = OneStrokeCommitter(settings: oneStrokeSettings)
         let object = committer.commit(points: points, style: strokeStyle)
 
-        // If recognition is not confident, the original stroke remains the page
-        // representation. Recognized objects are handed to the document layer.
         if object == nil { committed.append(finished) }
         onCommittedStroke?(finished, object)
     }
@@ -125,16 +132,80 @@ final class MosuanMetalCanvasView: MTKView {
         setNeedsDisplay()
     }
 
-    private func vertices(for strokes: [[MosuanPointerEvent]], color: SIMD4<Float>) -> [Vertex] {
-        strokes.flatMap { stroke in
-            stroke.map { Vertex(position: canvasToNDC($0.position), color: color) }
+    private func effectiveWidth(for event: MosuanPointerEvent, previous: MosuanPointerEvent?) -> Float {
+        let pressure = min(max(event.pressure, 0), 1)
+        let pressureFactor: Float
+        if pressure > 0.01 {
+            pressureFactor = 0.68 + 0.68 * pressure
+        } else if let previous {
+            let dt = max(Float(event.timestamp - previous.timestamp), 1.0 / 240.0)
+            let speed = simd_distance(event.position, previous.position) / dt
+            let speedT = min(max((speed - 80) / (1800 - 80), 0), 1)
+            pressureFactor = 1.18 + (0.58 - 1.18) * speedT
+        } else {
+            pressureFactor = 0.85
         }
+        return max(Float(strokeStyle.strokeWidth) * pressureFactor, 0.5)
+    }
+
+    private func brushVertices(for stroke: [MosuanPointerEvent], opacity: Float) -> [Vertex] {
+        guard !stroke.isEmpty else { return [] }
+        let sides = 12
+        var vertices: [Vertex] = []
+        vertices.reserveCapacity(stroke.count * sides * 3 + max(stroke.count - 1, 0) * 6)
+
+        let baseColor = strokeStyle.strokeColor
+        let color = SIMD4<Float>(Float(baseColor.red), Float(baseColor.green), Float(baseColor.blue), Float(baseColor.alpha) * opacity)
+
+        func screenPoint(_ point: SIMD2<Float>) -> SIMD2<Float> {
+            point * canvasScale + canvasOffset
+        }
+
+        func appendDisk(center: SIMD2<Float>, radius: Float) {
+            let c = screenPoint(center)
+            for i in 0..<sides {
+                let a0 = Float(i) * 2 * .pi / Float(sides)
+                let a1 = Float(i + 1) * 2 * .pi / Float(sides)
+                vertices.append(Vertex(position: canvasToNDC(c), color: color))
+                vertices.append(Vertex(position: canvasToNDC(c + SIMD2<Float>(cos(a0), sin(a0)) * radius), color: color))
+                vertices.append(Vertex(position: canvasToNDC(c + SIMD2<Float>(cos(a1), sin(a1)) * radius), color: color))
+            }
+        }
+
+        for index in stroke.indices {
+            let current = stroke[index]
+            let previous = index > 0 ? stroke[index - 1] : nil
+            let radius = effectiveWidth(for: current, previous: previous) * canvasScale * 0.5
+            appendDisk(center: current.position, radius: radius)
+
+            guard index > 0 else { continue }
+            let previousEvent = stroke[index - 1]
+            let a = screenPoint(previousEvent.position)
+            let b = screenPoint(current.position)
+            let delta = b - a
+            let length = simd_length(delta)
+            guard length > 0.001 else { continue }
+            let normal = SIMD2<Float>(-delta.y, delta.x) / length
+            let previousRadius = effectiveWidth(for: previousEvent, previous: index > 1 ? stroke[index - 2] : nil) * canvasScale * 0.5
+            let r = max(radius, previousRadius)
+
+            let p0 = a + normal * r
+            let p1 = a - normal * r
+            let p2 = b + normal * r
+            let p3 = b - normal * r
+            vertices.append(Vertex(position: canvasToNDC(p0), color: color))
+            vertices.append(Vertex(position: canvasToNDC(p1), color: color))
+            vertices.append(Vertex(position: canvasToNDC(p2), color: color))
+            vertices.append(Vertex(position: canvasToNDC(p2), color: color))
+            vertices.append(Vertex(position: canvasToNDC(p1), color: color))
+            vertices.append(Vertex(position: canvasToNDC(p3), color: color))
+        }
+        return vertices
     }
 
     private func canvasToNDC(_ point: SIMD2<Float>) -> SIMD2<Float> {
         let size = SIMD2<Float>(Float(max(drawableSize.width, 1)), Float(max(drawableSize.height, 1)))
-        let p = point * canvasScale + canvasOffset
-        return SIMD2(p.x / size.x * 2 - 1, 1 - p.y / size.y * 2)
+        return SIMD2(point.x / size.x * 2 - 1, 1 - point.y / size.y * 2)
     }
 }
 
@@ -151,9 +222,9 @@ extension MosuanMetalCanvasView: MTKViewDelegate {
         let encoder = commandBuffer?.makeRenderCommandEncoder(descriptor: pass)
         encoder?.setRenderPipelineState(pipeline)
 
-        drawStrokeLayer(committed, color: SIMD4<Float>(0, 0, 0, 1), encoder: encoder)
-        drawStrokeLayer(active.isEmpty ? [] : [active], color: SIMD4<Float>(0, 0, 0, 1), encoder: encoder)
-        drawStrokeLayer(predicted.isEmpty ? [] : [predicted], color: SIMD4<Float>(0, 0, 0, 0.35), encoder: encoder)
+        drawStrokeLayer(committed, opacity: 1, encoder: encoder)
+        if !active.isEmpty { drawStrokeLayer([active], opacity: 1, encoder: encoder) }
+        if !predicted.isEmpty { drawStrokeLayer([predicted], opacity: 0.35, encoder: encoder) }
 
         encoder?.endEncoding()
         commandBuffer?.present(drawable)
@@ -162,18 +233,19 @@ extension MosuanMetalCanvasView: MTKViewDelegate {
 
     private func drawStrokeLayer(
         _ strokes: [[MosuanPointerEvent]],
-        color: SIMD4<Float>,
+        opacity: Float,
         encoder: MTLRenderCommandEncoder?
     ) {
-        guard !strokes.isEmpty else { return }
-        var data = vertices(for: strokes, color: color)
-        guard !data.isEmpty,
-              let buffer = device?.makeBuffer(
-                bytes: &data,
-                length: MemoryLayout<Vertex>.stride * data.count,
-                options: .storageModeShared
-              ) else { return }
-        encoder?.setVertexBuffer(buffer, offset: 0, index: 0)
-        encoder?.drawPrimitives(type: .lineStrip, vertexStart: 0, vertexCount: data.count)
+        for stroke in strokes where stroke.count > 0 {
+            var data = brushVertices(for: stroke, opacity: opacity)
+            guard !data.isEmpty,
+                  let buffer = device?.makeBuffer(
+                    bytes: &data,
+                    length: MemoryLayout<Vertex>.stride * data.count,
+                    options: .storageModeShared
+                  ) else { continue }
+            encoder?.setVertexBuffer(buffer, offset: 0, index: 0)
+            encoder?.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: data.count)
+        }
     }
 }
