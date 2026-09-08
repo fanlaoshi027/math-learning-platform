@@ -14,7 +14,7 @@ let package = Package(
             name: "MosuanBoard",
             path: "Sources/MosuanBoard",
             resources: [
-                .process("Metal")
+                .process("Metal/InkShaders.metal")
             ]
         )
     ]
