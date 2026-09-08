@@ -14,9 +14,13 @@ enum PolygonGeometry {
         for i in polygon.indices {
             let a = polygon[i]
             let b = polygon[j]
-            let crosses = ((a.y > point.y) != (b.y > point.y)) &&
-                (point.x < (b.x - a.x) * (point.y - a.y) / max(b.y - a.y, .leastNonzeroMagnitude) + a.x)
-            if crosses { inside.toggle() }
+            if (a.y > point.y) != (b.y > point.y) {
+                let denominator = b.y - a.y
+                let x = (b.x - a.x) * (point.y - a.y) / denominator + a.x
+                if point.x < x {
+                    inside.toggle()
+                }
+            }
             j = i
         }
         return inside
@@ -27,7 +31,9 @@ enum PolygonGeometry {
         for (index, vertex) in vertices.enumerated() {
             let d = hypot(point.x - vertex.x, point.y - vertex.y)
             guard d <= tolerance else { continue }
-            if result == nil || d < result!.distance { result = (index, d) }
+            if result == nil || d < result!.distance {
+                result = (index, d)
+            }
         }
         return result?.index
     }
