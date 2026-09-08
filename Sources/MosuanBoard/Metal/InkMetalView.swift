@@ -26,10 +26,11 @@ final class InkMetalView: MTKView {
     var onHistoryChanged:(()->Void)?
     var onSelectionChanged:(()->Void)?
     var onPageStateChanged:((CanvasPageState)->Void)?
+    var onZoomChanged:((Int)->Void)?
     var penStyle=PenStyle(){didSet{renderer.setPenStyle(penStyle)}}
     var boardBackground:SIMD4<Float>=SIMD4(1,1,1,1){didSet{renderer.setBackgroundColor(boardBackground)}}
     var displayInverted=false{didSet{renderer.setDisplayInverted(displayInverted)}}
-    var canUndo:Bool{renderer.canUndo};var canRedo:Bool{renderer.canRedo};var hasSelection:Bool{renderer.hasSelection};var selectedRotationDegrees:Double{renderer.selectedRotationDegrees}
+    var canUndo:Bool{renderer.canUndo};var canRedo:Bool{renderer.canRedo};var hasSelection:Bool{renderer.hasSelection};var selectedRotationDegrees:Double{renderer.selectedRotationDegrees};var zoomPercent:Int{renderer.zoomPercent}
     override var isFlipped:Bool{true};override var acceptsFirstResponder:Bool{true}
 
     init(frame frameRect:NSRect = .zero){guard let device=MTLCreateSystemDefaultDevice(),let renderer=InkRenderer(device:device)else{fatalError("Metal is unavailable on this Mac")};self.renderer=renderer;super.init(frame:frameRect,device:device);configureMetal();renderer.setPenStyle(penStyle)}
@@ -39,29 +40,34 @@ final class InkMetalView: MTKView {
     func loadPageState(_ state:CanvasPageState){renderer.importPageState(state);onHistoryChanged?();onSelectionChanged?();draw()}
     func currentPageState()->CanvasPageState{renderer.exportPageState()}
     func undo(){renderer.undo();notifyState();draw()};func redo(){renderer.redo();notifyState();draw()};func deleteSelected(){renderer.deleteSelected();notifyState();draw()};func setSelectedRotationDegrees(_ degrees:Double){renderer.setSelectedRotationDegrees(degrees);notifyState();draw()}
+    func resetZoom(){renderer.resetZoom(centeredIn:bounds.size);onZoomChanged?(renderer.zoomPercent);draw()}
+    func zoomIn(){renderer.zoom(by:1.2,around:SIMD2(Float(bounds.midX),Float(bounds.midY)));onZoomChanged?(renderer.zoomPercent);draw()}
+    func zoomOut(){renderer.zoom(by:1/1.2,around:SIMD2(Float(bounds.midX),Float(bounds.midY)));onZoomChanged?(renderer.zoomPercent);draw()}
     private func notifyState(){onHistoryChanged?();onSelectionChanged?();onPageStateChanged?(renderer.exportPageState())}
 
     override func mouseDown(with event:NSEvent){window?.makeFirstResponder(self);let p=makePoint(from:event)
         if spaceHeld {panDrag=true;lastPoint=p;return}
         if isEraserTool {renderer.beginHistoryTransaction();eraserPoints=[p];return}
         if isSelectionTool {if renderer.rotationHandle(at:p){renderer.beginHistoryTransaction();rotationDrag=true;lastRotationPoint=p;return};if let h=renderer.selectionHandle(at:p){renderer.beginHistoryTransaction();resizeHandle=h;lastPoint=p;return};selectionDrag=renderer.selectStroke(at:p);lastPoint=p;onSelectionChanged?();draw();return}
-        guard isUserInteractionEnabledForTool else{return};renderer.beginHistoryTransaction();active=true;smartLineDetected=false;smartLineWorkItem?.cancel();points=[InkPoint(x:p.x,y:p.y,pressure:event.pressure>0 ? Float(event.pressure):1)];renderer.setStroke(points);draw()
+        guard isUserInteractionEnabledForTool else{return};renderer.beginHistoryTransaction();active=true;smartLineDetected=false;smartLineWorkItem?.cancel();let c=renderer.canvasPoint(from:p);points=[InkPoint(x:c.x,y:c.y,pressure:event.pressure>0 ? Float(event.pressure):1)];renderer.setStroke(points);draw()
     }
     override func mouseDragged(with event:NSEvent){let p=makePoint(from:event)
         if panDrag {renderer.pan(by:p-lastPoint);lastPoint=p;draw();return}
         if isEraserTool {eraserPoints.append(p);return}
-        if isSelectionTool {if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return};if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);draw();return};guard selectionDrag else{return};let d=p-lastPoint;if simd_length_squared(d)>0{renderer.beginHistoryTransaction();renderer.moveSelected(by:d);lastPoint=p;draw()};return}
-        guard isUserInteractionEnabledForTool && active else{return};let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:p.x,y:p.y,pressure:pressure));if isLineTool || (isSmartLineTool && smartLineDetected){renderer.setStroke(linePreview(from:points))}else{renderer.setStroke(points)};scheduleSmartLineDetection();draw()
+        if isSelectionTool {if rotationDrag{renderer.rotateSelected(to:p,from:lastRotationPoint);lastRotationPoint=p;onSelectionChanged?();draw();return};if resizeHandle != nil{renderer.resizeSelected(handle:resizeHandle!,to:p);draw();return};guard selectionDrag else{return};let d=renderer.canvasPoint(from:p)-renderer.canvasPoint(from:lastPoint);if simd_length_squared(d)>0{renderer.moveSelected(by:d);lastPoint=p;draw()};return}
+        guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));if isLineTool || (isSmartLineTool && smartLineDetected){renderer.setStroke(linePreview(from:points))}else{renderer.setStroke(points)};scheduleSmartLineDetection();draw()
     }
     override func mouseUp(with event:NSEvent){smartLineWorkItem?.cancel();let p=makePoint(from:event)
         if panDrag{panDrag=false;return}
         if isEraserTool{eraserPoints.append(p);eraseAlongPath(eraserPoints);eraserPoints.removeAll(keepingCapacity:true);renderer.endHistoryTransaction();notifyState();return}
         if isSelectionTool{rotationDrag=false;resizeHandle=nil;selectionDrag=false;renderer.endHistoryTransaction();notifyState();return}
-        guard isUserInteractionEnabledForTool && active else{return};let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:p.x,y:p.y,pressure:pressure));let committed=(isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points;renderer.commitStroke(committed);renderer.endHistoryTransaction();points.removeAll(keepingCapacity:true);active=false;smartLineDetected=false;renderer.setStroke([]);notifyState();draw()
+        guard isUserInteractionEnabledForTool && active else{return};let c=renderer.canvasPoint(from:p);let pressure=event.pressure>0 ? Float(event.pressure):(points.last?.pressure ?? 1);points.append(InkPoint(x:c.x,y:c.y,pressure:pressure));let committed=(isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from:points):points;renderer.commitStroke(committed);renderer.endHistoryTransaction();points.removeAll(keepingCapacity:true);active=false;smartLineDetected=false;renderer.setStroke([]);notifyState();draw()
     }
-    override func keyDown(with event:NSEvent){if event.keyCode==49{spaceHeld=true;return};if isSelectionTool && event.keyCode==51{deleteSelected();return};super.keyDown(with:event)}
-    override func keyUp(with event:NSEvent){if event.keyCode==49{spaceHeld=false;return};super.keyUp(with:event)}
-    override func tabletPoint(with event:NSEvent){switch event.phase{case .began:mouseDown(with:event);case .changed:mouseDragged(with:event);case .ended:mouseUp(with:event);case .cancelled:smartLineWorkItem?.cancel();active=false;renderer.setStroke([]);renderer.endHistoryTransaction();draw();default:break}}
+
+    override func scrollWheel(with event:NSEvent){let p=makePoint(from:event);if event.modifierFlags.contains(.command){let factor=powf(1.0018,Float(event.scrollingDeltaY));renderer.zoom(by:factor,around:p);onZoomChanged?(renderer.zoomPercent);draw()}else{renderer.pan(by:SIMD2(Float(event.scrollingDeltaX),Float(event.scrollingDeltaY)));draw()}}
+    override func keyDown(with event:NSEvent){if event.isARepeat{return};if event.keyCode==49{spaceHeld=true;return};if isSelectionTool && event.keyCode==51{deleteSelected();return};if event.modifierFlags.contains(.command) && event.keyCode==24{zoomIn();return};if event.modifierFlags.contains(.command) && event.keyCode==27{zoomOut();return};if event.modifierFlags.contains(.command) && event.keyCode==36{resetZoom();return};super.keyDown(with:event)}
+    override func keyUp(with event:NSEvent){if event.keyCode==49{spaceHeld=false;panDrag=false;return};super.keyUp(with:event)}
+    override func tabletPoint(with event:NSEvent){switch event.phase{case .began:mouseDown(with:event);case .changed:mouseDragged(with:event);case .ended:mouseUp(with:event);case .cancelled:smartLineWorkItem?.cancel();active=false;points.removeAll(keepingCapacity:true);renderer.setStroke([]);renderer.endHistoryTransaction();draw();default:break}}
 
     private func scheduleSmartLineDetection(){guard isSmartLineTool,points.count>=4 else{return};smartLineWorkItem?.cancel();let work=DispatchWorkItem{[weak self] in guard let self,self.active,self.isSmartLineTool,self.points.count>=4 else{return};if self.isLikelyStraightLine(self.points){self.smartLineDetected=true;self.renderer.setStroke(self.linePreview(from:self.points));self.draw()}};smartLineWorkItem=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.18,execute:work)}
     private func isLikelyStraightLine(_ p:[InkPoint])->Bool{guard let f=p.first,let l=p.last else{return false};let a=SIMD2(f.x,f.y),b=SIMD2(l.x,l.y),len=simd_distance(a,b);guard len>30 else{return false};let tol=max(7,len*0.075);return p.dropFirst().dropLast().allSatisfy{distanceToSegment(SIMD2($0.x,$0.y),a,b)<=tol}}
