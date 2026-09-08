@@ -16,6 +16,22 @@ enum BoardBackground: String, CaseIterable, Identifiable {
     }
 }
 
+enum EyeComfortBackground: String, CaseIterable, Identifiable {
+    case black90, deepGreen, deepBlue, custom
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .black90: "90%黑"; case .deepGreen: "深绿"; case .deepBlue: "深蓝"; case .custom: "自定义色值" }
+    }
+    var color: SIMD4<Float> {
+        switch self {
+        case .black90: SIMD4(0.10, 0.10, 0.10, 1)
+        case .deepGreen: SIMD4(0.08, 0.16, 0.12, 1)
+        case .deepBlue: SIMD4(0.07, 0.12, 0.22, 1)
+        case .custom: SIMD4(0.10, 0.10, 0.10, 1)
+        }
+    }
+}
+
 struct BoardView: View {
     @State private var selectedTool: BoardTool = .pen
     @State private var selectedPresetID = PenPreset.defaults[0].id
@@ -33,14 +49,14 @@ struct MetalInkCanvas: NSViewRepresentable {
     @Binding var tool: BoardTool
     let penStyle: PenStyle
     @ObservedObject var controller: CanvasController
-    var background: BoardBackground = .white
+    var background: SIMD4<Float> = SIMD4(1,1,1,1)
     var inverted: Bool = false
     func makeNSView(context: Context) -> InkMetalView { let view = InkMetalView(); configure(view); controller.attach(view); return view }
     func updateNSView(_ nsView: InkMetalView, context: Context) { configure(nsView); controller.attach(nsView) }
     private func configure(_ view: InkMetalView) {
         view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine
         view.isSelectionTool = tool == .select; view.isLineTool = tool == .line; view.isSmartLineTool = tool == .smartLine; view.isEraserTool = tool == .eraser
-        view.penStyle = penStyle; view.boardBackground = background.metal; view.displayInverted = inverted
+        view.penStyle = penStyle; view.boardBackground = background; view.displayInverted = inverted
     }
 }
 
