@@ -14,10 +14,14 @@ struct BoardScreen: View {
     @State private var inverted = false
     @State private var eyeComfortBackground: EyeComfortBackground = .black90
     @State private var customHex = "1A1A1A"
+    @State private var zoomPercent = 100
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var rotationBinding: Binding<String> { Binding(get: { rotationText }, set: { rotationText = $0 }) }
     private var toolbarIsVertical: Bool { toolbarDock == .left || toolbarDock == .right }
+    private var currentPage: BoardPage? { pageController.currentPage }
+    private var currentPageID: UUID { currentPage?.id ?? UUID() }
+    private var currentPageState: CanvasPageState { currentPage?.content ?? CanvasPageState() }
 
     private var customColor: SIMD4<Float> {
         let value = customHex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
@@ -44,9 +48,22 @@ struct BoardScreen: View {
                         .overlay(alignment: .trailing) { Divider() }
 
                     ZStack {
-                        MetalInkCanvas(tool: $tool, penStyle: preset.style, controller: controller, background: effectiveBackground, inverted: inverted, pattern: .blank)
-                            .background(effectiveBackgroundColor)
-                            .padding(24)
+                        MetalInkCanvas(
+                            pageID: currentPageID,
+                            pageState: currentPageState,
+                            tool: $tool,
+                            penStyle: preset.style,
+                            controller: controller,
+                            background: effectiveBackground,
+                            inverted: inverted,
+                            pattern: .blank,
+                            zoomPercent: $zoomPercent,
+                            onPageStateChanged: { state in
+                                pageController.saveCurrentPageState(state)
+                            }
+                        )
+                        .background(effectiveBackgroundColor)
+                        .padding(24)
 
                         if isDraggingToolbar { dockingGuides(for: proxy.size) }
 
