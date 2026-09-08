@@ -18,6 +18,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var uniformBuffer: (any MTLBuffer)?
     private var penStyle = PenStyle()
     private(set) var selectedStrokeIndex: Int?
+    private var backgroundColor = SIMD4<Float>(1, 1, 1, 1)
+    private var displayInverted = false
 
     init?(device: any MTLDevice) {
         guard let commandQueue = device.makeCommandQueue(),
@@ -47,6 +49,17 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     }
 
     func setPenStyle(_ style: PenStyle) { penStyle = style; rebuildGeometry() }
+
+    func setBackgroundColor(_ color: SIMD4<Float>) {
+        backgroundColor = color
+        rebuildGeometry()
+    }
+
+    func setDisplayInverted(_ inverted: Bool) {
+        displayInverted = inverted
+        rebuildGeometry()
+    }
+
     func setStroke(_ points: [InkPoint]) { activeStroke = points; rebuildGeometry() }
 
     func commitStroke(_ points: [InkPoint]) {
@@ -60,16 +73,12 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     func undo() {
         guard let stroke = committedStrokes.popLast() else { return }
-        redoStrokes.append(stroke)
-        selectedStrokeIndex = nil
-        rebuildGeometry()
+        redoStrokes.append(stroke); selectedStrokeIndex = nil; rebuildGeometry()
     }
 
     func redo() {
         guard let stroke = redoStrokes.popLast() else { return }
-        committedStrokes.append(stroke)
-        selectedStrokeIndex = nil
-        rebuildGeometry()
+        committedStrokes.append(stroke); selectedStrokeIndex = nil; rebuildGeometry()
     }
 
     @discardableResult
@@ -86,19 +95,14 @@ final class InkRenderer: NSObject, MTKViewDelegate {
                 if distance <= bestDistance { bestDistance = distance; bestIndex = index; break }
             }
         }
-        selectedStrokeIndex = bestIndex
-        rebuildGeometry()
-        return bestIndex != nil
+        selectedStrokeIndex = bestIndex; rebuildGeometry(); return bestIndex != nil
     }
 
     func clearSelection() { selectedStrokeIndex = nil; rebuildGeometry() }
 
     func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? {
         guard let bounds = selectedBounds() else { return nil }
-        let handles: [(SelectionHandle, SIMD2<Float>)] = [
-            (.topLeft, SIMD2<Float>(bounds.minX, bounds.minY)), (.topRight, SIMD2<Float>(bounds.maxX, bounds.minY)),
-            (.bottomLeft, SIMD2<Float>(bounds.minX, bounds.maxY)), (.bottomRight, SIMD2<Float>(bounds.maxX, bounds.maxY))
-        ]
+        let handles: [(SelectionHandle, SIMD2<Float>)] = [(.topLeft, SIMD2<Float>(bounds.minX, bounds.minY)), (.topRight, SIMD2<Float>(bounds.maxX, bounds.minY)), (.bottomLeft, SIMD2<Float>(bounds.minX, bounds.maxY)), (.bottomRight, SIMD2<Float>(bounds.maxX, bounds.maxY))]
         return handles.first { simd_distance(point, $0.1) <= tolerance }?.0
     }
 
@@ -108,44 +112,26 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         return simd_distance(point, center) <= tolerance
     }
 
-    func rotationHandlePosition() -> SIMD2<Float>? {
-        guard let bounds = selectedBounds() else { return nil }
-        return SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, bounds.minY - 28)
-    }
-
     func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
         let anchor: SIMD2<Float>
-        switch handle {
-        case .topLeft: anchor = SIMD2<Float>(bounds.maxX, bounds.maxY)
-        case .topRight: anchor = SIMD2<Float>(bounds.minX, bounds.maxY)
-        case .bottomLeft: anchor = SIMD2<Float>(bounds.maxX, bounds.minY)
-        case .bottomRight: anchor = SIMD2<Float>(bounds.minX, bounds.minY)
-        }
-        let oldWidth = max(bounds.maxX - bounds.minX, 1)
-        let oldHeight = max(bounds.maxY - bounds.minY, 1)
-        let newWidth = max(abs(point.x - anchor.x), 1)
-        let newHeight = max(abs(point.y - anchor.y), 1)
-        let sx = newWidth / oldWidth
-        let sy = newHeight / oldHeight
-        let points = committedStrokes[index].points
-        committedStrokes[index].points = points.map { InkPoint(x: anchor.x + ($0.x - anchor.x) * sx, y: anchor.y + ($0.y - anchor.y) * sy, pressure: $0.pressure) }
-        redoStrokes.removeAll(keepingCapacity: true)
-        rebuildGeometry()
+        switch handle { case .topLeft: anchor = SIMD2<Float>(bounds.maxX, bounds.maxY); case .topRight: anchor = SIMD2<Float>(bounds.minX, bounds.maxY); case .bottomLeft: anchor = SIMD2<Float>(bounds.maxX, bounds.minY); case .bottomRight: anchor = SIMD2<Float>(bounds.minX, bounds.minY) }
+        let oldWidth = max(bounds.maxX - bounds.minX, 1), oldHeight = max(bounds.maxY - bounds.minY, 1)
+        let sx = max(abs(point.x - anchor.x), 1) / oldWidth, sy = max(abs(point.y - anchor.y), 1) / oldHeight
+        committedStrokes[index].points = committedStrokes[index].points.map { InkPoint(x: anchor.x + ($0.x - anchor.x) * sx, y: anchor.y + ($0.y - anchor.y) * sy, pressure: $0.pressure) }
+        redoStrokes.removeAll(keepingCapacity: true); rebuildGeometry()
     }
 
     func rotateSelected(to point: SIMD2<Float>, from previous: SIMD2<Float>) {
-        guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index), let bounds = selectedBounds() else { return }
+        guard let bounds = selectedBounds() else { return }
         let center = SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, (bounds.minY + bounds.maxY) * 0.5)
-        let a0 = atan2(previous.y - center.y, previous.x - center.x)
-        let a1 = atan2(point.y - center.y, point.x - center.x)
+        let a0 = atan2(previous.y - center.y, previous.x - center.x), a1 = atan2(point.y - center.y, point.x - center.x)
         rotateSelected(by: a1 - a0)
     }
 
     func setSelectedRotationDegrees(_ degrees: Double) {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
-        let target = Float(degrees * .pi / 180)
-        rotateSelected(by: target - committedStrokes[index].rotation)
+        rotateSelected(by: Float(degrees * .pi / 180) - committedStrokes[index].rotation)
     }
 
     private func rotateSelected(by delta: Float) {
@@ -153,20 +139,16 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         let center = SIMD2<Float>((bounds.minX + bounds.maxX) * 0.5, (bounds.minY + bounds.maxY) * 0.5)
         let c = cos(delta), s = sin(delta)
         committedStrokes[index].points = committedStrokes[index].points.map {
-            let v = SIMD2<Float>($0.x, $0.y) - center
-            let r = SIMD2<Float>(v.x * c - v.y * s, v.x * s + v.y * c) + center
+            let v = SIMD2<Float>($0.x, $0.y) - center; let r = SIMD2<Float>(v.x * c - v.y * s, v.x * s + v.y * c) + center
             return InkPoint(x: r.x, y: r.y, pressure: $0.pressure)
         }
-        committedStrokes[index].rotation += delta
-        redoStrokes.removeAll(keepingCapacity: true)
-        rebuildGeometry()
+        committedStrokes[index].rotation += delta; redoStrokes.removeAll(keepingCapacity: true); rebuildGeometry()
     }
 
     func moveSelected(by delta: SIMD2<Float>) {
         guard let index = selectedStrokeIndex, committedStrokes.indices.contains(index) else { return }
         committedStrokes[index].points = committedStrokes[index].points.map { InkPoint(x: $0.x + delta.x, y: $0.y + delta.y, pressure: $0.pressure) }
-        redoStrokes.removeAll(keepingCapacity: true)
-        rebuildGeometry()
+        redoStrokes.removeAll(keepingCapacity: true); rebuildGeometry()
     }
 
     func deleteSelected() {
@@ -174,13 +156,11 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         committedStrokes.remove(at: index); selectedStrokeIndex = nil; redoStrokes.removeAll(keepingCapacity: true); rebuildGeometry()
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for: view.drawableSize) }
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for: size) }
 
     func draw(in view: MTKView) {
-        guard let descriptor = view.currentRenderPassDescriptor,
-              let drawable = view.currentDrawable,
-              let commandBuffer = commandQueue.makeCommandBuffer(),
-              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        guard let descriptor = view.currentRenderPassDescriptor, let drawable = view.currentDrawable, let commandBuffer = commandQueue.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        descriptor.colorAttachments[0].clearColor = MTLClearColor(red: Double(backgroundColor.x), green: Double(backgroundColor.y), blue: Double(backgroundColor.z), alpha: 1)
         updateUniformBuffer(for: view.drawableSize)
         encoder.setRenderPipelineState(pipelineState)
         if let vertexBuffer { encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0) }
@@ -197,8 +177,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
             if selectedStrokeIndex == index { appendSelectionBounds(stroke.points, color: SIMD4<Float>(0.1, 0.45, 1, 0.75), to: &output) }
         }
         if !activeStroke.isEmpty { appendStrokeGeometry(activeStroke, style: penStyle, to: &output) }
-        vertices = output
-        vertexBuffer = vertices.isEmpty ? nil : device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<InkVertex>.stride, options: .storageModeShared)
+        vertices = output; vertexBuffer = vertices.isEmpty ? nil : device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<InkVertex>.stride, options: .storageModeShared)
     }
 
     private func selectedBounds() -> (minX: Float, maxX: Float, minY: Float, maxY: Float)? {
@@ -212,13 +191,10 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         guard let first = stroke.first, let last = stroke.last else { return }
         let color = metalColor(style)
         for index in 0..<(stroke.count - 1) {
-            let p0 = stroke[index], p1 = stroke[index + 1]
-            let dx = p1.x - p0.x, dy = p1.y - p0.y
-            let length = max(sqrt(dx * dx + dy * dy), 0.001)
-            let nx = -dy / length, ny = dx / length
+            let p0 = stroke[index], p1 = stroke[index + 1], dx = p1.x - p0.x, dy = p1.y - p0.y
+            let length = max(sqrt(dx * dx + dy * dy), 0.001), nx = -dy / length, ny = dx / length
             let w0 = strokeWidth(p0.pressure, style: style), w1 = strokeWidth(p1.pressure, style: style)
-            let a = SIMD2<Float>(p0.x + nx * w0, p0.y + ny * w0), b = SIMD2<Float>(p0.x - nx * w0, p0.y - ny * w0)
-            let c = SIMD2<Float>(p1.x + nx * w1, p1.y + ny * w1), d = SIMD2<Float>(p1.x - nx * w1, p1.y - ny * w1)
+            let a = SIMD2<Float>(p0.x + nx * w0, p0.y + ny * w0), b = SIMD2<Float>(p0.x - nx * w0, p0.y - ny * w0), c = SIMD2<Float>(p1.x + nx * w1, p1.y + ny * w1), d = SIMD2<Float>(p1.x - nx * w1, p1.y - ny * w1)
             appendTriangle(a, b, c, color: color, to: &output); appendTriangle(c, b, d, color: color, to: &output)
         }
         appendDisk(center: SIMD2<Float>(first.x, first.y), radius: strokeWidth(first.pressure, style: style), color: color, to: &output)
@@ -230,36 +206,40 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         guard let first = stroke.first else { return }
         var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
         for point in stroke { minX = min(minX, point.x); maxX = max(maxX, point.x); minY = min(minY, point.y); maxY = max(maxY, point.y) }
-        let pad: Float = 8
-        let x0 = minX - pad, x1 = maxX + pad, y0 = minY - pad, y1 = maxY + pad
+        let pad: Float = 8, x0 = minX - pad, x1 = maxX + pad, y0 = minY - pad, y1 = maxY + pad
         let a = SIMD2<Float>(x0, y0), b = SIMD2<Float>(x1, y0), c = SIMD2<Float>(x1, y1), d = SIMD2<Float>(x0, y1)
         appendLineQuad(a, b, width: 1.5, color: color, to: &output); appendLineQuad(b, c, width: 1.5, color: color, to: &output); appendLineQuad(c, d, width: 1.5, color: color, to: &output); appendLineQuad(d, a, width: 1.5, color: color, to: &output)
         let handleColor = SIMD4<Float>(1, 1, 1, 1)
         for center in [a, b, c, d] { appendDisk(center: center, radius: 5, color: color, to: &output); appendDisk(center: center, radius: 2.5, color: handleColor, to: &output) }
         let rotationCenter = SIMD2<Float>((x0 + x1) * 0.5, y0 - 28)
-        appendLineQuad(SIMD2<Float>((x0 + x1) * 0.5, y0), rotationCenter, width: 1, color: color, to: &output)
-        appendDisk(center: rotationCenter, radius: 7, color: color, to: &output)
-        appendDisk(center: rotationCenter, radius: 3, color: handleColor, to: &output)
+        appendLineQuad(SIMD2<Float>((x0 + x1) * 0.5, y0), rotationCenter, width: 1, color: color, to: &output); appendDisk(center: rotationCenter, radius: 7, color: color, to: &output); appendDisk(center: rotationCenter, radius: 3, color: handleColor, to: &output)
     }
 
     private func appendLineQuad(_ a: SIMD2<Float>, _ b: SIMD2<Float>, width: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
-        let delta = b - a; let length = max(simd_length(delta), 0.001); let normal = SIMD2<Float>(-delta.y / length, delta.x / length) * width
+        let delta = b - a, length = max(simd_length(delta), 0.001), normal = SIMD2<Float>(-delta.y / length, delta.x / length) * width
         appendTriangle(a + normal, a - normal, b + normal, color: color, to: &output); appendTriangle(b + normal, a - normal, b - normal, color: color, to: &output)
     }
 
     private func distanceFromPoint(_ p: SIMD2<Float>, toSegment a: SIMD2<Float>, _ b: SIMD2<Float>) -> Float {
-        let ab = b - a; let lengthSquared = simd_length_squared(ab)
+        let ab = b - a, lengthSquared = simd_length_squared(ab)
         if lengthSquared < 0.0001 { return simd_distance(p, a) }
         let t = max(0, min(1, simd_dot(p - a, ab) / lengthSquared)); return simd_distance(p, a + ab * t)
     }
 
     private func strokeWidth(_ pressure: Float, style: PenStyle) -> Float {
-        let p = max(0, min(1, pressure)); let curved = style.pressureEnabled ? pow(p, max(0.25, Float(style.pressureCurve))) : 0.75
+        let p = max(0, min(1, pressure)), curved = style.pressureEnabled ? pow(p, max(0.25, Float(style.pressureCurve))) : 0.75
         return Float(style.width) * (0.45 + 0.75 * curved)
     }
 
     private func metalColor(_ style: PenStyle) -> SIMD4<Float> {
-        SIMD4<Float>(Float(style.color.red), Float(style.color.green), Float(style.color.blue), Float(style.color.alpha * style.opacity))
+        var color = SIMD4<Float>(Float(style.color.red), Float(style.color.green), Float(style.color.blue), Float(style.color.alpha * style.opacity))
+        guard displayInverted else { return color }
+        let brightness = max(color.x, max(color.y, color.z))
+        let darkness = min(color.x, min(color.y, color.z))
+        // Eye-comfort inversion only swaps near-black and near-white; chromatic ink keeps its hue.
+        if brightness < 0.12 { color.x = 1; color.y = 1; color.z = 1 }
+        else if darkness > 0.88 { color.x = 0; color.y = 0; color.z = 0 }
+        return color
     }
 
     private func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, color: SIMD4<Float>, to output: inout [InkVertex]) {
@@ -268,19 +248,13 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     private func appendDisk(center: SIMD2<Float>, radius: Float, color: SIMD4<Float>, to output: inout [InkVertex]) {
         let steps = 12
-        for index in 0..<steps {
-            let a0 = Float(index) / Float(steps) * 2 * .pi
-            let a1 = Float(index + 1) / Float(steps) * 2 * .pi
-            appendTriangle(center, center + SIMD2<Float>(cos(a0), sin(a0)) * radius, center + SIMD2<Float>(cos(a1), sin(a1)) * radius, color: color, to: &output)
-        }
+        for index in 0..<steps { let a0 = Float(index) / Float(steps) * 2 * .pi, a1 = Float(index + 1) / Float(steps) * 2 * .pi; appendTriangle(center, center + SIMD2<Float>(cos(a0), sin(a0)) * radius, center + SIMD2<Float>(cos(a1), sin(a1)) * radius, color: color, to: &output) }
     }
 
     private func updateUniformBuffer(for size: CGSize) {
         let uniform = Uniforms(viewportSize: SIMD2<Float>(Float(max(size.width, 1)), Float(max(size.height, 1))))
         if uniformBuffer == nil { uniformBuffer = device.makeBuffer(length: MemoryLayout<Uniforms>.stride, options: .storageModeShared) }
         guard let uniformBuffer else { return }
-        withUnsafeBytes(of: uniform) { rawBuffer in
-            memcpy(uniformBuffer.contents(), rawBuffer.baseAddress!, MemoryLayout<Uniforms>.stride)
-        }
+        withUnsafeBytes(of: uniform) { rawBuffer in memcpy(uniformBuffer.contents(), rawBuffer.baseAddress!, MemoryLayout<Uniforms>.stride) }
     }
 }
