@@ -1,20 +1,47 @@
 import Foundation
 import simd
 
-/// A small platform-neutral bridge for an iPad canvas host.
-/// The eventual UIKit/Metal view can forward Pencil events and navigation
-/// gestures here, keeping document editing independent of UIKit.
+/// Platform-neutral bridge for the iPad canvas host.
+/// Pencil input and touch navigation stay separate from document editing.
 final class MosuanIPadCanvasBridge {
+    enum PressureMode: Equatable {
+        case devicePressure
+        case syntheticNib
+    }
+
     var onPointerEvent: ((MosuanPointerEvent) -> Void)?
     var onPan: ((SIMD2<Float>) -> Void)?
     var onZoom: ((Float, SIMD2<Float>) -> Void)?
 
+    /// Use synthetic nib dynamics by default so pressure-free active pens and
+    /// capacitive styluses still produce visible thick/thin pen strokes.
+    var pressureMode: PressureMode = .syntheticNib
+    var inkDynamics = MosuanInkDynamics()
+
     private(set) var lastPencilPosition: SIMD2<Float>?
 
     func receivePencil(_ event: MosuanPointerEvent) {
+        receivePencil(event, timestamp: ProcessInfo.processInfo.systemUptime)
+    }
+
+    func receivePencil(_ event: MosuanPointerEvent, timestamp: TimeInterval) {
         guard event.deviceType == .pen else { return }
         lastPencilPosition = event.position
-        onPointerEvent?(event)
+
+        var forwarded = event
+        if pressureMode == .syntheticNib {
+            forwarded.pressure = inkDynamics.syntheticPressure(
+                position: event.position,
+                timestamp: timestamp,
+                phase: event.phase
+            )
+        }
+
+        onPointerEvent?(forwarded)
+
+        if event.phase == .ended || event.phase == .cancelled {
+            inkDynamics.reset()
+        }
     }
 
     func receiveTouchPan(delta: SIMD2<Float>) {
@@ -28,5 +55,6 @@ final class MosuanIPadCanvasBridge {
 
     func reset() {
         lastPencilPosition = nil
+        inkDynamics.reset()
     }
 }
