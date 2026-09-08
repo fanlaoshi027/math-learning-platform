@@ -13,10 +13,10 @@ let package = Package(
                 "BoardScreen.swift",
                 "BoardScreenFixed.swift",
                 "BoardScreenV2.swift",
-                "Metal/InkRenderer.swift",
-                "Core/GraphicObjectStore.swift",
+                "Metal/InkRendererFixed.swift",
                 "Core/GraphicObjectStoreFixed.swift",
                 "Core/GraphicObjectStoreV2.swift",
+                "Core/GraphicObjectStoreV3.swift",
                 "SMART_LINE_AND_ERASER.md"
             ],
             resources: [.process("Metal/InkShaders.metal")]
