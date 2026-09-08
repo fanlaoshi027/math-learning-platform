@@ -1,3 +1,4 @@
+import Foundation
 import Metal
 import MetalKit
 import simd
@@ -29,6 +30,8 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var undoStack: [HistoryState] = []
     private var redoStack: [HistoryState] = []
     private var transactionStart: HistoryState?
+    private var pasteCascadeIndex = 0
+    private var lastClipboardPayloadData: Data?
 
     init?(device: any MTLDevice) {
         guard let queue = device.makeCommandQueue(),
@@ -77,7 +80,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func resetZoom(centeredIn size: CGSize) { zoomScale = 1; panOffset = SIMD2(Float(size.width / 2), Float(size.height / 2)); rebuildGeometry() }
 
     func exportPageState() -> CanvasPageState { CanvasPageState(strokes: committedStrokes.map { CanvasStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }, objects: objectStore.exportObjects()) }
-    func importPageState(_ state: CanvasPageState) { committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }; objectStore.importObjects(state.objects); activeStroke = []; selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; undoStack = []; redoStack = []; transactionStart = nil; rebuildGeometry() }
+    func importPageState(_ state: CanvasPageState) { committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }; objectStore.importObjects(state.objects); activeStroke = []; selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; undoStack = []; redoStack = []; transactionStart = nil; pasteCascadeIndex = 0; lastClipboardPayloadData = nil; rebuildGeometry() }
     func beginHistoryTransaction() { if transactionStart == nil { transactionStart = captureState() } }
     func endHistoryTransaction() { guard let before = transactionStart else { return }; transactionStart = nil; let after = captureState(); if before.strokes != after.strokes || before.objects != after.objects || before.selection != after.selection || before.objectSelection != after.objectSelection { undoStack.append(before); redoStack.removeAll() } }
     private func recordMutation() { guard transactionStart == nil else { return }; undoStack.append(captureState()); redoStack.removeAll() }
@@ -89,6 +92,83 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func commitStroke(_ points: [InkPoint]) { guard points.count >= 2 else { activeStroke = []; rebuildGeometry(); return }; recordMutation(); committedStrokes.append(StoredStroke(id: UUID(), points: points, style: penStyle)); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
     func commitLine(from start: SIMD2<Float>, to end: SIMD2<Float>) { recordMutation(); let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0); _ = objectStore.addLine(from: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)), to: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)), style: style); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
     func commitPolygon(points: [CGPoint]) { guard points.count >= 3 else { return }; recordMutation(); let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0); _ = objectStore.addPolygon(points: points, style: style); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
+
+    // MARK: - Clipboard
+
+    /// Encodes the current mixed selection for the macOS pasteboard.
+    /// Selection is copied as actual content, never as indices, so it remains
+    /// valid after other edits or page changes.
+    func makeSelectionClipboardData() -> Data? {
+        let strokes = selectedStrokeIndices.compactMap { index -> CanvasStroke? in
+            guard committedStrokes.indices.contains(index) else { return nil }
+            let stroke = committedStrokes[index]
+            return CanvasStroke(id: stroke.id, points: stroke.points, style: stroke.style, rotation: stroke.rotation)
+        }
+        let objects = selectedObjectIDs.compactMap { objectStore.object(with: $0) }
+        let payload = SelectionClipboardPayload(strokes: strokes, objects: objects)
+        guard !payload.isEmpty, let data = try? JSONEncoder().encode(payload) else { return nil }
+        pasteCascadeIndex = 0
+        lastClipboardPayloadData = data
+        return data
+    }
+
+    /// Pastes a previously encoded Mosuan selection as new content.
+    /// Every paste is one undo operation and becomes the active selection.
+    @discardableResult
+    func pasteSelectionClipboardData(_ data: Data) -> Bool {
+        guard let payload = try? JSONDecoder().decode(SelectionClipboardPayload.self, from: data),
+              payload.version == SelectionClipboardPayload.currentVersion,
+              !payload.isEmpty else { return false }
+
+        if lastClipboardPayloadData != data {
+            pasteCascadeIndex = 0
+            lastClipboardPayloadData = data
+        }
+        pasteCascadeIndex += 1
+
+        let screenOffset: Float = 24
+        let canvasOffset = screenOffset / max(zoomScale, 0.001)
+        let delta = CGPoint(x: CGFloat(canvasOffset * Float(pasteCascadeIndex)), y: CGFloat(canvasOffset * Float(pasteCascadeIndex)))
+
+        recordMutation()
+
+        let strokeStartIndex = committedStrokes.count
+        for stroke in payload.strokes {
+            let shiftedPoints = stroke.points.map {
+                InkPoint(x: $0.x + Float(delta.x), y: $0.y + Float(delta.y), pressure: $0.pressure)
+            }
+            committedStrokes.append(StoredStroke(id: UUID(), points: shiftedPoints, style: stroke.style, rotation: stroke.rotation))
+        }
+
+        var pastedObjectIDs: [UUID] = []
+        for object in payload.objects {
+            let duplicated = duplicateObject(object, topLevelOffset: delta)
+            pastedObjectIDs.append(duplicated.id)
+            objectStore.update(duplicated)
+        }
+
+        selectedStrokeIndices = Array(strokeStartIndex..<committedStrokes.count)
+        selectedObjectIDs = pastedObjectIDs
+        customRotationCenter = nil
+        activeStroke = []
+        rebuildGeometry()
+        return true
+    }
+
+    private func duplicateObject(_ object: GraphicObject, topLevelOffset: CGPoint) -> GraphicObject {
+        let children = object.children.map { duplicateObject($0, topLevelOffset: .zero) }
+        var transform = object.transform
+        transform.position.x += topLevelOffset.x
+        transform.position.y += topLevelOffset.y
+        return GraphicObject(
+            id: UUID(),
+            kind: object.kind,
+            transform: transform,
+            style: object.style,
+            geometry: object.geometry,
+            children: children
+        )
+    }
 
     private func applySelection(_ operation: SelectionOperation, objects: [UUID], strokes: [Int]) {
         switch operation {
