@@ -3,6 +3,8 @@ import MetalKit
 import simd
 
 final class InkMetalView: MTKView {
+    private static let mosuanClipboardType = NSPasteboard.PasteboardType("com.fanlaoshi.mosuan.selection")
+
     private let renderer: InkRenderer
     private let lassoOverlay = LassoOverlayView()
     private var points: [InkPoint] = []
@@ -105,6 +107,20 @@ final class InkMetalView: MTKView {
     func zoomOut() { renderer.zoom(by: 1 / 1.2, around: SIMD2(Float(bounds.midX), Float(bounds.midY))); onZoomChanged?(renderer.zoomPercent); draw() }
     private func notifyState() { onHistoryChanged?(); onSelectionChanged?(); onPageStateChanged?(renderer.exportPageState()) }
     private var selectionModeActive: Bool { isSelectionTool || temporarySelectHeld }
+
+    private func copySelectionToPasteboard() {
+        guard let data = renderer.makeSelectionClipboardData() else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setData(data, forType: Self.mosuanClipboardType)
+    }
+
+    private func pasteSelectionFromPasteboard() {
+        guard let data = NSPasteboard.general.data(forType: Self.mosuanClipboardType),
+              renderer.pasteSelectionClipboardData(data) else { return }
+        notifyState()
+        draw()
+    }
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
@@ -238,6 +254,21 @@ final class InkMetalView: MTKView {
 
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
+
+        if event.modifierFlags.contains(.command),
+           let key = event.charactersIgnoringModifiers?.lowercased() {
+            switch key {
+            case "c":
+                if renderer.hasSelection { copySelectionToPasteboard() }
+                return
+            case "v":
+                pasteSelectionFromPasteboard()
+                return
+            default:
+                break
+            }
+        }
+
         if event.keyCode == 53 && isPolygonTool && polygonModel.isConstructing { polygonModel.cancel(); renderer.setStroke([]); renderer.endHistoryTransaction(); draw(); return }
         if event.keyCode == 56 || event.keyCode == 60 { temporarySelectHeld = true; return }
         if event.keyCode == 49 { spaceHeld = true; return }
