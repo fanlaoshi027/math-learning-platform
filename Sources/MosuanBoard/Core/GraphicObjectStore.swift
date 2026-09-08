@@ -93,6 +93,29 @@ final class GraphicObjectStore {
         return nil
     }
 
+    /// Finds objects touched by a freehand scribble. This is intentionally an
+    /// object-level operation: a line, polygon, or future math object can be
+    /// deleted as one unit rather than requiring the user to hit a tiny segment.
+    func objectsHitByScribble(_ path: [CGPoint], tolerance: CGFloat = 12) -> [UUID] {
+        guard path.count >= 2 else { return [] }
+        return objects.filter { object in
+            guard let bounds = bounds(of: object) else { return false }
+            let expanded = bounds.insetBy(dx: -tolerance, dy: -tolerance)
+            if path.contains(where: expanded.contains) { return true }
+            return zip(path, path.dropFirst()).contains { expanded.intersects(segmentBounds($0, $1)) }
+        }.map(\.id)
+    }
+
+    /// Deletes every structured object touched by a scribble and returns the
+    /// stable IDs that were removed so the caller can record one undo action.
+    @discardableResult
+    func eraseByScribble(_ path: [CGPoint], tolerance: CGFloat = 12) -> [UUID] {
+        let ids = Set(objectsHitByScribble(path, tolerance: tolerance))
+        guard !ids.isEmpty else { return [] }
+        objects.removeAll { ids.contains($0.id) }
+        return Array(ids)
+    }
+
     private func hitTest(_ object: GraphicObject, at point: CGPoint, tolerance: CGFloat) -> Bool {
         switch object.kind {
         case .line, .arrow:
@@ -156,6 +179,15 @@ final class GraphicObjectStore {
         return CGPoint(
             x: scaled.x * c - scaled.y * s + center.x + object.transform.position.x,
             y: scaled.x * s + scaled.y * c + center.y + object.transform.position.y
+        )
+    }
+
+    private func segmentBounds(_ a: CGPoint, _ b: CGPoint) -> CGRect {
+        CGRect(
+            x: min(a.x, b.x),
+            y: min(a.y, b.y),
+            width: abs(a.x - b.x),
+            height: abs(a.y - b.y)
         )
     }
 
