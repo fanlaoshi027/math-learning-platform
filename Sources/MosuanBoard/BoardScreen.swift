@@ -30,7 +30,7 @@ struct BoardScreen: View {
                     .background(.white)
                     .padding(24)
 
-                toolbar
+                toolbar(in: proxy.size)
                     .frame(
                         maxWidth: toolbarIsVertical ? 78 : .infinity,
                         maxHeight: toolbarIsVertical ? .infinity : 64
@@ -47,6 +47,12 @@ struct BoardScreen: View {
             }
             .coordinateSpace(name: "board")
             .animation(.easeInOut(duration: 0.18), value: toolbarDock)
+            .onAppear {
+                if let raw = UserDefaults.standard.string(forKey: "mosuan.toolbarDock"),
+                   let saved = ToolbarDock(rawValue: raw) {
+                    toolbarDock = saved
+                }
+            }
             .onChange(of: controller.rotationDegrees) { _, value in
                 rotationText = String(format: "%.1f", value)
             }
@@ -54,36 +60,9 @@ struct BoardScreen: View {
                 if selected { rotationText = String(format: "%.1f", controller.rotationDegrees) }
                 else { rotationText = "0" }
             }
-            .environment(\.layoutDirection, .leftToRight)
-            .onAppear {
-                // Restore the last toolbar edge without making it part of the document.
-                if let raw = UserDefaults.standard.string(forKey: "mosuan.toolbarDock"),
-                   let saved = ToolbarDock(rawValue: raw) {
-                    toolbarDock = saved
-                }
-            }
             .onChange(of: toolbarDock) { _, value in
                 UserDefaults.standard.set(value.rawValue, forKey: "mosuan.toolbarDock")
             }
-            .overlay(alignment: .topLeading) {
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-            .background(Color.clear)
-            .onPreferenceChange(EmptyPreferenceKey.self) { _ in }
-            .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(coordinateSpace: .named("board"))
-                    .onEnded { value in
-                        // This gesture only becomes active when no toolbar control consumes it.
-                        // The actual handle gesture is preferred for normal use.
-                        if value.translation.width.magnitude > 180 || value.translation.height.magnitude > 180 {
-                            toolbarDock = nearestDock(for: value.location, in: proxy.size)
-                        }
-                    }
-            )
         }
         .frame(minWidth: 1100, minHeight: 700)
     }
@@ -98,18 +77,18 @@ struct BoardScreen: View {
     }
 
     @ViewBuilder
-    private var toolbar: some View {
+    private func toolbar(in size: CGSize) -> some View {
         Group {
             if toolbarIsVertical {
                 VStack(spacing: 8) {
-                    dragHandle
+                    dragHandle(in: size)
                     Divider()
                     toolbarContents
                 }
                 .padding(8)
             } else {
                 HStack(spacing: 10) {
-                    dragHandle
+                    dragHandle(in: size)
                     Divider().frame(height: 24)
                     toolbarContents
                 }
@@ -190,7 +169,7 @@ struct BoardScreen: View {
         .disabled(!controller.canRedo)
     }
 
-    private var dragHandle: some View {
+    private func dragHandle(in size: CGSize) -> some View {
         Image(systemName: "line.3.horizontal")
             .font(.system(size: 14, weight: .semibold))
             .frame(width: 28, height: 32)
@@ -200,18 +179,9 @@ struct BoardScreen: View {
             .gesture(
                 DragGesture(coordinateSpace: .named("board"))
                     .onEnded { value in
-                        // Drawboard-style edge docking: drop near an edge to dock there.
-                        toolbarDock = nearestDock(for: value.location, in: currentBoardSize)
+                        toolbarDock = nearestDock(for: value.location, in: size)
                     }
             )
-    }
-
-    // The four-edge decision is intentionally based on the current window rather than a fixed size.
-    private var currentBoardSize: CGSize {
-        // GeometryReader updates the view when the window changes; using the minimum supported
-        // window here keeps the helper deterministic until the next layout pass.
-        CGSize(width: max(1100, NSScreen.main?.visibleFrame.width ?? 1100),
-               height: max(700, NSScreen.main?.visibleFrame.height ?? 700))
     }
 
     private func nearestDock(for point: CGPoint, in size: CGSize) -> ToolbarDock {
@@ -230,12 +200,5 @@ struct BoardScreen: View {
             return
         }
         controller.setRotationDegrees(value)
-    }
-}
-
-private struct EmptyPreferenceKey: PreferenceKey {
-    static var defaultValue: Bool = false
-    static func reduce(value: inout Bool, nextValue: () -> Bool) {
-        value = value || nextValue()
     }
 }
