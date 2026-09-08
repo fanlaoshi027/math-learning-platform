@@ -33,7 +33,10 @@ final class GraphicObjectStore {
     func object(with id: UUID) -> GraphicObject? { objects.first { $0.id == id } }
 
     func update(_ object: GraphicObject) {
-        guard let index = objects.firstIndex(where: { $0.id == object.id }) else { return }
+        guard let index = objects.firstIndex(where: { $0.id == object.id }) else {
+            objects.append(object)
+            return
+        }
         objects[index] = object
     }
 
