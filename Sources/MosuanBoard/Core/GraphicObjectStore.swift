@@ -24,6 +24,12 @@ final class GraphicObjectStore {
         return object.id
     }
 
+    /// Inserts an already-created object, preserving its UUID.
+    /// Used by clipboard/import flows that create a fresh UUID before insertion.
+    func insert(_ object: GraphicObject) {
+        objects.append(object)
+    }
+
     func object(with id: UUID) -> GraphicObject? { objects.first { $0.id == id } }
 
     func update(_ object: GraphicObject) {
