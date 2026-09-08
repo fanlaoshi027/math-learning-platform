@@ -90,21 +90,71 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func commitLine(from start: SIMD2<Float>, to end: SIMD2<Float>) { recordMutation(); let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0); _ = objectStore.addLine(from: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)), to: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)), style: style); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
     func commitPolygon(points: [CGPoint]) { guard points.count >= 3 else { return }; recordMutation(); let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0); _ = objectStore.addPolygon(points: points, style: style); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
 
-    @discardableResult func selectObject(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { let p = canvasPoint(from: point); guard let id = objectStore.hitTest(at: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { clearSelection(); return false }; selectedObjectIDs = [id]; selectedStrokeIndices = []; customRotationCenter = nil; rebuildGeometry(); return true }
-    @discardableResult func toggleObject(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { let p = canvasPoint(from: point); guard let id = objectStore.hitTest(at: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { return false }; if selectedObjectIDs.contains(id) { selectedObjectIDs.removeAll { $0 == id } } else { selectedObjectIDs.append(id) }; selectedStrokeIndices = []; rebuildGeometry(); return true }
-    @discardableResult func selectObjects(in viewRect: CGRect, fullyContained: Bool = false) -> Int { let a = canvasPoint(from: SIMD2(Float(viewRect.minX), Float(viewRect.minY))); let b = canvasPoint(from: SIMD2(Float(viewRect.maxX), Float(viewRect.maxY))); let r = CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(a.x-b.x)), height: CGFloat(abs(a.y-b.y))); selectedObjectIDs = objectStore.objectsIntersecting(r, fullyContained: fullyContained); selectedStrokeIndices = []; rebuildGeometry(); return selectedObjectIDs.count }
-    @discardableResult func lineEndpoint(at point: SIMD2<Float>, tolerance: Float = 14) -> (id: UUID, endpoint: Int)? { let p = canvasPoint(from: point); guard let hit = objectStore.nearestLineEndpoint(to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { return nil }; return (hit.id, hit.endpoint) }
-    @discardableResult func moveSelectedLineEndpoint(id: UUID, endpoint: Int, to point: SIMD2<Float>) -> Bool { let p = canvasPoint(from: point); guard objectStore.moveLineEndpoint(id: id, endpoint: endpoint, to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) else { return false }; rebuildGeometry(); return true }
+    private func applySelection(_ operation: SelectionOperation, objects: [UUID], strokes: [Int]) {
+        switch operation {
+        case .replace:
+            selectedObjectIDs = objects
+            selectedStrokeIndices = strokes
+        case .add:
+            for id in objects where !selectedObjectIDs.contains(id) { selectedObjectIDs.append(id) }
+            for index in strokes where !selectedStrokeIndices.contains(index) { selectedStrokeIndices.append(index) }
+        case .subtract:
+            selectedObjectIDs.removeAll { objects.contains($0) }
+            selectedStrokeIndices.removeAll { strokes.contains($0) }
+        }
+        customRotationCenter = nil
+        rebuildGeometry()
+    }
+
+    @discardableResult func selectObject(at point: SIMD2<Float>, tolerance: Float = 10, operation: SelectionOperation = .replace) -> Bool {
+        let p = canvasPoint(from: point)
+        guard let id = objectStore.hitTest(at: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else {
+            if operation == .replace { clearSelection() }
+            return false
+        }
+        applySelection(operation, objects: [id], strokes: [])
+        return true
+    }
+
+    @discardableResult func toggleObject(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool {
+        let p = canvasPoint(from: point)
+        guard let id = objectStore.hitTest(at: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { return false }
+        if selectedObjectIDs.contains(id) { selectedObjectIDs.removeAll { $0 == id } } else { selectedObjectIDs.append(id) }
+        customRotationCenter = nil
+        rebuildGeometry()
+        return true
+    }
+
+    @discardableResult func selectObjects(in viewRect: CGRect, fullyContained: Bool = false, operation: SelectionOperation = .replace) -> Int {
+        let a = canvasPoint(from: SIMD2(Float(viewRect.minX), Float(viewRect.minY)))
+        let b = canvasPoint(from: SIMD2(Float(viewRect.maxX), Float(viewRect.maxY)))
+        let r = CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(a.x-b.x)), height: CGFloat(abs(a.y-b.y)))
+        let ids = objectStore.objectsIntersecting(r, fullyContained: fullyContained)
+        applySelection(operation, objects: ids, strokes: [])
+        return selectionCount
+    }
+
+    @discardableResult func lineEndpoint(at point: SIMD2<Float>, tolerance: Float = 14) -> (id: UUID, endpoint: Int)? {
+        let p = canvasPoint(from: point)
+        guard let hit = objectStore.nearestLineEndpoint(to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { return nil }
+        return (hit.id, hit.endpoint)
+    }
+
+    @discardableResult func moveSelectedLineEndpoint(id: UUID, endpoint: Int, to point: SIMD2<Float>) -> Bool {
+        let p = canvasPoint(from: point)
+        guard objectStore.moveLineEndpoint(id: id, endpoint: endpoint, to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) else { return false }
+        rebuildGeometry()
+        return true
+    }
+
     @discardableResult func polygonVertex(at point: SIMD2<Float>, tolerance: Float = 14) -> (id: UUID, vertexIndex: Int)? {
-        guard selectedObjectIDs.count == 1,
-              let selectedID = selectedObjectIDs.first,
-              let object = objectStore.object(with: selectedID),
-              object.kind == .polygon else { return nil }
+        guard selectedObjectIDs.count == 1, let selectedID = selectedObjectIDs.first, let object = objectStore.object(with: selectedID), object.kind == .polygon else { return nil }
         let p = canvasPoint(from: point)
         guard let hit = objectStore.nearestPolygonVertex(to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { return nil }
         guard hit.id == selectedID else { return nil }
         return (hit.id, hit.index)
     }
+
     @discardableResult func moveSelectedPolygonVertex(id: UUID, vertexIndex: Int, to point: SIMD2<Float>) -> Bool {
         guard selectedObjectIDs.count == 1, selectedObjectIDs.first == id else { return false }
         let p = canvasPoint(from: point)
@@ -112,31 +162,83 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         rebuildGeometry()
         return true
     }
-    func deleteSelectedObjects() { guard !selectedObjectIDs.isEmpty else { return }; recordMutation(); for id in selectedObjectIDs { objectStore.remove(id: id) }; selectedObjectIDs = []; rebuildGeometry() }
-    @discardableResult func eraseObjectsByScribble(_ path: [SIMD2<Float>], tolerance: Float = 12) -> Bool { let p = path.map { let q = canvasPoint(from: $0); return CGPoint(x: CGFloat(q.x), y: CGFloat(q.y)) }; let ids = objectStore.eraseByScribble(p, tolerance: CGFloat(tolerance / zoomScale)); guard !ids.isEmpty else { return false }; selectedObjectIDs.removeAll { ids.contains($0) }; rebuildGeometry(); return true }
 
-    @discardableResult func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { let p = canvasPoint(from: point); var hit: Int?; var best = tolerance / zoomScale; for i in committedStrokes.indices.reversed() { let s = committedStrokes[i].points; guard s.count > 1 else { continue }; for j in 0..<(s.count-1) { let d = distance(p, SIMD2(s[j].x,s[j].y), SIMD2(s[j+1].x,s[j+1].y)); if d <= best { best = d; hit = i; break } } }; selectedStrokeIndices = hit.map { [$0] } ?? []; selectedObjectIDs = []; rebuildGeometry(); return hit != nil }
-    @discardableResult func toggleStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { selectStroke(at: point, tolerance: tolerance) }
-    @discardableResult func selectStrokes(in viewRect: CGRect, fullyContained: Bool = false) -> Int { let a = canvasPoint(from: SIMD2(Float(viewRect.minX),Float(viewRect.minY))); let b = canvasPoint(from: SIMD2(Float(viewRect.maxX),Float(viewRect.maxY))); let r = CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(a.x-b.x)), height: CGFloat(abs(a.y-b.y))); let result = committedStrokes.indices.filter { guard let b = bounds(committedStrokes[$0].points) else { return false }; return fullyContained ? r.contains(b) : r.intersects(b) }; selectedStrokeIndices = Array(result); selectedObjectIDs = []; rebuildGeometry(); return result.count }
+    func deleteSelectedObjects() {
+        guard !selectedObjectIDs.isEmpty else { return }
+        recordMutation()
+        for id in selectedObjectIDs { objectStore.remove(id: id) }
+        selectedObjectIDs = []
+        rebuildGeometry()
+    }
 
-    /// Selects both structured objects and freehand strokes touched by a closed lasso.
-    /// The lasso itself is supplied in view coordinates; content is tested in canvas coordinates.
-    @discardableResult func selectLasso(in viewPoints: [SIMD2<Float>]) -> Int {
-        guard viewPoints.count >= 3 else { clearSelection(); return 0 }
-        let lasso = viewPoints.map { p in
-            let c = canvasPoint(from: p)
-            return CGPoint(x: CGFloat(c.x), y: CGFloat(c.y))
+    @discardableResult func eraseObjectsByScribble(_ path: [SIMD2<Float>], tolerance: Float = 12) -> Bool {
+        let p = path.map { let q = canvasPoint(from: $0); return CGPoint(x: CGFloat(q.x), y: CGFloat(q.y)) }
+        let ids = objectStore.eraseByScribble(p, tolerance: CGFloat(tolerance / zoomScale))
+        guard !ids.isEmpty else { return false }
+        selectedObjectIDs.removeAll { ids.contains($0) }
+        rebuildGeometry()
+        return true
+    }
+
+    private func strokeHit(at point: SIMD2<Float>, tolerance: Float) -> Int? {
+        let p = canvasPoint(from: point)
+        var hit: Int?
+        var best = tolerance / zoomScale
+        for i in committedStrokes.indices.reversed() {
+            let s = committedStrokes[i].points
+            guard s.count > 1 else { continue }
+            for j in 0..<(s.count-1) {
+                let d = distance(p, SIMD2(s[j].x,s[j].y), SIMD2(s[j+1].x,s[j+1].y))
+                if d <= best { best = d; hit = i; break }
+            }
         }
-        selectedObjectIDs = objectStore.objectsIntersectingLasso(lasso)
-        selectedStrokeIndices = committedStrokes.indices.filter { strokeIntersectsLasso(committedStrokes[$0].points, lasso) }
+        return hit
+    }
+
+    @discardableResult func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10, operation: SelectionOperation = .replace) -> Bool {
+        guard let hit = strokeHit(at: point, tolerance: tolerance) else {
+            if operation == .replace { clearSelection() }
+            return false
+        }
+        applySelection(operation, objects: [], strokes: [hit])
+        return true
+    }
+
+    @discardableResult func toggleStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool {
+        guard let hit = strokeHit(at: point, tolerance: tolerance) else { return false }
+        if selectedStrokeIndices.contains(hit) { selectedStrokeIndices.removeAll { $0 == hit } } else { selectedStrokeIndices.append(hit) }
         customRotationCenter = nil
         rebuildGeometry()
+        return true
+    }
+
+    @discardableResult func selectStrokes(in viewRect: CGRect, fullyContained: Bool = false, operation: SelectionOperation = .replace) -> Int {
+        let a = canvasPoint(from: SIMD2(Float(viewRect.minX),Float(viewRect.minY)))
+        let b = canvasPoint(from: SIMD2(Float(viewRect.maxX),Float(viewRect.maxY)))
+        let r = CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(a.x-b.x)), height: CGFloat(abs(a.y-b.y)))
+        let result = committedStrokes.indices.filter { guard let b = bounds(committedStrokes[$0].points) else { return false }; return fullyContained ? r.contains(b) : r.intersects(b) }
+        applySelection(operation, objects: [], strokes: Array(result))
+        return selectionCount
+    }
+
+    @discardableResult func selectLasso(in viewPoints: [SIMD2<Float>], operation: SelectionOperation = .replace) -> Int {
+        guard viewPoints.count >= 3 else { if operation == .replace { clearSelection() }; return selectionCount }
+        let lasso = viewPoints.map { p in let c = canvasPoint(from: p); return CGPoint(x: CGFloat(c.x), y: CGFloat(c.y)) }
+        let objects = objectStore.objectsIntersectingLasso(lasso)
+        let strokes = committedStrokes.indices.filter { strokeIntersectsLasso(committedStrokes[$0].points, lasso) }
+        applySelection(operation, objects: objects, strokes: Array(strokes))
         return selectionCount
     }
 
     func clearSelection() { selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; rebuildGeometry() }
 
-    func selectionBounds() -> CGRect? { var result: CGRect?; for i in selectedStrokeIndices { if let b = bounds(committedStrokes[i].points) { result = result?.union(b) ?? b } }; for id in selectedObjectIDs { if let b = objectStore.bounds(of: id) { result = result?.union(b) ?? b } }; return result?.insetBy(dx: -8, dy: -8) }
+    func selectionBounds() -> CGRect? {
+        var result: CGRect?
+        for i in selectedStrokeIndices { if committedStrokes.indices.contains(i), let b = bounds(committedStrokes[i].points) { result = result?.union(b) ?? b } }
+        for id in selectedObjectIDs { if let b = objectStore.bounds(of: id) { result = result?.union(b) ?? b } }
+        return result?.insetBy(dx: -8, dy: -8)
+    }
+
     func selectionBoundsInView() -> CGRect? { guard let r = selectionBounds() else { return nil }; let a = viewPoint(from: SIMD2(Float(r.minX),Float(r.minY))); let b = viewPoint(from: SIMD2(Float(r.maxX),Float(r.maxY))); return CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(b.x-a.x)), height: CGFloat(abs(b.y-a.y))) }
     func selectionCenter() -> SIMD2<Float>? { guard let r = selectionBounds() else { return nil }; return SIMD2(Float(r.midX), Float(r.midY)) }
     func setRotationCenter(to point: SIMD2<Float>) { customRotationCenter = canvasPoint(from: point); rebuildGeometry() }
@@ -145,14 +247,89 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func rotationHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool { guard let r = selectionBounds() else { return false }; let p = canvasPoint(from: point); return simd_distance(p,SIMD2(Float(r.midX),Float(r.minY-28))) <= tolerance / zoomScale }
     func rotationCenterHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool { guard customRotationCenter != nil, let c = rotationCenterViewPoint() else { return false }; return simd_distance(point,c) <= tolerance }
 
-    func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) { guard !selectedStrokeIndices.isEmpty, selectedObjectIDs.isEmpty, let r = selectionBounds() else { return }; let p = canvasPoint(from: point); let anchor:SIMD2<Float>; switch handle { case .topLeft: anchor=SIMD2(Float(r.maxX),Float(r.maxY)); case .topRight: anchor=SIMD2(Float(r.minX),Float(r.maxY)); case .bottomLeft: anchor=SIMD2(Float(r.maxX),Float(r.minY)); case .bottomRight: anchor=SIMD2(Float(r.minX),Float(r.minY)) }; let sx=max(abs(p.x-anchor.x),1)/max(Float(r.width),1); let sy=max(abs(p.y-anchor.y),1)/max(Float(r.height),1); for i in selectedStrokeIndices { committedStrokes[i].points=committedStrokes[i].points.map { InkPoint(x:anchor.x+($0.x-anchor.x)*sx,y:anchor.y+($0.y-anchor.y)*sy,pressure:$0.pressure) } }; rebuildGeometry() }
-    func scaleSelected(by factor: Float) { guard factor > 0, let c = selectionCenter() else { return }; if !selectedObjectIDs.isEmpty { for id in selectedObjectIDs { guard let o=objectStore.object(with:id) else { continue }; let s=o.transform.scale; _=objectStore.transform(id:id,scale:CGSize(width:s.width*CGFloat(factor),height:s.height*CGFloat(factor))) } } else { for i in selectedStrokeIndices { committedStrokes[i].points=committedStrokes[i].points.map { InkPoint(x:c.x+($0.x-c.x)*factor,y:c.y+($0.y-c.y)*factor,pressure:$0.pressure) } } }; rebuildGeometry() }
-    func moveSelected(by delta: SIMD2<Float>) { if !selectedObjectIDs.isEmpty { for id in selectedObjectIDs { guard let o=objectStore.object(with:id) else { continue }; let p=o.transform.position; _=objectStore.transform(id:id,position:CGPoint(x:p.x+CGFloat(delta.x),y:p.y+CGFloat(delta.y))) } } else { for i in selectedStrokeIndices { committedStrokes[i].points=committedStrokes[i].points.map { InkPoint(x:$0.x+delta.x,y:$0.y+delta.y,pressure:$0.pressure) } } }; rebuildGeometry() }
+    func resizeSelected(handle: SelectionHandle, to point: SIMD2<Float>) {
+        guard let r = selectionBounds() else { return }
+        let p = canvasPoint(from: point)
+        let anchor: SIMD2<Float>
+        switch handle { case .topLeft: anchor=SIMD2(Float(r.maxX),Float(r.maxY)); case .topRight: anchor=SIMD2(Float(r.minX),Float(r.maxY)); case .bottomLeft: anchor=SIMD2(Float(r.maxX),Float(r.minY)); case .bottomRight: anchor=SIMD2(Float(r.minX),Float(r.minY)) }
+        let sx=max(abs(p.x-anchor.x),1)/max(Float(r.width),1)
+        let sy=max(abs(p.y-anchor.y),1)/max(Float(r.height),1)
+        for i in selectedStrokeIndices where committedStrokes.indices.contains(i) {
+            committedStrokes[i].points=committedStrokes[i].points.map { InkPoint(x:anchor.x+($0.x-anchor.x)*sx,y:anchor.y+($0.y-anchor.y)*sy,pressure:$0.pressure) }
+        }
+        for id in selectedObjectIDs {
+            guard let o=objectStore.object(with:id) else { continue }
+            let transformed = objectStore.transformedPoints(of:o)
+            guard let b = transformed.reduce(nil, { (current: CGRect?, point: CGPoint) -> CGRect? in current?.union(CGRect(origin: point, size: .zero)) ?? CGRect(origin: point, size: .zero) }) else { continue }
+            let oldCenter = SIMD2(Float(b.midX),Float(b.midY))
+            let newCenter = SIMD2(anchor.x+(oldCenter.x-anchor.x)*sx,anchor.y+(oldCenter.y-anchor.y)*sy)
+            let s=o.transform.scale
+            _=objectStore.transform(id:id,position:CGPoint(x:CGFloat(newCenter.x),y:CGFloat(newCenter.y)),scale:CGSize(width:s.width*CGFloat(sx),height:s.height*CGFloat(sy)))
+        }
+        rebuildGeometry()
+    }
+
+    func scaleSelected(by factor: Float) {
+        guard factor > 0, let c = selectionCenter() else { return }
+        for i in selectedStrokeIndices where committedStrokes.indices.contains(i) { committedStrokes[i].points=committedStrokes[i].points.map { InkPoint(x:c.x+($0.x-c.x)*factor,y:c.y+($0.y-c.y)*factor,pressure:$0.pressure) } }
+        for id in selectedObjectIDs {
+            guard let o=objectStore.object(with:id) else { continue }
+            let p=o.transform.position
+            let np=SIMD2(Float(p.x),Float(p.y))
+            let moved=c+(np-c)*factor
+            let s=o.transform.scale
+            _=objectStore.transform(id:id,position:CGPoint(x:CGFloat(moved.x),y:CGFloat(moved.y)),scale:CGSize(width:s.width*CGFloat(factor),height:s.height*CGFloat(factor)))
+        }
+        rebuildGeometry()
+    }
+
+    func moveSelected(by delta: SIMD2<Float>) {
+        for id in selectedObjectIDs { guard let o=objectStore.object(with:id) else { continue }; let p=o.transform.position; _=objectStore.transform(id:id,position:CGPoint(x:p.x+CGFloat(delta.x),y:p.y+CGFloat(delta.y))) }
+        for i in selectedStrokeIndices where committedStrokes.indices.contains(i) { committedStrokes[i].points=committedStrokes[i].points.map { InkPoint(x:$0.x+delta.x,y:$0.y+delta.y,pressure:$0.pressure) } }
+        rebuildGeometry()
+    }
+
     func rotateSelected(to point: SIMD2<Float>, from previous: SIMD2<Float>) { guard let c=customRotationCenter ?? selectionCenter() else { return }; let p=canvasPoint(from:point),q=canvasPoint(from:previous); rotateSelected(by:atan2(p.y-c.y,p.x-c.x)-atan2(q.y-c.y,q.x-c.x),center:c) }
     func setSelectedRotationDegrees(_ degrees: Double) { guard let c=selectionCenter() else { return }; rotateSelected(by:Float(degrees-selectedRotationDegrees)*Float.pi/180,center:c) }
-    private func rotateSelected(by d:Float,center c:SIMD2<Float>) { if !selectedObjectIDs.isEmpty { for id in selectedObjectIDs { guard let o=objectStore.object(with:id) else { continue }; _=objectStore.transform(id:id,rotation:o.transform.rotation+CGFloat(d)) } } else { let co=cos(d),si=sin(d); for i in selectedStrokeIndices { committedStrokes[i].points=committedStrokes[i].points.map { let v=SIMD2($0.x,$0.y)-c; return InkPoint(x:v.x*co-v.y*si+c.x,y:v.x*si+v.y*co+c.y,pressure:$0.pressure) }; committedStrokes[i].rotation += d } }; rebuildGeometry() }
-    func reflectSelected(horizontal: Bool) { guard let c=selectionCenter() else { return }; if !selectedObjectIDs.isEmpty { for id in selectedObjectIDs { guard let o=objectStore.object(with:id) else { continue }; let s=o.transform.scale; _=objectStore.transform(id:id,scale:CGSize(width:horizontal ? -s.width:s.width,height:horizontal ? s.height:-s.height)) } } else { for i in selectedStrokeIndices { committedStrokes[i].points=committedStrokes[i].points.map { horizontal ? InkPoint(x:2*c.x-$0.x,y:$0.y,pressure:$0.pressure) : InkPoint(x:$0.x,y:2*c.y-$0.y,pressure:$0.pressure) } } }; rebuildGeometry() }
-    func deleteSelected() { if !selectedObjectIDs.isEmpty { deleteSelectedObjects(); return }; guard !selectedStrokeIndices.isEmpty else { return }; recordMutation(); for i in selectedStrokeIndices.sorted(by:>) { if committedStrokes.indices.contains(i) { committedStrokes.remove(at:i) } }; selectedStrokeIndices=[]; rebuildGeometry() }
+
+    private func rotateSelected(by d:Float,center c:SIMD2<Float>) {
+        let co=cos(d),si=sin(d)
+        for i in selectedStrokeIndices where committedStrokes.indices.contains(i) {
+            committedStrokes[i].points=committedStrokes[i].points.map { let v=SIMD2($0.x,$0.y)-c; return InkPoint(x:v.x*co-v.y*si+c.x,y:v.x*si+v.y*co+c.y,pressure:$0.pressure) }
+            committedStrokes[i].rotation += d
+        }
+        for id in selectedObjectIDs {
+            guard let o=objectStore.object(with:id) else { continue }
+            let p=SIMD2(Float(o.transform.position.x),Float(o.transform.position.y))-c
+            let moved=SIMD2(p.x*co-p.y*si,p.x*si+p.y*co)+c
+            _=objectStore.transform(id:id,position:CGPoint(x:CGFloat(moved.x),y:CGFloat(moved.y)),rotation:o.transform.rotation+CGFloat(d))
+        }
+        rebuildGeometry()
+    }
+
+    func reflectSelected(horizontal: Bool) {
+        guard let c=selectionCenter() else { return }
+        for i in selectedStrokeIndices where committedStrokes.indices.contains(i) { committedStrokes[i].points=committedStrokes[i].points.map { horizontal ? InkPoint(x:2*c.x-$0.x,y:$0.y,pressure:$0.pressure) : InkPoint(x:$0.x,y:2*c.y-$0.y,pressure:$0.pressure) } }
+        for id in selectedObjectIDs {
+            guard let o=objectStore.object(with:id) else { continue }
+            let p=o.transform.position
+            let reflected=horizontal ? SIMD2(2*c.x-Float(p.x),Float(p.y)) : SIMD2(Float(p.x),2*c.y-Float(p.y))
+            let s=o.transform.scale
+            _=objectStore.transform(id:id,position:CGPoint(x:CGFloat(reflected.x),y:CGFloat(reflected.y)),scale:CGSize(width:horizontal ? -s.width:s.width,height:horizontal ? s.height:-s.height))
+        }
+        rebuildGeometry()
+    }
+
+    func deleteSelected() {
+        guard hasSelection else { return }
+        recordMutation()
+        for id in selectedObjectIDs { objectStore.remove(id:id) }
+        for i in selectedStrokeIndices.sorted(by:>) where committedStrokes.indices.contains(i) { committedStrokes.remove(at:i) }
+        selectedObjectIDs=[]
+        selectedStrokeIndices=[]
+        customRotationCenter=nil
+        rebuildGeometry()
+    }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { updateUniformBuffer(for:size) }
     func draw(in view: MTKView) { guard let pass=view.currentRenderPassDescriptor,let drawable=view.currentDrawable,let cb=commandQueue.makeCommandBuffer(),let encoder=cb.makeRenderCommandEncoder(descriptor:pass) else { return }; pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:1); updateUniformBuffer(for:view.drawableSize); encoder.setRenderPipelineState(pipelineState); if let b=vertexBuffer { encoder.setVertexBuffer(b,offset:0,index:0) }; if let b=uniformBuffer { encoder.setVertexBuffer(b,offset:0,index:1) }; if !vertices.isEmpty { encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:vertices.count) }; encoder.endEncoding(); cb.present(drawable); cb.commit() }
@@ -160,19 +337,10 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func rebuildGeometry() { var out:[InkVertex]=[]; appendBackground(to:&out); for s in committedStrokes { appendStroke(s.points,style:s.style,to:&out) }; appendObjects(to:&out); if let r=selectionBounds() { appendSelection(r,to:&out) }; if !activeStroke.isEmpty { appendStroke(activeStroke,style:penStyle,to:&out) }; vertices=out; vertexBuffer=vertices.isEmpty ? nil : device.makeBuffer(bytes:vertices,length:vertices.count*MemoryLayout<InkVertex>.stride,options:.storageModeShared) }
     private func appendObjects(to out:inout[InkVertex]) { for o in objectStore.objects { let p=objectStore.transformedPoints(of:o); guard p.count>=2 else { continue }; let color=metalColor(o.style); if o.kind == .line || o.kind == .arrow { appendLine(viewPoint(from:SIMD2(Float(p[0].x),Float(p[0].y))),viewPoint(from:SIMD2(Float(p[1].x),Float(p[1].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } else if o.kind == .polygon { let limit = p.count; if limit >= 2 { for i in 0..<limit { let j=(i+1)%limit; appendLine(viewPoint(from:SIMD2(Float(p[i].x),Float(p[i].y))),viewPoint(from:SIMD2(Float(p[j].x),Float(p[j].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } } } } }
     private func appendBackground(to out:inout[InkVertex]) { guard backgroundPattern != 0 else { return }; let color=SIMD4<Float>(0.82,0.84,0.88,0.55); let step:Float=backgroundPattern == 3 ? 24:32; let e:Float=2000; if backgroundPattern == 1 { var y:Float = -e; while y<=e { appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.55,color:color,to:&out); y+=step } } else { var x:Float = -e; while x<=e { appendLine(viewPoint(from:SIMD2(x,-e)),viewPoint(from:SIMD2(x,e)),width:0.45,color:color,to:&out); x+=step }; var y:Float = -e; while y<=e { appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.45,color:color,to:&out); y+=step } } }
-    private func appendStroke(_ s:[InkPoint],style:PenStyle,to out:inout[InkVertex]) { guard !s.isEmpty else { return }; let color=metalColor(style); if s.count>1 { for i in 0..<(s.count-1) { let p=s[i],q=s[i+1],dx=q.x-p.x,dy=q.y-p.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/l,ny=dx/l,w0=strokeWidth(p.pressure,style),w1=strokeWidth(q.pressure,style); let a=viewPoint(from:SIMD2(p.x+nx*w0,p.y+ny*w0)),b=viewPoint(from:SIMD2(p.x-nx*w0,p.y-ny*w0)),c=viewPoint(from:SIMD2(q.x+nx*w1,q.y+ny*w1)),d=viewPoint(from:SIMD2(q.x-nx*w1,q.y-ny*w1)); triangle(a,b,c,color:color,to:&out); triangle(c,b,d,color:color,to:&out) } }; for p in s { disk(viewPoint(from:SIMD2(p.x,p.y)), strokeWidth(p.pressure,style), color, to:&out) } }
+    private func appendStroke(_ s:[InkPoint],style:PenStyle,to out:inout[InkVertex]) { guard !s.isEmpty else { return }; let color=metalColor(style); if s.count>1 { for i in 0..<(s.count-1) { let p=s[i],q=s[i+1],dx=q.x-p.x,dy=q.y-p.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/l,ny=dx/l,w0=strokeWidth(p.pressure,style),w1=strokeWidth(q.pressure,style),a=viewPoint(from:SIMD2(p.x+nx*w0,p.y+ny*w0)),b=viewPoint(from:SIMD2(p.x-nx*w0,p.y-ny*w0)),c=viewPoint(from:SIMD2(q.x+nx*w1,q.y+ny*w1)),d=viewPoint(from:SIMD2(q.x-nx*w1,q.y-ny*w1)); triangle(a,b,c,color:color,to:&out); triangle(c,b,d,color:color,to:&out) } }; for p in s { disk(viewPoint(from:SIMD2(p.x,p.y)), strokeWidth(p.pressure,style), color, to:&out) } }
     private func appendSelection(_ r:CGRect,to out:inout[InkVertex]) { let c=SIMD4<Float>(0.1,0.45,1,0.75),a=viewPoint(from:SIMD2(Float(r.minX),Float(r.minY))),b=viewPoint(from:SIMD2(Float(r.maxX),Float(r.maxY))),p0=SIMD2(a.x,a.y),p1=SIMD2(b.x,a.y),p2=SIMD2(b.x,b.y),p3=SIMD2(a.x,b.y); appendLine(p0,p1,width:1.5,color:c,to:&out);appendLine(p1,p2,width:1.5,color:c,to:&out);appendLine(p2,p3,width:1.5,color:c,to:&out);appendLine(p3,p0,width:1.5,color:c,to:&out);for p in [p0,p1,p2,p3] { disk(p,5,c,to:&out) };let rot=SIMD2((a.x+b.x)/2,a.y-28);appendLine(SIMD2((a.x+b.x)/2,a.y),rot,width:1,color:c,to:&out);disk(rot,7,c,to:&out);if let rc=customRotationCenter { disk(viewPoint(from:rc),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) };if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .line { for q in objectStore.transformedPoints(of:o).prefix(2) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) } } else if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .polygon { for q in objectStore.transformedPoints(of:o) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out) } } }
     private func bounds(_ p:[InkPoint])->CGRect? { guard let f=p.first else { return nil }; var x0=f.x,x1=f.x,y0=f.y,y1=f.y;for q in p{x0=min(x0,q.x);x1=max(x1,q.x);y0=min(y0,q.y);y1=max(y1,q.y)};return CGRect(x:CGFloat(x0),y:CGFloat(y0),width:CGFloat(x1-x0),height:CGFloat(y1-y0)) }
-    private func strokeIntersectsLasso(_ stroke:[InkPoint], _ lasso:[CGPoint])->Bool {
-        guard stroke.count >= 2, lasso.count >= 3 else { return false }
-        if stroke.contains(where: { pointInPolygon(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)), lasso) }) { return true }
-        for pair in zip(stroke, stroke.dropFirst()) {
-            let a = CGPoint(x: CGFloat(pair.0.x), y: CGFloat(pair.0.y))
-            let b = CGPoint(x: CGFloat(pair.1.x), y: CGFloat(pair.1.y))
-            if segmentIntersectsPolygon(a, b, lasso) { return true }
-        }
-        return false
-    }
+    private func strokeIntersectsLasso(_ stroke:[InkPoint], _ lasso:[CGPoint])->Bool { guard stroke.count >= 2, lasso.count >= 3 else { return false }; if stroke.contains(where: { pointInPolygon(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)), lasso) }) { return true }; for pair in zip(stroke, stroke.dropFirst()) { let a=CGPoint(x:CGFloat(pair.0.x),y:CGFloat(pair.0.y)),b=CGPoint(x:CGFloat(pair.1.x),y:CGFloat(pair.1.y)); if segmentIntersectsPolygon(a,b,lasso) { return true } }; return false }
     private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool { var inside=false; var j=poly.count-1; for i in poly.indices { let a=poly[i],b=poly[j]; if (a.y > p.y) != (b.y > p.y) { let d=b.y-a.y; if d != 0 { let x=(b.x-a.x)*(p.y-a.y)/d+a.x; if p.x < x { inside.toggle() } } }; j=i }; return inside }
     private func segmentIntersectsPolygon(_ a:CGPoint,_ b:CGPoint,_ polygon:[CGPoint])->Bool { if pointInPolygon(a,polygon) || pointInPolygon(b,polygon) { return true }; var edges=Array(polygon.dropFirst()); edges.append(polygon[0]); return zip(polygon,edges).contains { segmentsIntersect(a,b,$0.0,$0.1) } }
     private func segmentsIntersect(_ a:CGPoint,_ b:CGPoint,_ c:CGPoint,_ d:CGPoint)->Bool { func cross(_ p:CGPoint,_ q:CGPoint,_ r:CGPoint)->CGFloat { (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x) }; let o1=cross(a,b,c),o2=cross(a,b,d),o3=cross(c,d,a),o4=cross(c,d,b); let eps:CGFloat=0.001; if abs(o1)<eps && onSegment(a,b,c){return true}; if abs(o2)<eps && onSegment(a,b,d){return true}; if abs(o3)<eps && onSegment(c,d,a){return true}; if abs(o4)<eps && onSegment(c,d,b){return true}; return (o1 > 0) != (o2 > 0) && (o3 > 0) != (o4 > 0) }
