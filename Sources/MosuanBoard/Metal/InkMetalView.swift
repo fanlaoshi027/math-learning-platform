@@ -49,7 +49,9 @@ final class InkMetalView: MTKView {
     override var acceptsFirstResponder: Bool { true }
 
     init(frame frameRect: NSRect = .zero) {
-        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else { fatalError("Metal is unavailable on this Mac") }
+        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else {
+            fatalError("Metal is unavailable on this Mac")
+        }
         self.renderer = renderer
         super.init(frame: frameRect, device: device)
         configureMetal()
@@ -57,7 +59,9 @@ final class InkMetalView: MTKView {
     }
 
     required init(coder: NSCoder) {
-        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else { fatalError("Metal is unavailable on this Mac") }
+        guard let device = MTLCreateSystemDefaultDevice(), let renderer = InkRenderer(device: device) else {
+            fatalError("Metal is unavailable on this Mac")
+        }
         self.renderer = renderer
         super.init(coder: coder)
         configureMetal()
@@ -104,7 +108,14 @@ final class InkMetalView: MTKView {
             if renderer.rotationHandle(at: p) { renderer.beginHistoryTransaction(); rotationDrag = true; lastRotationPoint = p; return }
             if let handle = renderer.selectionHandle(at: p) { renderer.beginHistoryTransaction(); resizeHandle = handle; return }
             if renderer.selectObject(at: p) || renderer.selectStroke(at: p) { selectionDrag = true; lastPoint = p; onSelectionChanged?(); draw(); return }
-            marqueeActive = true; marqueeStart = p; marqueeCurrent = p; renderer.clearSelection(); marqueeOverlay.update(rect: marqueeRect(from: p, to: p), visible: true); onSelectionChanged?(); draw(); return
+            marqueeActive = true
+            marqueeStart = p
+            marqueeCurrent = p
+            renderer.clearSelection()
+            marqueeOverlay.update(rect: marqueeRect(from: p, to: p), visible: true)
+            onSelectionChanged?()
+            draw()
+            return
         }
         guard isUserInteractionEnabledForTool else { return }
         renderer.beginHistoryTransaction()
@@ -146,15 +157,34 @@ final class InkMetalView: MTKView {
         let p = makePoint(from: event)
         if event.buttonNumber == 2 || middleButtonHeld { middleButtonHeld = false; panDrag = false; return }
         if panDrag { panDrag = false; return }
-        if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); eraseAlongPath(eraserPoints); eraserPoints.removeAll(keepingCapacity: true); renderer.endHistoryTransaction(); notifyState(); return }
+        if isEraserTool && !temporarySelectHeld {
+            eraserPoints.append(p)
+            eraseAlongPath(eraserPoints)
+            eraserPoints.removeAll(keepingCapacity: true)
+            renderer.endHistoryTransaction()
+            notifyState()
+            return
+        }
         if selectionModeActive {
             if marqueeActive {
                 marqueeCurrent = p
                 let r = marqueeRect(from: marqueeStart, to: marqueeCurrent)
                 if r.width > 4 || r.height > 4 { _ = renderer.selectObjects(in: r); _ = renderer.selectStrokes(in: r) } else { renderer.clearSelection() }
-                marqueeActive = false; marqueeOverlay.update(rect: .zero, visible: false); onSelectionChanged?(); draw(); return
+                marqueeActive = false
+                marqueeOverlay.update(rect: .zero, visible: false)
+                onSelectionChanged?()
+                draw()
+                return
             }
-            lineEndpointDrag = nil; rotationCenterDrag = false; rotationDrag = false; resizeHandle = nil; selectionDrag = false; renderer.endHistoryTransaction(); notifyState(); draw(); return
+            lineEndpointDrag = nil
+            rotationCenterDrag = false
+            rotationDrag = false
+            resizeHandle = nil
+            selectionDrag = false
+            renderer.endHistoryTransaction()
+            notifyState()
+            draw()
+            return
         }
         guard isUserInteractionEnabledForTool && active else { return }
         let c = renderer.canvasPoint(from: p)
@@ -163,20 +193,104 @@ final class InkMetalView: MTKView {
         if isLineTool || (isSmartLineTool && smartLineDetected) {
             let line = linePreview(from: points)
             if line.count >= 2 { renderer.commitLine(from: SIMD2(line[0].x, line[0].y), to: SIMD2(line[1].x, line[1].y)) }
-        } else { renderer.commitStroke(points) }
-        renderer.endHistoryTransaction(); points.removeAll(keepingCapacity: true); active = false; smartLineDetected = false; renderer.setStroke([]); notifyState(); draw()
+        } else {
+            renderer.commitStroke(points)
+        }
+        renderer.endHistoryTransaction()
+        points.removeAll(keepingCapacity: true)
+        active = false
+        smartLineDetected = false
+        renderer.setStroke([])
+        notifyState()
+        draw()
     }
 
-    override func scrollWheel(with event: NSEvent) { let p = makePoint(from: event); if event.modifierFlags.contains(.command) { renderer.zoom(by: powf(1.0018, Float(event.scrollingDeltaY)), around: p); onZoomChanged?(renderer.zoomPercent); draw() } else { renderer.pan(by: SIMD2(Float(event.scrollingDeltaX), Float(event.scrollingDeltaY))); draw() } }
-    override func keyDown(with event: NSEvent) { if event.isARepeat { return }; if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = true; return }; if event.keyCode == 49 { spaceHeld = true; return }; if selectionModeActive && event.keyCode == 51 { deleteSelected(); return }; if event.modifierFlags.contains(.command) && event.keyCode == 24 { zoomIn(); return }; if event.modifierFlags.contains(.command) && event.keyCode == 27 { zoomOut(); return }; if event.modifierFlags.contains(.command) && event.keyCode == 36 { resetZoom(); return }; super.keyDown(with: event) }
-    override func keyUp(with event: NSEvent) { if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = false; return }; if event.keyCode == 49 { spaceHeld = false; panDrag = false; return }; super.keyUp(with: event) }
-    override func tabletPoint(with event: NSEvent) { switch event.phase { case .began: mouseDown(with: event); case .changed: mouseDragged(with: event); case .ended: mouseUp(with: event); case .cancelled: smartLineWorkItem?.cancel(); active = false; points.removeAll(keepingCapacity: true); renderer.setStroke([]); renderer.endHistoryTransaction(); marqueeOverlay.update(rect: .zero, visible: false); draw(); default: break } }
+    override func scrollWheel(with event: NSEvent) {
+        let p = makePoint(from: event)
+        if event.modifierFlags.contains(.command) {
+            renderer.zoom(by: powf(1.0018, Float(event.scrollingDeltaY)), around: p)
+            onZoomChanged?(renderer.zoomPercent)
+            draw()
+        } else {
+            renderer.pan(by: SIMD2(Float(event.scrollingDeltaX), Float(event.scrollingDeltaY)))
+            draw()
+        }
+    }
 
-    private func marqueeRect(from a: SIMD2<Float>, to b: SIMD2<Float>) -> CGRect { CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(b.x-b.x) + abs(b.x-a.x)), height: CGFloat(abs(b.y-a.y))) }
-    private func scheduleSmartLineDetection() { guard isSmartLineTool, points.count >= 4 else { return }; smartLineWorkItem?.cancel(); let work = DispatchWorkItem { [weak self] in guard let self, self.active, self.isSmartLineTool, self.points.count >= 4 else { return }; if LineGeometry.isLikelyStraight(points: self.points, tolerance: 8, minimumLength: 30) { self.smartLineDetected = true; self.renderer.setStroke(self.linePreview(from: self.points)); self.draw() } }; smartLineWorkItem = work; DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work) }
-    private func linePreview(from p: [InkPoint]) -> [InkPoint] { guard let first = p.first, let last = p.last else { return p }; return [first,last] }
-    private func eraseAlongPath(_ path: [SIMD2<Float>]) { guard !path.isEmpty else { return }; var deleted = renderer.eraseObjectsByScribble(path,tolerance:14); for p in path { if renderer.selectStroke(at:p,tolerance:16) { renderer.deleteSelected(); deleted = true } }; if deleted { draw() } }
-    private func makePoint(from event: NSEvent) -> SIMD2<Float> { let p = convert(event.locationInWindow, from: nil); return SIMD2(Float(p.x), Float(p.y)) }
+    override func keyDown(with event: NSEvent) {
+        if event.isARepeat { return }
+        if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = true; return }
+        if event.keyCode == 49 { spaceHeld = true; return }
+        if selectionModeActive && event.keyCode == 51 { deleteSelected(); return }
+        if event.modifierFlags.contains(.command) && event.keyCode == 24 { zoomIn(); return }
+        if event.modifierFlags.contains(.command) && event.keyCode == 27 { zoomOut(); return }
+        if event.modifierFlags.contains(.command) && event.keyCode == 36 { resetZoom(); return }
+        super.keyDown(with: event)
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if event.keyCode == 58 || event.keyCode == 61 { temporarySelectHeld = false; return }
+        if event.keyCode == 49 { spaceHeld = false; panDrag = false; return }
+        super.keyUp(with: event)
+    }
+
+    override func tabletPoint(with event: NSEvent) {
+        switch event.phase {
+        case .began: mouseDown(with: event)
+        case .changed: mouseDragged(with: event)
+        case .ended: mouseUp(with: event)
+        case .cancelled:
+            smartLineWorkItem?.cancel()
+            active = false
+            points.removeAll(keepingCapacity: true)
+            renderer.setStroke([])
+            renderer.endHistoryTransaction()
+            marqueeOverlay.update(rect: .zero, visible: false)
+            draw()
+        default: break
+        }
+    }
+
+    private func marqueeRect(from a: SIMD2<Float>, to b: SIMD2<Float>) -> CGRect {
+        CGRect(x: CGFloat(min(a.x, b.x)), y: CGFloat(min(a.y, b.y)), width: CGFloat(abs(b.x - a.x)), height: CGFloat(abs(b.y - a.y)))
+    }
+
+    private func scheduleSmartLineDetection() {
+        guard isSmartLineTool, points.count >= 4 else { return }
+        smartLineWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.active, self.isSmartLineTool, self.points.count >= 4 else { return }
+            if LineGeometry.isLikelyStraight(points: self.points, tolerance: 8, minimumLength: 30) {
+                self.smartLineDetected = true
+                self.renderer.setStroke(self.linePreview(from: self.points))
+                self.draw()
+            }
+        }
+        smartLineWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+    }
+
+    private func linePreview(from p: [InkPoint]) -> [InkPoint] {
+        guard let first = p.first, let last = p.last else { return p }
+        return [first, last]
+    }
+
+    private func eraseAlongPath(_ path: [SIMD2<Float>]) {
+        guard !path.isEmpty else { return }
+        var deleted = renderer.eraseObjectsByScribble(path, tolerance: 14)
+        for p in path {
+            if renderer.selectStroke(at: p, tolerance: 16) {
+                renderer.deleteSelected()
+                deleted = true
+            }
+        }
+        if deleted { draw() }
+    }
+
+    private func makePoint(from event: NSEvent) -> SIMD2<Float> {
+        let p = convert(event.locationInWindow, from: nil)
+        return SIMD2(Float(p.x), Float(p.y))
+    }
 }
 
 private final class MarqueeOverlayView: NSView {
@@ -187,5 +301,15 @@ private final class MarqueeOverlayView: NSView {
     required init?(coder: NSCoder) { super.init(coder: coder); wantsLayer = true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     func update(rect: CGRect, visible: Bool) { self.rect = rect.standardized; self.visible = visible; isHidden = !visible; needsDisplay = true }
-    override func draw(_ dirtyRect: NSRect) { guard visible, rect.width > 0, rect.height > 0 else { return }; let path = NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5)); path.lineWidth = 1; let dash:[CGFloat] = [5,4]; path.setLineDash(dash,count:dash.count,phase:0); NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke(); path.stroke(); NSColor.controlAccentColor.withAlphaComponent(0.08).setFill(); rect.fill() }
+    override func draw(_ dirtyRect: NSRect) {
+        guard visible, rect.width > 0, rect.height > 0 else { return }
+        let path = NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5))
+        path.lineWidth = 1
+        let dash: [CGFloat] = [5, 4]
+        path.setLineDash(dash, count: dash.count, phase: 0)
+        NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
+        path.stroke()
+        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
+        rect.fill()
+    }
 }
