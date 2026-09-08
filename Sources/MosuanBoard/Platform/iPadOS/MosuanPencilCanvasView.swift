@@ -1,9 +1,11 @@
 import UIKit
+import simd
 
 /// Native iPad input surface for Mosuan.
 ///
-/// Pencil draws; one-finger touch is reserved for UI/selection gestures; two or
-/// more fingers pan/zoom the canvas. Rendering stays outside this input layer.
+/// Pencil draws; finger navigation never becomes ink. Actual Pencil samples use
+/// UIKit coalesced touches for high-fidelity input, while predicted samples are
+/// exposed separately as temporary preview data and are never committed.
 final class MosuanPencilCanvasView: UIView {
     enum GestureMode {
         case pencilWriting
@@ -11,13 +13,15 @@ final class MosuanPencilCanvasView: UIView {
     }
 
     var onPointerEvent: ((MosuanPointerEvent) -> Void)?
+    /// Temporary predicted samples. The renderer must discard/replace these when
+    /// the next real event arrives; they must never enter saved page content.
+    var onPredictedPointerEvent: ((MosuanPointerEvent) -> Void)?
     var onPan: ((CGPoint) -> Void)?
     var onZoom: ((CGFloat, CGPoint) -> Void)?
 
     private(set) var gestureMode: GestureMode = .fingerNavigation
     private var activePencilTouch: UITouch?
     private var lastNavigationPoint: CGPoint?
-    private var lastPinchScale: CGFloat = 1
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -32,7 +36,6 @@ final class MosuanPencilCanvasView: UIView {
     private func configure() {
         isMultipleTouchEnabled = true
         backgroundColor = .clear
-        // Do not delay Pencil input behind UIKit gesture recognition.
         delaysContentTouches = false
     }
 
@@ -42,30 +45,27 @@ final class MosuanPencilCanvasView: UIView {
         if touch.type == .pencil {
             activePencilTouch = touch
             gestureMode = .pencilWriting
-            emit(touch, phase: .began)
+            emitActualSamples(for: touch, event: event, fallbackPhase: .began)
+            emitPredictedSamples(for: touch, event: event)
             return
         }
 
         guard activePencilTouch == nil else { return }
-        if touches.count >= 2 {
-            gestureMode = .fingerNavigation
-            lastNavigationPoint = averageLocation(of: touches)
-        } else {
-            // A single finger does not write. This leaves room for tap/select UI.
-            gestureMode = .fingerNavigation
-            lastNavigationPoint = touch.location(in: self)
-        }
+        gestureMode = .fingerNavigation
+        lastNavigationPoint = averageLocation(of: touches)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         if let pencil = activePencilTouch, touches.contains(pencil) {
-            emit(pencil, phase: .changed)
+            // UIKit can provide up to 240 Hz input while ordinary delivery is
+            // commonly around 60 Hz. Coalesced touches recover the missing path.
+            emitActualSamples(for: pencil, event: event, fallbackPhase: .changed)
+            emitPredictedSamples(for: pencil, event: event)
             return
         }
 
         let points = touches.filter { $0.type != .pencil }
         guard !points.isEmpty, activePencilTouch == nil else { return }
-
         let current = averageLocation(of: points)
         if let previous = lastNavigationPoint {
             onPan?(current - previous)
@@ -75,46 +75,72 @@ final class MosuanPencilCanvasView: UIView {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         if let pencil = activePencilTouch, touches.contains(pencil) {
-            emit(pencil, phase: .ended)
+            emitActualSamples(for: pencil, event: event, fallbackPhase: .ended)
             activePencilTouch = nil
             return
         }
-
         lastNavigationPoint = nil
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         if let pencil = activePencilTouch, touches.contains(pencil) {
-            emit(pencil, phase: .cancelled)
+            emitActualSamples(for: pencil, event: event, fallbackPhase: .cancelled)
             activePencilTouch = nil
         }
         lastNavigationPoint = nil
     }
 
-    private func emit(_ touch: UITouch, phase: MosuanPointerEvent.Phase) {
+    private func emitActualSamples(
+        for touch: UITouch,
+        event: UIEvent?,
+        fallbackPhase: MosuanPointerEvent.Phase
+    ) {
+        guard let event else {
+            onPointerEvent?(makeEvent(from: touch, phase: fallbackPhase))
+            return
+        }
+
+        // Do not mix the normal touch with coalesced touches: the coalesced array
+        // already includes the latest reported touch.
+        let samples = event.coalescedTouches(for: touch) ?? [touch]
+        for sample in samples {
+            let phase: MosuanPointerEvent.Phase
+            switch sample.phase {
+            case .began: phase = .began
+            case .moved, .stationary: phase = .changed
+            case .ended: phase = .ended
+            case .cancelled: phase = .cancelled
+            @unknown default: phase = fallbackPhase
+            }
+            onPointerEvent?(makeEvent(from: sample, phase: phase))
+        }
+    }
+
+    private func emitPredictedSamples(for touch: UITouch, event: UIEvent?) {
+        guard let event, let predicted = event.predictedTouches(for: touch) else { return }
+        for sample in predicted {
+            onPredictedPointerEvent?(makeEvent(from: sample, phase: .changed))
+        }
+    }
+
+    private func makeEvent(from touch: UITouch, phase: MosuanPointerEvent.Phase) -> MosuanPointerEvent {
         let location = touch.location(in: self)
-        let previous = touch.previousLocation(in: self)
         let vector = touch.azimuthUnitVector(in: self)
         let altitude = touch.altitudeAngle
+        let tilt = SIMD2<Float>(
+            Float(cos(altitude) * vector.dx),
+            Float(cos(altitude) * vector.dy)
+        )
 
-        // Convert Pencil altitude/azimuth into a compact tilt vector. Consumers
-        // can use pressure directly and ignore tilt when a pen does not expose it.
-        let tiltX = Float(cos(altitude) * vector.dx)
-        let tiltY = Float(cos(altitude) * vector.dy)
-
-        let event = MosuanPointerEvent(
+        return MosuanPointerEvent(
             position: SIMD2(Float(location.x), Float(location.y)),
             pressure: max(0, Float(touch.force)),
-            tilt: SIMD2(tiltX, tiltY),
+            tilt: tilt,
             azimuth: Float(atan2(vector.dy, vector.dx)),
             phase: phase,
-            deviceType: .pen
+            deviceType: .pen,
+            timestamp: touch.timestamp
         )
-        onPointerEvent?(event)
-
-        // Keep the compiler aware that previousLocation is intentionally part of
-        // the input sampling contract; future coalesced samples can use it.
-        _ = previous
     }
 
     private func averageLocation(of touches: Set<UITouch>) -> CGPoint {
