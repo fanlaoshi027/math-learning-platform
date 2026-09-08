@@ -1,19 +1,8 @@
 import CoreGraphics
 
-struct PenStyle: Equatable {
-    enum Tip: String, CaseIterable {
-        case ballpoint
-        case pencil
-        case marker
-        case highlighter
-    }
-
-    enum LineStyle: String, CaseIterable {
-        case solid
-        case dashed
-        case dashDot
-        case dotted
-    }
+struct PenStyle: Equatable, Codable {
+    enum Tip: String, CaseIterable, Codable { case ballpoint, pencil, marker, highlighter }
+    enum LineStyle: String, CaseIterable, Codable { case solid, dashed, dashDot, dotted }
 
     var color: RGBAColor = .black
     var width: CGFloat = 2.0
@@ -31,7 +20,7 @@ struct PenStyle: Equatable {
     }
 }
 
-struct RGBAColor: Equatable {
+struct RGBAColor: Equatable, Codable {
     var red: CGFloat
     var green: CGFloat
     var blue: CGFloat
