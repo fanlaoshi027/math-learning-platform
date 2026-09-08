@@ -22,5 +22,7 @@ vertex MosuanRaster mosuanBoardVertex(
 }
 
 fragment float4 mosuanBoardFragment(MosuanRaster in [[stage_in]]) {
+    // MSAA handles geometric edge smoothing; preserve premultiplied-style alpha
+    // blending configured by the canvas pipeline.
     return in.color;
 }
