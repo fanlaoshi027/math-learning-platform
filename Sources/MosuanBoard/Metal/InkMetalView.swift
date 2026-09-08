@@ -305,19 +305,9 @@ final class InkMetalView: MTKView {
         }
     }
 
-    /// The first implementation stores polygon edges as structured line objects.
-    /// This keeps the construction vector-based and immediately editable while
-    /// the dedicated polygon/group object editor is added later.
     private func commitPolygon(_ vertices: [CGPoint]) {
         guard vertices.count >= 3 else { return }
-        for index in vertices.indices {
-            let next = vertices[(index + 1) % vertices.count]
-            let a = vertices[index]
-            renderer.commitLine(
-                from: SIMD2(Float(a.x), Float(a.y)),
-                to: SIMD2(Float(next.x), Float(next.y))
-            )
-        }
+        renderer.commitPolygon(points: vertices)
     }
 
     private func marqueeRect(from a: SIMD2<Float>, to b: SIMD2<Float>) -> CGRect {
