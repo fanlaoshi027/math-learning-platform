@@ -2,15 +2,8 @@ import MetalKit
 import UIKit
 import simd
 
-/// iPad Metal canvas shell.
-///
-/// The view deliberately keeps three stroke buffers separate:
-/// - committed: durable page content
-/// - active: the current real Pencil stroke
-/// - predicted: temporary latency compensation only
-///
-/// Predicted samples are cleared as soon as a real sample arrives and are never
-/// exposed as page content or passed to undo/history.
+/// iPad Metal canvas shell with separate committed, active and predicted layers.
+/// Predicted samples are transient and are never persisted or sent to history.
 final class MosuanMetalCanvasView: MTKView {
     private struct Vertex {
         var position: SIMD2<Float>
@@ -22,15 +15,12 @@ final class MosuanMetalCanvasView: MTKView {
     private var committed: [[MosuanPointerEvent]] = []
     private var active: [MosuanPointerEvent] = []
     private var predicted: [MosuanPointerEvent] = []
-
     private var canvasScale: Float = 1
     private var canvasOffset: SIMD2<Float> = .zero
 
     var inputMode = MosuanPencilInputMode()
     var oneStrokeSettings = OneStrokeSettings()
     var strokeStyle = GraphicObject.Style()
-
-    /// Called only after a real Pencil stroke has ended and has been committed.
     var onCommittedStroke: (([MosuanPointerEvent], GraphicObject?) -> Void)?
 
     override init(frame: CGRect, device: MTLDevice? = MTLCreateSystemDefaultDevice()) {
@@ -53,11 +43,9 @@ final class MosuanMetalCanvasView: MTKView {
 
         guard let device else { return }
         commandQueue = device.makeCommandQueue()
-
-        guard let library = device.makeDefaultLibrary() else { return }
-        let vertex = library.makeFunction(name: "mosuanBoardVertex")
-        let fragment = library.makeFunction(name: "mosuanBoardFragment")
-        guard let vertex, let fragment else { return }
+        guard let library = device.makeDefaultLibrary(),
+              let vertex = library.makeFunction(name: "mosuanBoardVertex"),
+              let fragment = library.makeFunction(name: "mosuanBoardFragment") else { return }
 
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = vertex
@@ -68,21 +56,14 @@ final class MosuanMetalCanvasView: MTKView {
     }
 
     func connect(to input: MosuanPencilCanvasView) {
-        input.onPointerEvent = { [weak self] event in
-            self?.receiveActual(event)
-        }
-        input.onPredictedPointerEvent = { [weak self] event in
-            self?.receivePredicted(event)
-        }
-        input.onPan = { [weak self] delta in
-            self?.pan(delta)
-        }
-        input.onZoom = { [weak self] factor, point in
-            self?.zoom(factor, around: point)
-        }
+        input.onPointerEvent = { [weak self] event in self?.receiveActual(event) }
+        input.onPredictedPointerEvent = { [weak self] event in self?.receivePredicted(event) }
+        input.onPan = { [weak self] delta in self?.pan(delta) }
+        input.onZoom = { [weak self] factor, point in self?.zoom(factor, around: point) }
     }
 
     private func receiveActual(_ event: MosuanPointerEvent) {
+        // A real sample supersedes every prediction generated before it.
         predicted.removeAll(keepingCapacity: true)
 
         switch event.phase {
@@ -90,7 +71,6 @@ final class MosuanMetalCanvasView: MTKView {
             active.removeAll(keepingCapacity: true)
             active.append(event)
         case .changed:
-            guard !active.isEmpty else { active.append(event); return }
             active.append(event)
         case .ended:
             active.append(event)
@@ -98,12 +78,10 @@ final class MosuanMetalCanvasView: MTKView {
         case .cancelled:
             active.removeAll(keepingCapacity: true)
         }
-
         setNeedsDisplay()
     }
 
     private func receivePredicted(_ event: MosuanPointerEvent) {
-        // Never append prediction after the real stroke has ended.
         guard !active.isEmpty else { return }
         predicted.append(event)
         setNeedsDisplay()
@@ -116,14 +94,12 @@ final class MosuanMetalCanvasView: MTKView {
         guard finished.count >= 2 else { return }
 
         let points = finished.map { CGPoint(x: CGFloat($0.position.x), y: CGFloat($0.position.y)) }
-        var committer = OneStrokeCommitter(settings: oneStrokeSettings)
+        let committer = OneStrokeCommitter(settings: oneStrokeSettings)
         let object = committer.commit(points: points, style: strokeStyle)
 
-        // Store the original stroke when shape recognition does not confidently
-        // replace it. A recognized object is reported to the document layer.
-        if object == nil {
-            committed.append(finished)
-        }
+        // If recognition is not confident, the original stroke remains the page
+        // representation. Recognized objects are handed to the document layer.
+        if object == nil { committed.append(finished) }
         onCommittedStroke?(finished, object)
     }
 
@@ -151,22 +127,14 @@ final class MosuanMetalCanvasView: MTKView {
 
     private func vertices(for strokes: [[MosuanPointerEvent]], color: SIMD4<Float>) -> [Vertex] {
         strokes.flatMap { stroke in
-            stroke.map {
-                Vertex(
-                    position: canvasToNDC($0.position),
-                    color: color
-                )
-            }
+            stroke.map { Vertex(position: canvasToNDC($0.position), color: color) }
         }
     }
 
     private func canvasToNDC(_ point: SIMD2<Float>) -> SIMD2<Float> {
-        let drawableSize = SIMD2<Float>(Float(max(drawableSize.width, 1)), Float(max(drawableSize.height, 1)))
+        let size = SIMD2<Float>(Float(max(drawableSize.width, 1)), Float(max(drawableSize.height, 1)))
         let p = point * canvasScale + canvasOffset
-        return SIMD2(
-            p.x / drawableSize.x * 2 - 1,
-            1 - p.y / drawableSize.y * 2
-        )
+        return SIMD2(p.x / size.x * 2 - 1, 1 - p.y / size.y * 2)
     }
 }
 
@@ -188,7 +156,7 @@ extension MosuanMetalCanvasView: MTKViewDelegate {
         drawStrokeLayer(predicted.isEmpty ? [] : [predicted], color: SIMD4<Float>(0, 0, 0, 0.35), encoder: encoder)
 
         encoder?.endEncoding()
-        if let drawable { commandBuffer?.present(drawable) }
+        commandBuffer?.present(drawable)
         commandBuffer?.commit()
     }
 
@@ -199,12 +167,12 @@ extension MosuanMetalCanvasView: MTKViewDelegate {
     ) {
         guard !strokes.isEmpty else { return }
         var data = vertices(for: strokes, color: color)
-        guard !data.isEmpty else { return }
-        guard let buffer = device?.makeBuffer(
-            bytes: &data,
-            length: MemoryLayout<Vertex>.stride * data.count,
-            options: .storageModeShared
-        ) else { return }
+        guard !data.isEmpty,
+              let buffer = device?.makeBuffer(
+                bytes: &data,
+                length: MemoryLayout<Vertex>.stride * data.count,
+                options: .storageModeShared
+              ) else { return }
         encoder?.setVertexBuffer(buffer, offset: 0, index: 0)
         encoder?.drawPrimitives(type: .lineStrip, vertexStart: 0, vertexCount: data.count)
     }
