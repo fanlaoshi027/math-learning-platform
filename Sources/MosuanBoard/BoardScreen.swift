@@ -3,6 +3,7 @@ import SwiftUI
 struct BoardScreen: View {
     private enum ToolbarDock: String { case top, bottom, left, right }
     @StateObject private var controller = CanvasController()
+    @StateObject private var pageController = PageController()
     @State private var tool: BoardTool = .pen
     @State private var presetID = PenPreset.defaults[0].id
     @State private var rotationText = "0"
@@ -25,9 +26,7 @@ struct BoardScreen: View {
     }
 
     private var effectiveBackground: SIMD4<Float> {
-        if inverted && background == .white {
-            return eyeComfortBackground == .custom ? customColor : eyeComfortBackground.color
-        }
+        if inverted && background == .white { return eyeComfortBackground == .custom ? customColor : eyeComfortBackground.color }
         return background.metal
     }
 
@@ -39,17 +38,28 @@ struct BoardScreen: View {
         GeometryReader { proxy in
             ZStack {
                 effectiveBackgroundColor.ignoresSafeArea()
-                MetalInkCanvas(tool: $tool, penStyle: preset.style, controller: controller, background: effectiveBackground, inverted: inverted)
-                    .background(effectiveBackgroundColor).padding(24)
-                if isDraggingToolbar { dockingGuides(for: proxy.size) }
-                toolbar(in: proxy.size)
-                    .frame(maxWidth: toolbarIsVertical ? 82 : .infinity, maxHeight: toolbarIsVertical ? .infinity : 72)
-                    .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.quaternary, lineWidth: 1) }
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toolbarAlignment)
+
+                HStack(spacing: 0) {
+                    PageSidebar(controller: pageController)
+                        .overlay(alignment: .trailing) { Divider() }
+
+                    ZStack {
+                        MetalInkCanvas(tool: $tool, penStyle: preset.style, controller: controller, background: effectiveBackground, inverted: inverted, pattern: .blank)
+                            .background(effectiveBackgroundColor)
+                            .padding(24)
+
+                        if isDraggingToolbar { dockingGuides(for: proxy.size) }
+
+                        toolbar(in: proxy.size)
+                            .frame(maxWidth: toolbarIsVertical ? 82 : .infinity, maxHeight: toolbarIsVertical ? .infinity : 72)
+                            .background(.regularMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.quaternary, lineWidth: 1) }
+                            .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toolbarAlignment)
+                    }
+                }
             }
             .coordinateSpace(name: "board")
             .animation(.easeInOut(duration: 0.18), value: toolbarDock)
@@ -81,17 +91,22 @@ struct BoardScreen: View {
         ToolButton(title: "智能直线", systemImage: "scribble.variable", selected: tool == .smartLine) { tool = .smartLine }
         ToolButton(title: "橡皮", systemImage: "eraser", selected: tool == .eraser) { tool = .eraser }
         Divider().frame(height: toolbarIsVertical ? nil : 24)
-        ForEach(PenPreset.defaults) { item in Button { presetID = item.id; tool = .pen } label: { Circle().fill(Color(red: item.style.color.red, green: item.style.color.green, blue: item.style.color.blue)).frame(width: 18, height: 18).overlay { Circle().stroke(presetID == item.id ? Color.accentColor : .clear, lineWidth: 2) } }.buttonStyle(.plain).help(item.name) }
+        ForEach(PenPreset.defaults) { item in
+            Button { presetID = item.id; tool = .pen } label: {
+                Circle().fill(Color(red: item.style.color.red, green: item.style.color.green, blue: item.style.color.blue)).frame(width: 18, height: 18)
+                    .overlay { Circle().stroke(presetID == item.id ? Color.accentColor : .clear, lineWidth: 2) }
+            }.buttonStyle(.plain).help(item.name)
+        }
         Divider().frame(height: toolbarIsVertical ? nil : 24)
         backgroundMenu
         if background == .white {
             Toggle(isOn: $inverted) { Label("反色", systemImage: "circle.lefthalf.filled") }
-                .toggleStyle(.checkbox)
-                .help("白色背景切换为护眼深色背景")
+                .toggleStyle(.checkbox).help("白色背景切换为护眼深色背景")
             if inverted { eyeComfortMenu }
         }
         if controller.hasSelection {
-            HStack(spacing: 5) { Image(systemName: "rotate.right"); TextField("角度", text: rotationBinding).frame(width: 62).textFieldStyle(.roundedBorder).onSubmit { applyRotation() }; Text("°") }.help("输入旋转角度")
+            HStack(spacing: 5) { Image(systemName: "rotate.right"); TextField("角度", text: rotationBinding).frame(width: 62).textFieldStyle(.roundedBorder).onSubmit { applyRotation() }; Text("°") }
+                .help("输入旋转角度")
         }
         Button { controller.deleteSelected() } label: { Label("删除", systemImage: "trash") }.disabled(!controller.hasSelection)
         Button { controller.undo() } label: { Label("撤销", systemImage: "arrow.uturn.backward") }.keyboardShortcut("z", modifiers: .command).disabled(!controller.canUndo)
@@ -100,40 +115,33 @@ struct BoardScreen: View {
 
     @ViewBuilder private var backgroundMenu: some View {
         Menu {
-            ForEach(BoardBackground.allCases) { item in Button { background = item; if item != .white { inverted = false } } label: { Label(item.title, systemImage: background == item ? "checkmark" : "square") } }
+            ForEach(BoardBackground.allCases) { item in
+                Button { background = item; if item != .white { inverted = false } } label: { Label(item.title, systemImage: background == item ? "checkmark" : "square") }
+            }
         } label: { Label("背景", systemImage: "rectangle.fill") }.menuStyle(.borderlessButton)
     }
 
     @ViewBuilder private var eyeComfortMenu: some View {
         Menu {
             ForEach(EyeComfortBackground.allCases) { item in
-                Button { eyeComfortBackground = item } label: {
-                    Label(item.title, systemImage: eyeComfortBackground == item ? "checkmark" : "circle")
-                }
+                Button { eyeComfortBackground = item } label: { Label(item.title, systemImage: eyeComfortBackground == item ? "checkmark" : "circle") }
             }
             Divider()
             HStack(spacing: 6) {
                 Text("色值")
                 TextField("RRGGBB", text: $customHex).frame(width: 78).textFieldStyle(.roundedBorder)
                 ColorPicker("", selection: customColorBinding).labelsHidden()
-            }
-            .padding(.horizontal, 8)
-        } label: {
-            Label(eyeComfortBackground == .custom ? "护眼色" : eyeComfortBackground.title, systemImage: "moon.fill")
-        }
-        .menuStyle(.borderlessButton)
+            }.padding(.horizontal, 8)
+        } label: { Label(eyeComfortBackground == .custom ? "护眼色" : eyeComfortBackground.title, systemImage: "moon.fill") }
+            .menuStyle(.borderlessButton)
     }
 
     private var customColorBinding: Binding<Color> {
-        Binding(
-            get: { Color(red: Double(customColor.x), green: Double(customColor.y), blue: Double(customColor.z)) },
-            set: { color in
-                let ns = NSColor(color).usingColorSpace(.deviceRGB) ?? NSColor.black
-                let r = Int(round(ns.redComponent * 255)), g = Int(round(ns.greenComponent * 255)), b = Int(round(ns.blueComponent * 255))
-                customHex = String(format: "%02X%02X%02X", r, g, b)
-                eyeComfortBackground = .custom
-            }
-        )
+        Binding(get: { Color(red: Double(customColor.x), green: Double(customColor.y), blue: Double(customColor.z)) }, set: { color in
+            let ns = NSColor(color).usingColorSpace(.deviceRGB) ?? NSColor.black
+            customHex = String(format: "%02X%02X%02X", Int(round(ns.redComponent * 255)), Int(round(ns.greenComponent * 255)), Int(round(ns.blueComponent * 255)))
+            eyeComfortBackground = .custom
+        })
     }
 
     private func dragHandle(in size: CGSize) -> some View {
@@ -150,6 +158,7 @@ struct BoardScreen: View {
         let thickness: CGFloat = selected ? 8 : 3
         return Rectangle().fill(Color.accentColor.opacity(selected ? 0.28 : 0.08)).frame(width: dock == .left || dock == .right ? thickness : size.width, height: dock == .top || dock == .bottom ? thickness : size.height).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: edgeAlignment(dock))
     }
+
     private func edgeAlignment(_ dock: ToolbarDock) -> Alignment { switch dock { case .top: .top; case .bottom: .bottom; case .left: .leading; case .right: .trailing } }
     private func nearestDock(for point: CGPoint, in size: CGSize) -> ToolbarDock { let distances: [(ToolbarDock, CGFloat)] = [(.top, max(0, point.y)), (.bottom, max(0, size.height - point.y)), (.left, max(0, point.x)), (.right, max(0, size.width - point.x))]; return distances.min(by: { $0.1 < $1.1 })?.0 ?? .top }
     private func applyRotation() { guard let value = Double(rotationText) else { rotationText = String(format: "%.1f", controller.rotationDegrees); return }; controller.setRotationDegrees(value) }
