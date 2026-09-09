@@ -2,8 +2,8 @@ import MetalKit
 import UIKit
 import simd
 
-/// iPad Metal canvas with a CPU-generated brush mesh and transient prediction layer.
-/// Actual samples are persisted; predicted samples are display-only.
+/// iPad Metal canvas focused on natural handwriting: high-frequency input,
+/// rendering-only smoothing, pressure/speed dynamics, and transient prediction.
 final class MosuanMetalCanvasView: MTKView {
     private struct Vertex {
         var position: SIMD2<Float>
@@ -18,10 +18,16 @@ final class MosuanMetalCanvasView: MTKView {
     private var canvasScale: Float = 1
     private var canvasOffset: SIMD2<Float> = .zero
 
-    /// Rendering-only smoothing. Stored input and one-stroke recognition always use
-    /// the original coalesced samples so smoothing can never alter document data.
+    /// Rendering-only smoothing. Original samples remain untouched for saving
+    /// and one-stroke recognition.
     var smoothingEnabled = true
     var smoothingSubdivisions = 3
+
+    /// Natural-ink tuning. Conservative defaults avoid the "rubber band" look.
+    var dynamicsEnabled = true
+    var entryTaperSamples = 5
+    var exitTaperSamples = 5
+    var turnWidthRecovery: Float = 0.82
 
     var inputMode = MosuanPencilInputMode()
     var oneStrokeSettings = OneStrokeSettings()
@@ -79,7 +85,6 @@ final class MosuanMetalCanvasView: MTKView {
 
     private func receiveActual(_ event: MosuanPointerEvent) {
         predicted.removeAll(keepingCapacity: true)
-
         switch event.phase {
         case .began:
             active.removeAll(keepingCapacity: true)
@@ -137,36 +142,36 @@ final class MosuanMetalCanvasView: MTKView {
         setNeedsDisplay()
     }
 
-    private func effectiveWidth(for event: MosuanPointerEvent, previous: MosuanPointerEvent?) -> Float {
+    private func baseWidth(for event: MosuanPointerEvent, previous: MosuanPointerEvent?) -> Float {
         let pressure = min(max(event.pressure, 0), 1)
-        let pressureFactor: Float
         if pressure > 0.01 {
-            pressureFactor = 0.68 + 0.68 * pressure
-        } else if let previous {
-            let dt = max(Float(event.timestamp - previous.timestamp), 1.0 / 240.0)
-            let speed = simd_distance(event.position, previous.position) / dt
-            let speedT = min(max((speed - 80) / (1800 - 80), 0), 1)
-            pressureFactor = 1.18 + (0.58 - 1.18) * speedT
-        } else {
-            pressureFactor = 0.85
+            return Float(strokeStyle.strokeWidth) * (0.62 + 0.76 * pressure)
         }
-        return max(Float(strokeStyle.strokeWidth) * pressureFactor, 0.5)
+        guard let previous else { return Float(strokeStyle.strokeWidth) * 0.88 }
+        let dt = max(Float(event.timestamp - previous.timestamp), 1.0 / 240.0)
+        let speed = simd_distance(event.position, previous.position) / dt
+        let speedT = min(max((speed - 80) / (1800 - 80), 0), 1)
+        return Float(strokeStyle.strokeWidth) * (1.16 - 0.60 * speedT)
     }
 
-    /// Catmull-Rom interpolation is used only for the display mesh. It preserves
-    /// the original samples while removing visible polygonal corners during fast
-    /// handwriting. Endpoints are duplicated so the visible stroke stays anchored
-    /// to the actual Pencil contact points.
+    /// Generates a display-only smooth path. Sharp turns are deliberately damped
+    /// instead of allowing Catmull-Rom to overshoot outside the user's path.
     private func smoothedEvents(for stroke: [MosuanPointerEvent]) -> [MosuanPointerEvent] {
         guard smoothingEnabled, stroke.count >= 3 else { return stroke }
         let subdivisions = min(max(smoothingSubdivisions, 1), 5)
         var result: [MosuanPointerEvent] = []
-        result.reserveCapacity(stroke.count * subdivisions)
+        result.reserveCapacity(stroke.count * subdivisions + 1)
 
-        func interpolate(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, _ d: SIMD2<Float>, _ t: Float) -> SIMD2<Float> {
+        func lerp(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ t: Float) -> SIMD2<Float> {
+            a + (b - a) * t
+        }
+
+        func catmull(_ p0: SIMD2<Float>, _ p1: SIMD2<Float>, _ p2: SIMD2<Float>, _ p3: SIMD2<Float>, _ t: Float) -> SIMD2<Float> {
             let t2 = t * t
             let t3 = t2 * t
-            return 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3)
+            return 0.5 * ((2 * p1) + (-p0 + p2) * t +
+                (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+                (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
         }
 
         for index in 0..<(stroke.count - 1) {
@@ -174,13 +179,21 @@ final class MosuanMetalCanvasView: MTKView {
             let p1 = stroke[index].position
             let p2 = stroke[index + 1].position
             let p3 = index + 2 < stroke.count ? stroke[index + 2].position : p2
+            let incoming = simd_normalize(p1 - p0)
+            let outgoing = simd_normalize(p3 - p2)
+            let turn = min(max((1 - simd_dot(incoming, outgoing)) * 0.5, 0), 1)
 
             for step in 0..<subdivisions {
                 let t = Float(step) / Float(subdivisions)
                 var event = stroke[index]
-                event.position = interpolate(p0, p1, p2, p3, t)
+                let curvePoint = catmull(p0, p1, p2, p3, t)
+                // At sharp turns, blend toward the actual segment to prevent
+                // overshoot and preserve the teacher's intended corner.
+                let damp = min(turn * 0.70, 0.70)
+                event.position = lerp(curvePoint, lerp(p1, p2, t), damp)
                 event.pressure = stroke[index].pressure + (stroke[index + 1].pressure - stroke[index].pressure) * t
-                event.timestamp = stroke[index].timestamp + (stroke[index + 1].timestamp - stroke[index].timestamp) * TimeInterval(t)
+                event.timestamp = stroke[index].timestamp +
+                    (stroke[index + 1].timestamp - stroke[index].timestamp) * TimeInterval(t)
                 result.append(event)
             }
         }
@@ -188,10 +201,54 @@ final class MosuanMetalCanvasView: MTKView {
         return result
     }
 
+    /// Width is smoothed independently from position. Entry/exit taper gives a
+    /// natural pen lift, while sharp turns recover conservatively rather than
+    /// producing a sudden thick blob.
+    private func widthEnvelope(for stroke: [MosuanPointerEvent]) -> [Float] {
+        guard !stroke.isEmpty else { return [] }
+        var raw = [Float](repeating: Float(strokeStyle.strokeWidth), count: stroke.count)
+        for i in stroke.indices {
+            raw[i] = baseWidth(for: stroke[i], previous: i > 0 ? stroke[i - 1] : nil)
+            if dynamicsEnabled, i > 0, i + 1 < stroke.count {
+                let a = simd_normalize(stroke[i].position - stroke[i - 1].position)
+                let b = simd_normalize(stroke[i + 1].position - stroke[i].position)
+                let dot = min(max(simd_dot(a, b), -1), 1)
+                let turn = (1 - dot) * 0.5
+                raw[i] *= 1 - min(max(turn, 0), 1) * (1 - turnWidthRecovery)
+            }
+        }
+
+        guard dynamicsEnabled else { return raw }
+        var smoothed = raw
+        for i in stroke.indices {
+            var sum: Float = 0
+            var weight: Float = 0
+            for offset in -2...2 {
+                let j = i + offset
+                guard stroke.indices.contains(j) else { continue }
+                let w: Float = offset == 0 ? 3 : (abs(offset) == 1 ? 2 : 1)
+                sum += raw[j] * w
+                weight += w
+            }
+            smoothed[i] = sum / max(weight, 1)
+        }
+
+        let entryCount = max(entryTaperSamples, 1)
+        let exitCount = max(exitTaperSamples, 1)
+        for i in stroke.indices {
+            let entryT = min(Float(i + 1) / Float(entryCount), 1)
+            let exitT = min(Float(stroke.count - i) / Float(exitCount), 1)
+            let taper = min(1, min(0.72 + 0.28 * entryT, 0.72 + 0.28 * exitT))
+            smoothed[i] *= taper
+        }
+        return smoothed
+    }
+
     private func brushVertices(for stroke: [MosuanPointerEvent], opacity: Float) -> [Vertex] {
         let renderStroke = smoothedEvents(for: stroke)
         guard !renderStroke.isEmpty else { return [] }
-        let sides = 12
+        let widths = widthEnvelope(for: renderStroke)
+        let sides = 16
         var vertices: [Vertex] = []
         vertices.reserveCapacity(renderStroke.count * sides * 3 + max(renderStroke.count - 1, 0) * 6)
 
@@ -215,25 +272,23 @@ final class MosuanMetalCanvasView: MTKView {
 
         for index in renderStroke.indices {
             let current = renderStroke[index]
-            let previous = index > 0 ? renderStroke[index - 1] : nil
-            let radius = effectiveWidth(for: current, previous: previous) * canvasScale * 0.5
+            let radius = max(widths[index], 0.5) * canvasScale * 0.5
             appendDisk(center: current.position, radius: radius)
 
             guard index > 0 else { continue }
-            let previousEvent = renderStroke[index - 1]
-            let a = screenPoint(previousEvent.position)
+            let previous = renderStroke[index - 1]
+            let a = screenPoint(previous.position)
             let b = screenPoint(current.position)
             let delta = b - a
             let length = simd_length(delta)
             guard length > 0.001 else { continue }
             let normal = SIMD2<Float>(-delta.y, delta.x) / length
-            let previousRadius = effectiveWidth(for: previousEvent, previous: index > 1 ? renderStroke[index - 2] : nil) * canvasScale * 0.5
-            let r = max(radius, previousRadius)
-
-            let p0 = a + normal * r
-            let p1 = a - normal * r
-            let p2 = b + normal * r
-            let p3 = b - normal * r
+            let r0 = max(widths[index - 1], 0.5) * canvasScale * 0.5
+            let r1 = radius
+            let p0 = a + normal * r0
+            let p1 = a - normal * r0
+            let p2 = b + normal * r1
+            let p3 = b - normal * r1
             vertices.append(Vertex(position: canvasToNDC(p0), color: color))
             vertices.append(Vertex(position: canvasToNDC(p1), color: color))
             vertices.append(Vertex(position: canvasToNDC(p2), color: color))
