@@ -15,6 +15,7 @@ struct GraphicObject: Identifiable, Codable, Equatable {
         case coordinateSystem
         case functionGraph
         case parameterizedTriangle
+        case dynamicAngle
         case group
     }
 
@@ -56,6 +57,7 @@ struct GraphicObject: Identifiable, Codable, Equatable {
     /// so ordinary objects remain lightweight and backward compatible.
     var geometryModel: GeometryModel?
     var triangleModel: ParameterizedTriangle?
+    var dynamicAngleModel: DynamicAngle?
 
     init(
         id: UUID = UUID(),
@@ -65,7 +67,8 @@ struct GraphicObject: Identifiable, Codable, Equatable {
         geometry: Geometry = Geometry(),
         children: [GraphicObject] = [],
         geometryModel: GeometryModel? = nil,
-        triangleModel: ParameterizedTriangle? = nil
+        triangleModel: ParameterizedTriangle? = nil,
+        dynamicAngleModel: DynamicAngle? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -75,6 +78,7 @@ struct GraphicObject: Identifiable, Codable, Equatable {
         self.children = children
         self.geometryModel = geometryModel
         self.triangleModel = triangleModel
+        self.dynamicAngleModel = dynamicAngleModel
     }
 }
 
