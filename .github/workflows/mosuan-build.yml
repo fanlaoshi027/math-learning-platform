@@ -17,6 +17,8 @@ jobs:
         run: swift --version
 
       - name: Build app bundle and DMG
+        env:
+          SWIFT_FRONTEND_FLAGS: "-Xfrontend -solver-expression-time-threshold=10"
         run: bash scripts/build-macos-app.sh
 
       - name: Upload app bundle
