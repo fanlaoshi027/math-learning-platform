@@ -7,6 +7,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
     var onPlaybackChanged: ((Bool) -> Void)?
 
     @State private var isPlaying = false
+    @State private var isEditingParameter = false
     private let presets: [Int] = [30, 45, 60, 90, 120, 150]
 
     private var apexAngle: Int { Int(degrees.rounded()) }
@@ -35,6 +36,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
             Slider(value: $degrees, in: 30...150, step: 1) {
                 Text("顶角")
             } onEditingChanged: { editing in
+                isEditingParameter = editing
                 onParameterEditingChanged?(editing)
                 if !editing { onValueChanged?() }
             }
@@ -85,6 +87,10 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 .stroke(.quaternary, lineWidth: 1)
         }
         .onDisappear {
+            if isEditingParameter {
+                isEditingParameter = false
+                onParameterEditingChanged?(false)
+            }
             if isPlaying {
                 isPlaying = false
                 onPlaybackChanged?(false)
