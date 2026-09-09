@@ -21,7 +21,6 @@ struct GeometryAngleAnnotation: Codable, Equatable, Identifiable {
     var name: String
     /// Optional fixed/shared parameter target for driving the end ray.
     var angleReference: GeometryAngleReference?
-    /// User-adjustable offset from the angle arc/label's automatically chosen anchor.
     var labelOffset: CGPoint
     var radius: CGFloat
     var autoAvoid: Bool
@@ -48,6 +47,24 @@ struct GeometryAngleAnnotation: Codable, Equatable, Identifiable {
         self.labelOffset = labelOffset
         self.radius = max(8, radius)
         self.autoAvoid = autoAvoid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, vertexID, startPointID, endPointID, mode, name, angleReference, labelOffset, radius, autoAvoid
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        vertexID = try container.decode(UUID.self, forKey: .vertexID)
+        startPointID = try container.decode(UUID.self, forKey: .startPointID)
+        endPointID = try container.decode(UUID.self, forKey: .endPointID)
+        mode = try container.decodeIfPresent(GeometryAngleLabelMode.self, forKey: .mode) ?? .degrees
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "α"
+        angleReference = try container.decodeIfPresent(GeometryAngleReference.self, forKey: .angleReference)
+        labelOffset = try container.decodeIfPresent(CGPoint.self, forKey: .labelOffset) ?? .zero
+        radius = max(8, try container.decodeIfPresent(CGFloat.self, forKey: .radius) ?? 32)
+        autoAvoid = try container.decodeIfPresent(Bool.self, forKey: .autoAvoid) ?? true
     }
 }
 
