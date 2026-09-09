@@ -6,6 +6,9 @@ on:
       - mosuan-board-dev
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-14
@@ -16,8 +19,31 @@ jobs:
       - name: Select Swift toolchain
         run: swift --version
 
+      - name: Apply Swift type-check fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
+          s = p.read_text()
+          old = "        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)"
+          new = "        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        var previous = v + startVector * Float(radius)"
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Build app bundle and DMG
         run: bash scripts/build-macos-app.sh
+
+      - name: Persist source fix
+        run: |
+          if git diff --quiet -- Sources/MosuanBoard/Metal/InkRenderer.swift; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Sources/MosuanBoard/Metal/InkRenderer.swift
+          git commit -m "fix: split dynamic angle start vector"
+          git push
 
       - name: Upload app bundle
         uses: actions/upload-artifact@v4
