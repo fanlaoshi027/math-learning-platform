@@ -46,6 +46,9 @@ final class CanvasController: ObservableObject {
     func toggleDynamicAnglePlayback() { canvas?.toggleSelectedDynamicAnglePlayback(); refreshState() }
     func setDynamicTriangleDegrees(_ degrees: Double) { canvas?.setSelectedDynamicIsoscelesTriangleDegrees(CGFloat(degrees)); refreshState() }
 
+    func beginDynamicTrianglePlaybackHistory() { canvas?.beginHistoryTransaction(); refreshState() }
+    func endDynamicTrianglePlaybackHistory() { canvas?.endHistoryTransaction(); refreshState() }
+
     func refreshState() {
         canUndo = canvas?.canUndo ?? false
         canRedo = canvas?.canRedo ?? false
