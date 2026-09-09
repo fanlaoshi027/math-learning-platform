@@ -6,8 +6,6 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
     var onPlaybackChanged: ((Bool) -> Void)?
 
     @State private var isPlaying = false
-    @State private var direction = 1.0
-    private let timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
     private let presets: [Int] = [30, 45, 60, 90, 120, 150]
 
     private var apexAngle: Int {
@@ -23,7 +21,6 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
             isPlaying = false
             onPlaybackChanged?(false)
         }
-        direction = 1
         degrees = value
         onValueChanged?()
     }
@@ -93,19 +90,6 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(.quaternary, lineWidth: 1)
-        }
-        .onReceive(timer) { _ in
-            guard isPlaying else { return }
-            var next = degrees + direction
-            if next >= 150 {
-                next = 150
-                direction = -1
-            } else if next <= 30 {
-                next = 30
-                direction = 1
-            }
-            degrees = next
-            onValueChanged?()
         }
         .onDisappear {
             if isPlaying {
