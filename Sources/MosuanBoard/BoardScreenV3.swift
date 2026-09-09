@@ -38,6 +38,12 @@ struct BoardScreen: View {
                     ZStack {
                         MetalInkCanvas(tool:$tool, penStyle:preset.style, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
                             .padding(24)
+
+                        if tool == .dynamicAngle {
+                            DynamicAngleOverlay()
+                                .padding(24)
+                        }
+
                         toolbar(in: proxy.size)
                             .frame(maxWidth:toolbarIsVertical ? 96 : .infinity, maxHeight:toolbarIsVertical ? .infinity : 76)
                             .background(.regularMaterial)
@@ -106,6 +112,7 @@ struct BoardScreen: View {
         ToolButton(title:"直线",systemImage:"line.diagonal",selected:tool == .line) { tool = .line }
         ToolButton(title:"智能直线",systemImage:"scribble.variable",selected:tool == .smartLine) { tool = .smartLine }
         ToolButton(title:"多边形",systemImage:"triangle",selected:tool == .polygon) { tool = .polygon }
+        ToolButton(title:"动态角",systemImage:"angle",selected:tool == .dynamicAngle) { tool = .dynamicAngle }
         ToolButton(title:"橡皮",systemImage:"eraser",selected:tool == .eraser) { tool = .eraser }
         ForEach(PenPreset.defaults) { item in
             Button { presetID=item.id; tool = .pen } label: {
