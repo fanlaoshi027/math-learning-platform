@@ -41,17 +41,13 @@ final class CanvasController: ObservableObject {
     func resetRotationCenter() { canvas?.setRotationCenterToSelectionCenter(); refreshState() }
 
     func setDynamicAngleDegrees(_ degrees: Double) {
-        canvas?.beginHistoryTransaction()
-        _ = canvas?.setSelectedDynamicAngleDegrees(degrees)
-        canvas?.endHistoryTransaction()
+        canvas?.setSelectedDynamicAngleDegrees(CGFloat(degrees))
         refreshState()
-        canvas?.draw()
     }
 
     func toggleDynamicAnglePlayback() {
         canvas?.toggleSelectedDynamicAnglePlayback()
         refreshState()
-        canvas?.draw()
     }
 
     func refreshState() {
