@@ -112,8 +112,12 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func stopAllDynamicAngleAnimations() { dynamicAngleAnimationDriver.stopAll(); animationTimer?.invalidate(); animationTimer = nil }
     private func startAnimationTimerIfNeeded() {
         guard animationTimer == nil else { return }
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in guard let self else { timer.invalidate(); return }; self.advanceDynamicAngleAnimation(deltaTime: 1.0 / 30.0) }
-        if let timer = animationTimer { RunLoop.main.add(timer, forMode: .common) }
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            self.advanceDynamicAngleAnimation(deltaTime: 1.0 / 30.0)
+        }
+        animationTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
     private func advanceDynamicAngleAnimation(deltaTime: CGFloat) {
         var changed = false
@@ -182,15 +186,50 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     private func rebuildGeometry() { var out:[InkVertex]=[]; appendBackground(to:&out); for s in committedStrokes { appendStroke(s.points,style:s.style,to:&out) }; appendObjects(to:&out); if let r=selectionBounds() { appendSelection(r,to:&out) }; if !activeStroke.isEmpty { appendStroke(activeStroke,style:penStyle,to:&out) }; vertices=out; vertexBuffer=vertices.isEmpty ? nil : device.makeBuffer(bytes:vertices,length:vertices.count*MemoryLayout<InkVertex>.stride,options:.storageModeShared) }
     private func appendObjects(to out:inout[InkVertex]) { for o in objectStore.objects { let p=objectStore.transformedPoints(of:o); guard p.count>=2 else { continue }; let color=metalColor(o.style); if o.kind == .line || o.kind == .arrow { appendLine(viewPoint(from:SIMD2(Float(p[0].x),Float(p[0].y))),viewPoint(from:SIMD2(Float(p[1].x),Float(p[1].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } else if o.kind == .polygon { let limit=p.count; if limit >= 2 { for i in 0..<limit { let j=(i+1)%limit; appendLine(viewPoint(from:SIMD2(Float(p[i].x),Float(p[i].y))),viewPoint(from:SIMD2(Float(p[j].x),Float(p[j].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } } } else if o.kind == .dynamicAngle { appendDynamicAngle(o,points:p,color:color,to:&out) } } }
-    private func appendDynamicAngle(_ object: GraphicObject, points:[CGPoint], color:SIMD4<Float>, to out:inout[InkVertex]) { guard let model=object.dynamicAngleModel, let vertex=model.model.points.first(where:{$0.id==model.vertexPointID}), let start=model.model.points.first(where:{$0.id==model.startPointID}), let end=model.model.points.first(where:{$0.id==model.endPointID}), points.count>=3 else { return }; let v=viewPoint(from:SIMD2(Float(vertex.position.x),Float(vertex.position.y))); let s=viewPoint(from:SIMD2(Float(start.position.x),Float(start.position.y))); let e=viewPoint(from:SIMD2(Float(end.position.x),Float(end.position.y))); appendLine(v,s,width:Float(max(0.5,object.style.strokeWidth)),color:color,to:&out); appendLine(v,e,width:Float(max(0.5,object.style.strokeWidth)),color:color,to:&out); let startAngle=atan2(s.y-v.y,s.x-v.x); let endAngle=atan2(e.y-v.y,e.x-v.x); let cross=(s.x-v.x)*(e.y-v.y)-(s.y-v.y)*(e.x-v.x); let signed:CGFloat=cross>=0 ? 1 : -1; var delta=abs(endAngle-startAngle); if delta > .pi { delta=2*.pi-delta }; let radius=min(60,max(18,hypot(s.x-v.x,s.y-v.y)*0.32)); var previous=v+SIMD2(cos(startAngle),sin(startAngle))*radius; let segments=max(12,Int((delta*180/.pi)/4)); for i in 1...segments { let fraction=CGFloat(i)/CGFloat(segments); let a=startAngle+signed*delta*fraction; let current=v+SIMD2(cos(a),sin(a))*radius; appendLine(previous,current,width:Float(max(1.0,object.style.strokeWidth*0.9)),color:color,to:&out); previous=current }; if selectedObjectIDs.contains(object.id) { disk(v,6,SIMD4<Float>(0.1,0.45,1,0.9),to:&out); disk(e,7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) } }
+    private func appendDynamicAngle(_ object: GraphicObject, points:[CGPoint], color:SIMD4<Float>, to out:inout[InkVertex]) {
+        guard let model = object.dynamicAngleModel,
+              let vertex = model.model.points.first(where: { $0.id == model.vertexPointID }),
+              let start = model.model.points.first(where: { $0.id == model.startPointID }),
+              let end = model.model.points.first(where: { $0.id == model.endPointID }),
+              points.count >= 3 else { return }
+        let v = viewPoint(from: SIMD2(Float(vertex.position.x), Float(vertex.position.y)))
+        let s = viewPoint(from: SIMD2(Float(start.position.x), Float(start.position.y)))
+        let e = viewPoint(from: SIMD2(Float(end.position.x), Float(end.position.y)))
+        let lineWidth = Float(max(0.5, object.style.strokeWidth))
+        appendLine(v, s, width: lineWidth, color: color, to: &out)
+        appendLine(v, e, width: lineWidth, color: color, to: &out)
+        let startAngle = atan2(s.y - v.y, s.x - v.x)
+        let endAngle = atan2(e.y - v.y, e.x - v.x)
+        let cross = (s.x - v.x) * (e.y - v.y) - (s.y - v.y) * (e.x - v.x)
+        let signed: CGFloat = cross >= 0 ? 1 : -1
+        var delta = abs(endAngle - startAngle)
+        if delta > .pi { delta = 2 * .pi - delta }
+        let sourceRadius = hypot(s.x - v.x, s.y - v.y)
+        let radius = min(CGFloat(60), max(CGFloat(18), sourceRadius * CGFloat(0.32)))
+        let segmentCount = max(12, Int((delta * CGFloat(180.0 / .pi)) / CGFloat(4.0)))
+        let angleStep = delta / CGFloat(segmentCount)
+        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)
+        for index in 1...segmentCount {
+            let offset = angleStep * CGFloat(index)
+            let signedOffset = signed * offset
+            let angle = startAngle + signedOffset
+            let current = v + SIMD2(cos(angle), sin(angle)) * Float(radius)
+            appendLine(previous, current, width: Float(max(1.0, object.style.strokeWidth * 0.9)), color: color, to: &out)
+            previous = current
+        }
+        if selectedObjectIDs.contains(object.id) {
+            disk(v, 6, SIMD4<Float>(0.1, 0.45, 1, 0.9), to: &out)
+            disk(e, 7, SIMD4<Float>(0.95, 0.55, 0.05, 1), to: &out)
+        }
+    }
     private func appendBackground(to out:inout[InkVertex]) { guard backgroundPattern != 0 else { return }; let color=SIMD4<Float>(0.82,0.84,0.88,0.55); let step:Float=backgroundPattern == 3 ? 24:32; let e:Float=2000; if backgroundPattern == 1 { var y:Float = -e; while y<=e { appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.55,color:color,to:&out); y+=step } } else { var x:Float = -e; while x<=e { appendLine(viewPoint(from:SIMD2(x,-e)),viewPoint(from:SIMD2(x,e)),width:0.45,color:color,to:&out); x+=step }; var y:Float = -e; while y<=e { appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.45,color:color,to:&out); y+=step } } }
     private func appendStroke(_ s:[InkPoint],style:PenStyle,to out:inout[InkVertex]) { guard !s.isEmpty else { return }; let color=metalColor(style); if s.count>1 { for i in 0..<(s.count-1) { let p=s[i],q=s[i+1],dx=q.x-p.x,dy=q.y-p.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx = -dy/l,ny = dx/l,w0=strokeWidth(p.pressure,style),w1=strokeWidth(q.pressure,style),a=viewPoint(from:SIMD2(p.x+nx*w0,p.y+ny*w0)),b=viewPoint(from:SIMD2(p.x-nx*w0,p.y-ny*w0)),c=viewPoint(from:SIMD2(q.x+nx*w1,q.y+ny*w1)),d=viewPoint(from:SIMD2(q.x-nx*w1,q.y-ny*w1)); triangle(a,b,c,color:color,to:&out); triangle(c,b,d,color:color,to:&out) } }; for p in s { disk(viewPoint(from:SIMD2(p.x,p.y)), strokeWidth(p.pressure,style), color, to:&out) } }
     private func appendSelection(_ r:CGRect,to out:inout[InkVertex]) { let c=SIMD4<Float>(0.1,0.45,1,0.75),a=viewPoint(from:SIMD2(Float(r.minX),Float(r.minY))),b=viewPoint(from:SIMD2(Float(r.maxX),Float(r.maxY))),p0=SIMD2(a.x,a.y),p1=SIMD2(b.x,a.y),p2=SIMD2(b.x,b.y),p3=SIMD2(a.x,b.y); appendLine(p0,p1,width:1.5,color:c,to:&out);appendLine(p1,p2,width:1.5,color:c,to:&out);appendLine(p2,p3,width:1.5,color:c,to:&out);appendLine(p3,p0,width:1.5,color:c,to:&out);for p in [p0,p1,p2,p3] { disk(p,5,c,to:&out) };let rot=SIMD2((a.x+b.x)/2,a.y-28);appendLine(SIMD2((a.x+b.x)/2,a.y),rot,width:1,color:c,to:&out);disk(rot,7,c,to:&out);if let rc=customRotationCenter { disk(viewPoint(from:rc),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) };if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .line { for q in objectStore.transformedPoints(of:o).prefix(2) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) } } else if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .polygon { for q in objectStore.transformedPoints(of:o) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out) } } }
     private func bounds(_ p:[InkPoint])->CGRect? { guard let f=p.first else { return nil }; var x0=f.x,x1=f.x,y0=f.y,y1=f.y;for q in p{x0=min(x0,q.x);x1=max(x1,q.x);y0=min(y0,q.y);y1=max(y1,q.y)};return CGRect(x:CGFloat(x0),y:CGFloat(y0),width:CGFloat(x1-x0),height:CGFloat(y1-y0)) }
     private func strokeIntersectsLasso(_ stroke:[InkPoint], _ lasso:[CGPoint])->Bool { guard stroke.count >= 2, lasso.count >= 3 else { return false }; if stroke.contains(where: { pointInPolygon(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)), lasso) }) { return true }; for pair in zip(stroke, stroke.dropFirst()) { let a=CGPoint(x:CGFloat(pair.0.x),y:CGFloat(pair.0.y)),b=CGPoint(x:CGFloat(pair.1.x),y:CGFloat(pair.1.y)); if segmentIntersectsPolygon(a,b,lasso) { return true } }; return false }
-    private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool { var inside=false; var j=poly.count-1; for i in poly.indices { let a=poly[i],b=poly[j]; if (a.y > p.y) != (b.y > p.y) { let d=b.y-a.y; if d != 0 { let x=(b.x-a.x)*(p.y-a.y)/d+a.x; if p.x < x { inside.toggle() } } }; j=i }; return inside }
+    private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool { var inside=false; var j=poly.count-1; for i in poly.indices { let a=poly[i],b=poly[j]; if (a.y > p.y) != (b.y > p.y) { let d=b.y-a.y;if d != 0 { let x=(b.x-a.x)*(p.y-a.y)/d+a.x;if p.x < x { inside.toggle() } } };j=i };return inside }
     private func segmentIntersectsPolygon(_ a:CGPoint,_ b:CGPoint,_ polygon:[CGPoint])->Bool { if pointInPolygon(a,polygon) || pointInPolygon(b,polygon) { return true }; var edges=Array(polygon.dropFirst()); edges.append(polygon[0]); return zip(polygon,edges).contains { segmentsIntersect(a,b,$0.0,$0.1) } }
-    private func segmentsIntersect(_ a:CGPoint,_ b:CGPoint,_ c:CGPoint,_ d:CGPoint)->Bool { func cross(_ p:CGPoint,_ q:CGPoint,_ r:CGPoint)->CGFloat { (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x) }; let o1=cross(a,b,c),o2=cross(a,b,d),o3=cross(c,d,a),o4=cross(c,d,b); let eps:CGFloat=0.001; if abs(o1)<eps && onSegment(a,b,c){return true}; if abs(o2)<eps && onSegment(a,b,d){return true}; if abs(o3)<eps && onSegment(c,d,a){return true}; if abs(o4)<eps && onSegment(c,d,b){return true}; return (o1 > 0) != (o2 > 0) && (o3 > 0) != (o4 > 0) }
+    private func segmentsIntersect(_ a:CGPoint,_ b:CGPoint,_ c:CGPoint,_ d:CGPoint)->Bool { func cross(_ p:CGPoint,_ q:CGPoint,_ r:CGPoint)->CGFloat { (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x) }; let o1=cross(a,b,c),o2=cross(a,b,d),o3=cross(c,d,a),o4=cross(c,d,b); let eps:CGFloat=0.001;if abs(o1)<eps && onSegment(a,b,c){return true};if abs(o2)<eps && onSegment(a,b,d){return true};if abs(o3)<eps && onSegment(c,d,a){return true};if abs(o4)<eps && onSegment(c,d,b){return true};return (o1 > 0) != (o2 > 0) && (o3 > 0) != (o4 > 0) }
     private func onSegment(_ a:CGPoint,_ b:CGPoint,_ p:CGPoint)->Bool { p.x >= min(a.x,b.x)-0.001 && p.x <= max(a.x,b.x)+0.001 && p.y >= min(a.y,b.y)-0.001 && p.y <= max(a.y,b.y)+0.001 }
     private func appendLine(_ a:SIMD2<Float>,_ b:SIMD2<Float>,width:Float,color:SIMD4<Float>,to out:inout[InkVertex]) { let d=b-a,l=max(simd_length(d),0.001),n=SIMD2(-d.y,d.x)/l*width;triangle(a+n,a-n,b+n,color:color,to:&out);triangle(b+n,a-n,b-n,color:color,to:&out) }
     private func distance(_ p:SIMD2<Float>,_ a:SIMD2<Float>,_ b:SIMD2<Float>)->Float { let d=b-a,l=simd_length_squared(d);if l<0.0001{return simd_distance(p,a)};let t=max(0,min(1,simd_dot(p-a,d)/l));return simd_distance(p,a+d*t) }
