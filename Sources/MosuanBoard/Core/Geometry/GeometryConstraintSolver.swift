@@ -3,6 +3,15 @@ import Foundation
 
 enum GeometryConstraintSolver {
     static func apply(_ model: inout GeometryModel) {
+        // Parameter-driven angle annotations are constraints in their own right.
+        // Applying them before the explicit constraint list keeps the parameter
+        // slider/animation path independent from UI code.
+        for annotation in model.angles {
+            if let target = GeometryAngleCalculator.targetDegrees(in: model, annotation: annotation) {
+                setAngle(&model, angleID: annotation.id, targetDegrees: target)
+            }
+        }
+
         for constraint in model.constraints {
             switch constraint {
             case let .fixedPoint(pointID, position):
@@ -110,7 +119,7 @@ enum GeometryConstraintSolver {
         let endVector = CGPoint(x: model.points[endIndex].position.x - vertex.position.x,
                                 y: model.points[endIndex].position.y - vertex.position.y)
         let radius = max(0.001, hypot(endVector.x, endVector.y))
-        let direction = targetDegrees * .pi / 180
+        let direction = max(0.001, min(179.999, targetDegrees)) * .pi / 180
         let currentCross = (start.position.x - vertex.position.x) * endVector.y - (start.position.y - vertex.position.y) * endVector.x
         let signedDirection: CGFloat = currentCross >= 0 ? 1 : -1
         let angle = startAngle + signedDirection * direction
