@@ -17,6 +17,8 @@ jobs:
         run: swift --version
 
       - name: Build app bundle and DMG
+        id: build
+        continue-on-error: true
         run: bash scripts/build-macos-app.sh
 
       - name: Upload build diagnostics
@@ -26,6 +28,10 @@ jobs:
           name: Mosuan-Board-build-diagnostics
           path: dist/swift-build.log
           if-no-files-found: warn
+
+      - name: Fail if build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
 
       - name: Upload app bundle
         if: success()
