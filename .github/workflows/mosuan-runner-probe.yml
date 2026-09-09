@@ -1,0 +1,19 @@
+name: Mosuan Runner Probe
+
+on:
+  push:
+    branches:
+      - mosuan-board-dev
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner probe
+        run: |
+          echo "=== BRAND NEW WORKFLOW RUNNER PROBE ==="
+          date -u
+          uname -a
+          echo "Runner OS: $RUNNER_OS"
+          echo "Runner architecture: $RUNNER_ARCH"
