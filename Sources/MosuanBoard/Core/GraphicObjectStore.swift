@@ -22,6 +22,12 @@ final class GraphicObjectStore {
     func addIsoscelesTriangle(anchor: CGPoint, legLength: CGFloat = 150, apexAngleDegrees: CGFloat = 60, style: GraphicObject.Style = GraphicObject.Style()) -> UUID {
         let object = GraphicObject.isoscelesTriangle(anchor: anchor, legLength: legLength, apexAngleDegrees: apexAngleDegrees, style: style); objects.append(object); return object.id
     }
+    @discardableResult
+    func addDynamicIsoscelesTriangle(anchor: CGPoint, legLength: CGFloat = 150, apexAngleDegrees: CGFloat = 60, minimum: CGFloat = 30, maximum: CGFloat = 150, step: CGFloat = 1, style: GraphicObject.Style = GraphicObject.Style()) -> UUID {
+        let dynamic = DynamicIsoscelesTriangle(anchor: anchor, legLength: legLength, apexAngleDegrees: apexAngleDegrees, minimum: minimum, maximum: maximum, step: step)
+        objects.append(dynamic.graphicObject(style: style))
+        return dynamic.id
+    }
     func insert(_ object: GraphicObject) { objects.append(object) }
     func object(with id: UUID) -> GraphicObject? { objects.first { $0.id == id } }
     func update(_ object: GraphicObject) { guard let index=objects.firstIndex(where:{$0.id==object.id}) else { objects.append(object); return }; objects[index]=object }
@@ -41,6 +47,30 @@ final class GraphicObjectStore {
     @discardableResult
     func setTriangleParameter(id:UUID,parameter:TriangleParameter,value:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};GeometryInteractionEngine.setTriangleParameter(&m,parameter:parameter,value:value);objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
     func triangleParameter(id:UUID)->CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.apexAngleDegrees }
+    func triangleLegLength(id: UUID) -> CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.legLength }
+
+    @discardableResult
+    func setDynamicTriangleAngle(id: UUID, degrees: CGFloat) -> Bool {
+        guard let i = objects.firstIndex(where: { $0.id == id }), objects[i].kind == .parameterizedTriangle, var model = objects[i].triangleModel else { return false }
+        model.setApexAngle(degrees)
+        objects[i].triangleModel = model
+        objects[i].geometry.points = model.vertices()
+        return true
+    }
+
+    @discardableResult
+    func dragDynamicTriangleVertex(id: UUID, vertexIndex: Int, to point: CGPoint) -> Bool {
+        guard let i = objects.firstIndex(where: { $0.id == id }), objects[i].kind == .parameterizedTriangle, var model = objects[i].triangleModel else { return false }
+        guard GeometryInteractionEngine.dragTriangle(&model, vertexIndex: vertexIndex, to: point) else { return false }
+        objects[i].triangleModel = model
+        objects[i].geometry.points = model.vertices()
+        return true
+    }
+
+    func dynamicTriangleSnapshot(id: UUID) -> (angle: CGFloat, legLength: CGFloat, vertices: [CGPoint])? {
+        guard let o = object(with: id), o.kind == .parameterizedTriangle, let model = o.triangleModel else { return nil }
+        return (model.apexAngleDegrees, model.legLength, model.vertices())
+    }
 
     @discardableResult
     func setDynamicAngle(id:UUID,degrees:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false};guard m.setAngle(degrees) else{return false};objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true }
