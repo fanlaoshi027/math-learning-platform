@@ -18,6 +18,11 @@ final class MosuanMetalCanvasView: MTKView {
     private var canvasScale: Float = 1
     private var canvasOffset: SIMD2<Float> = .zero
 
+    /// Rendering-only smoothing. Stored input and one-stroke recognition always use
+    /// the original coalesced samples so smoothing can never alter document data.
+    var smoothingEnabled = true
+    var smoothingSubdivisions = 3
+
     var inputMode = MosuanPencilInputMode()
     var oneStrokeSettings = OneStrokeSettings()
     var strokeStyle = GraphicObject.Style()
@@ -148,11 +153,47 @@ final class MosuanMetalCanvasView: MTKView {
         return max(Float(strokeStyle.strokeWidth) * pressureFactor, 0.5)
     }
 
+    /// Catmull-Rom interpolation is used only for the display mesh. It preserves
+    /// the original samples while removing visible polygonal corners during fast
+    /// handwriting. Endpoints are duplicated so the visible stroke stays anchored
+    /// to the actual Pencil contact points.
+    private func smoothedEvents(for stroke: [MosuanPointerEvent]) -> [MosuanPointerEvent] {
+        guard smoothingEnabled, stroke.count >= 3 else { return stroke }
+        let subdivisions = min(max(smoothingSubdivisions, 1), 5)
+        var result: [MosuanPointerEvent] = []
+        result.reserveCapacity(stroke.count * subdivisions)
+
+        func interpolate(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, _ d: SIMD2<Float>, _ t: Float) -> SIMD2<Float> {
+            let t2 = t * t
+            let t3 = t2 * t
+            return 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3)
+        }
+
+        for index in 0..<(stroke.count - 1) {
+            let p0 = index > 0 ? stroke[index - 1].position : stroke[index].position
+            let p1 = stroke[index].position
+            let p2 = stroke[index + 1].position
+            let p3 = index + 2 < stroke.count ? stroke[index + 2].position : p2
+
+            for step in 0..<subdivisions {
+                let t = Float(step) / Float(subdivisions)
+                var event = stroke[index]
+                event.position = interpolate(p0, p1, p2, p3, t)
+                event.pressure = stroke[index].pressure + (stroke[index + 1].pressure - stroke[index].pressure) * t
+                event.timestamp = stroke[index].timestamp + (stroke[index + 1].timestamp - stroke[index].timestamp) * TimeInterval(t)
+                result.append(event)
+            }
+        }
+        if let last = stroke.last { result.append(last) }
+        return result
+    }
+
     private func brushVertices(for stroke: [MosuanPointerEvent], opacity: Float) -> [Vertex] {
-        guard !stroke.isEmpty else { return [] }
+        let renderStroke = smoothedEvents(for: stroke)
+        guard !renderStroke.isEmpty else { return [] }
         let sides = 12
         var vertices: [Vertex] = []
-        vertices.reserveCapacity(stroke.count * sides * 3 + max(stroke.count - 1, 0) * 6)
+        vertices.reserveCapacity(renderStroke.count * sides * 3 + max(renderStroke.count - 1, 0) * 6)
 
         let baseColor = strokeStyle.strokeColor
         let color = SIMD4<Float>(Float(baseColor.red), Float(baseColor.green), Float(baseColor.blue), Float(baseColor.alpha) * opacity)
@@ -172,21 +213,21 @@ final class MosuanMetalCanvasView: MTKView {
             }
         }
 
-        for index in stroke.indices {
-            let current = stroke[index]
-            let previous = index > 0 ? stroke[index - 1] : nil
+        for index in renderStroke.indices {
+            let current = renderStroke[index]
+            let previous = index > 0 ? renderStroke[index - 1] : nil
             let radius = effectiveWidth(for: current, previous: previous) * canvasScale * 0.5
             appendDisk(center: current.position, radius: radius)
 
             guard index > 0 else { continue }
-            let previousEvent = stroke[index - 1]
+            let previousEvent = renderStroke[index - 1]
             let a = screenPoint(previousEvent.position)
             let b = screenPoint(current.position)
             let delta = b - a
             let length = simd_length(delta)
             guard length > 0.001 else { continue }
             let normal = SIMD2<Float>(-delta.y, delta.x) / length
-            let previousRadius = effectiveWidth(for: previousEvent, previous: index > 1 ? stroke[index - 2] : nil) * canvasScale * 0.5
+            let previousRadius = effectiveWidth(for: previousEvent, previous: index > 1 ? renderStroke[index - 2] : nil) * canvasScale * 0.5
             let r = max(radius, previousRadius)
 
             let p0 = a + normal * r
