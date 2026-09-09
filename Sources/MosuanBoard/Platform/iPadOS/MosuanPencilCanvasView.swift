@@ -7,17 +7,12 @@ import simd
 /// UIKit coalesced touches for high-fidelity input, while predicted samples are
 /// exposed separately as temporary preview data and are never committed.
 final class MosuanPencilCanvasView: UIView {
-    enum GestureMode {
-        case pencilWriting
-        case fingerNavigation
-    }
+    enum GestureMode { case pencilWriting, fingerNavigation }
 
     /// Shared anti-palm policy. Strong is the default teacher mode.
     var inputMode = MosuanPencilInputMode()
 
     var onPointerEvent: ((MosuanPointerEvent) -> Void)?
-    /// Temporary predicted samples. The renderer must discard/replace these when
-    /// the next real event arrives; they must never enter saved page content.
     var onPredictedPointerEvent: ((MosuanPointerEvent) -> Void)?
     var onPan: ((CGPoint) -> Void)?
     var onZoom: ((CGFloat, CGPoint) -> Void)?
@@ -26,15 +21,8 @@ final class MosuanPencilCanvasView: UIView {
     private var activePencilTouch: UITouch?
     private var lastNavigationPoint: CGPoint?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        configure()
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        configure()
-    }
+    override init(frame: CGRect) { super.init(frame: frame); configure() }
+    required init?(coder: NSCoder) { super.init(coder: coder); configure() }
 
     private func configure() {
         isMultipleTouchEnabled = true
@@ -44,7 +32,6 @@ final class MosuanPencilCanvasView: UIView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
-
         if touch.type == .pencil {
             guard inputMode.acceptsWriting(.pen) else { return }
             activePencilTouch = touch
@@ -54,9 +41,6 @@ final class MosuanPencilCanvasView: UIView {
             emitPredictedSamples(for: touch, event: event)
             return
         }
-
-        // In strong/extreme modes, a finger that lands while Pencil is down is
-        // ignored completely. This is the important palm/hand rejection path.
         guard activePencilTouch == nil,
               inputMode.acceptsNavigation(.touch, pencilActive: false) else { return }
         gestureMode = .fingerNavigation
@@ -65,22 +49,16 @@ final class MosuanPencilCanvasView: UIView {
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         if let pencil = activePencilTouch, touches.contains(pencil) {
-            // UIKit can provide high-frequency input while ordinary delivery is
-            // commonly lower frequency. Coalesced touches recover the path.
             emitActualSamples(for: pencil, event: event, fallbackPhase: .changed)
             emitPredictedSamples(for: pencil, event: event)
             return
         }
-
         let points = touches.filter { $0.type != .pencil }
         guard !points.isEmpty,
               activePencilTouch == nil,
               inputMode.acceptsNavigation(.touch, pencilActive: false) else { return }
-
         let current = averageLocation(of: points)
-        if let previous = lastNavigationPoint {
-            onPan?(current - previous)
-        }
+        if let previous = lastNavigationPoint { onPan?(current - previous) }
         lastNavigationPoint = current
     }
 
@@ -104,17 +82,11 @@ final class MosuanPencilCanvasView: UIView {
         lastNavigationPoint = nil
     }
 
-    private func emitActualSamples(
-        for touch: UITouch,
-        event: UIEvent?,
-        fallbackPhase: MosuanPointerEvent.Phase
-    ) {
+    private func emitActualSamples(for touch: UITouch, event: UIEvent?, fallbackPhase: MosuanPointerEvent.Phase) {
         guard let event else {
             onPointerEvent?(makeEvent(from: touch, phase: fallbackPhase))
             return
         }
-
-        // The coalesced array already contains the latest reported touch.
         let samples = event.coalescedTouches(for: touch) ?? [touch]
         for sample in samples {
             let phase: MosuanPointerEvent.Phase
@@ -131,9 +103,7 @@ final class MosuanPencilCanvasView: UIView {
 
     private func emitPredictedSamples(for touch: UITouch, event: UIEvent?) {
         guard let event, let predicted = event.predictedTouches(for: touch) else { return }
-        for sample in predicted {
-            onPredictedPointerEvent?(makeEvent(from: sample, phase: .changed))
-        }
+        for sample in predicted { onPredictedPointerEvent?(makeEvent(from: sample, phase: .changed)) }
     }
 
     private func makeEvent(from touch: UITouch, phase: MosuanPointerEvent.Phase) -> MosuanPointerEvent {
@@ -144,10 +114,11 @@ final class MosuanPencilCanvasView: UIView {
             Float(cos(altitude) * vector.dx),
             Float(cos(altitude) * vector.dy)
         )
-
+        let maximumForce = max(touch.maximumPossibleForce, 1)
+        let normalizedPressure = min(max(Float(touch.force / maximumForce), 0), 1)
         return MosuanPointerEvent(
             position: SIMD2(Float(location.x), Float(location.y)),
-            pressure: max(0, Float(touch.force)),
+            pressure: normalizedPressure,
             tilt: tilt,
             azimuth: Float(atan2(vector.dy, vector.dx)),
             phase: phase,
@@ -166,7 +137,5 @@ final class MosuanPencilCanvasView: UIView {
 }
 
 private extension CGPoint {
-    static func -(lhs: CGPoint, rhs: CGPoint) -> CGPoint {
-        CGPoint(x: lhs.x - rhs.x, y: lhs.y - rhs.y)
-    }
+    static func -(lhs: CGPoint, rhs: CGPoint) -> CGPoint { CGPoint(x: lhs.x - rhs.x, y: lhs.y - rhs.y) }
 }
