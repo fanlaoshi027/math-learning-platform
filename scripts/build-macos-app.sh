@@ -13,7 +13,24 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-swift build -c release -Xswiftc -Xfrontend -Xswiftc -solver-expression-time-threshold=10
+# Keep the production source explicit about Float math in the dynamic-angle renderer.
+# This is a build-time safety net while the source is being normalized across branches.
+python3 - <<'PY'
+from pathlib import Path
+p = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
+s = p.read_text()
+old_previous = "        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)"
+new_previous = "        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat"
+if old_previous in s:
+    s = s.replace(old_previous, new_previous, 1)
+old_current = "            let current = v + SIMD2(cos(angle), sin(angle)) * Float(radius)"
+new_current = "            let cosAngleFloat = Float(cos(angle))\n            let sinAngleFloat = Float(sin(angle))\n            let arcVector = SIMD2<Float>(cosAngleFloat, sinAngleFloat)\n            let current = v + arcVector * radiusFloat"
+if old_current in s:
+    s = s.replace(old_current, new_current, 1)
+p.write_text(s)
+PY
+
+swift build -c release
 BINARY="$ROOT_DIR/.build/release/MosuanBoard"
 if [ ! -x "$BINARY" ]; then
   echo "Release binary not found: $BINARY" >&2
