@@ -36,11 +36,14 @@ final class GraphicObjectStore {
         objects[index] = object
     }
 
-    func remove(id: UUID) { objects.removeAll { $0.id == id } }
+    func remove(id: UUID) { objects.removeAll { $0.id != id ? false : true } }
 
     func transformedPoints(of object: GraphicObject) -> [CGPoint] {
         if object.kind == .parameterizedTriangle, let triangle = object.triangleModel {
             return triangle.vertices().map { transformedPoint($0, in: object) }
+        }
+        if object.kind == .dynamicAngle, let dynamicAngle = object.dynamicAngleModel {
+            return dynamicAngle.model.points.map { transformedPoint($0.position, in: object) }
         }
         return object.geometry.points.map { transformedPoint($0, in: object) }
     }
@@ -77,6 +80,42 @@ final class GraphicObjectStore {
               var triangle = objects[index].triangleModel else { return false }
         GeometryInteractionEngine.setTriangleParameter(&triangle, parameter: parameter, value: value)
         objects[index].triangleModel = triangle
+        return true
+    }
+
+    @discardableResult
+    func setDynamicAngle(id: UUID, degrees: CGFloat) -> Bool {
+        guard let index = objects.firstIndex(where: { $0.id == id }),
+              objects[index].kind == .dynamicAngle,
+              var dynamicAngle = objects[index].dynamicAngleModel else { return false }
+        guard dynamicAngle.setAngle(degrees) else { return false }
+        objects[index].dynamicAngleModel = dynamicAngle
+        objects[index].geometryModel = dynamicAngle.model
+        return true
+    }
+
+    @discardableResult
+    func dragDynamicAngleEndpoint(id: UUID, to point: CGPoint) -> Bool {
+        guard let index = objects.firstIndex(where: { $0.id == id }),
+              objects[index].kind == .dynamicAngle,
+              var dynamicAngle = objects[index].dynamicAngleModel else { return false }
+        guard let endIndex = dynamicAngle.model.points.firstIndex(where: { $0.id == dynamicAngle.endPointID }),
+              !dynamicAngle.model.points[endIndex].isFixed,
+              let vertex = dynamicAngle.model.points.first(where: { $0.id == dynamicAngle.vertexPointID }),
+              let start = dynamicAngle.model.points.first(where: { $0.id == dynamicAngle.startPointID }) else { return false }
+        let dx = point.x - vertex.position.x
+        let dy = point.y - vertex.position.y
+        guard hypot(dx, dy) > 0.001 else { return false }
+        let sx = start.position.x - vertex.position.x
+        let sy = start.position.y - vertex.position.y
+        let cross = sx * dy - sy * dx
+        let dot = sx * dx + sy * dy
+        var degrees = atan2(abs(cross), dot) * 180 / .pi
+        if degrees < 0 { degrees += 360 }
+        degrees = min(170, max(10, degrees))
+        guard dynamicAngle.setAngle(degrees) else { return false }
+        objects[index].dynamicAngleModel = dynamicAngle
+        objects[index].geometryModel = dynamicAngle.model
         return true
     }
 
@@ -126,7 +165,7 @@ final class GraphicObjectStore {
     private func hitTest(_ object: GraphicObject, at point: CGPoint, tolerance: CGFloat) -> Bool {
         let t = tolerance + object.style.strokeWidth
         switch object.kind {
-        case .line, .arrow, .parameterizedTriangle:
+        case .line, .arrow, .parameterizedTriangle, .dynamicAngle:
             let p = transformedPoints(of: object)
             guard p.count >= 2 else { return false }
             let closingPoints = object.kind == .parameterizedTriangle ? p.dropFirst() + [p[0]] : p.dropFirst()
