@@ -53,6 +53,18 @@ struct BoardScreen: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         }
 
+                        if let degrees = controller.dynamicTriangleDegrees, tool == .select {
+                            DynamicIsoscelesTriangleParameterPanel(
+                                degrees: Binding(
+                                    get: { degrees },
+                                    set: { controller.setDynamicTriangleDegrees($0) }
+                                )
+                            )
+                            .frame(width: 280)
+                            .padding(16)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        }
+
                         toolbar(in: proxy.size)
                             .frame(maxWidth:toolbarIsVertical ? 96 : .infinity, maxHeight:toolbarIsVertical ? .infinity : 76)
                             .background(.regularMaterial)
@@ -122,6 +134,7 @@ struct BoardScreen: View {
         ToolButton(title:"智能直线",systemImage:"scribble.variable",selected:tool == .smartLine) { tool = .smartLine }
         ToolButton(title:"多边形",systemImage:"triangle",selected:tool == .polygon) { tool = .polygon }
         ToolButton(title:"动态角",systemImage:"angle",selected:tool == .dynamicAngle) { tool = .dynamicAngle }
+        ToolButton(title:"等腰三角",systemImage:"triangle",selected:tool == .dynamicIsoscelesTriangle) { tool = .dynamicIsoscelesTriangle }
         ToolButton(title:"橡皮",systemImage:"eraser",selected:tool == .eraser) { tool = .eraser }
         ForEach(PenPreset.defaults) { item in
             Button { presetID=item.id; tool = .pen } label: {
