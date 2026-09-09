@@ -2,8 +2,8 @@ import SwiftUI
 import CoreGraphics
 
 /// First interactive macOS teaching surface for the dynamic-angle system.
-/// It intentionally sits above the existing Metal board so the current ink/selection
-/// implementation remains untouched while the geometry interaction is validated.
+/// It sits above the existing Metal board so the current ink/selection implementation
+/// remains untouched while the geometry interaction is validated.
 struct DynamicAngleOverlay: View {
     @State private var active = false
     @State private var angle: CGFloat = 45
@@ -21,9 +21,6 @@ struct DynamicAngleOverlay: View {
                     DynamicAngleDrawing(center: center, radius: radius, degrees: angle)
                         .contentShape(Rectangle())
                         .gesture(endpointDrag)
-                        .onTapGesture { location in
-                            center = location
-                        }
                         .onAppear {
                             if center == CGPoint(x: 520, y: 340) {
                                 center = CGPoint(x: proxy.size.width * 0.5, y: proxy.size.height * 0.5)
