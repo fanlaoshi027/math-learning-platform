@@ -12,7 +12,6 @@ final class CanvasController: ObservableObject {
     @Published private(set) var dynamicAngleDegrees: Double?
     @Published private(set) var dynamicAnglePlaying = false
     @Published private(set) var dynamicTriangleDegrees: Double?
-    @Published private(set) var dynamicTrianglePlaying = false
 
     func attach(_ canvas: InkMetalView) {
         self.canvas = canvas
@@ -30,7 +29,6 @@ final class CanvasController: ObservableObject {
             self.dynamicAngleDegrees = canvas.selectedDynamicAngleDegrees.map(Double.init)
             self.dynamicAnglePlaying = canvas.isSelectedDynamicAnglePlaying
             self.dynamicTriangleDegrees = canvas.selectedDynamicIsoscelesTriangleDegrees.map(Double.init)
-            self.dynamicTrianglePlaying = canvas.isSelectedDynamicIsoscelesTrianglePlaying
         }
         refreshState()
     }
@@ -47,8 +45,6 @@ final class CanvasController: ObservableObject {
     func setDynamicAngleDegrees(_ degrees: Double) { canvas?.setSelectedDynamicAngleDegrees(CGFloat(degrees)); refreshState() }
     func toggleDynamicAnglePlayback() { canvas?.toggleSelectedDynamicAnglePlayback(); refreshState() }
     func setDynamicTriangleDegrees(_ degrees: Double) { canvas?.setSelectedDynamicIsoscelesTriangleDegrees(CGFloat(degrees)); refreshState() }
-    func toggleDynamicTrianglePlayback() { canvas?.toggleSelectedDynamicIsoscelesTrianglePlayback(); refreshState() }
-    func stopDynamicTrianglePlayback() { canvas?.stopDynamicIsoscelesTrianglePlayback(); refreshState() }
 
     func refreshState() {
         canUndo = canvas?.canUndo ?? false
@@ -60,6 +56,5 @@ final class CanvasController: ObservableObject {
         dynamicAngleDegrees = canvas?.selectedDynamicAngleDegrees.map(Double.init)
         dynamicAnglePlaying = canvas?.isSelectedDynamicAnglePlaying ?? false
         dynamicTriangleDegrees = canvas?.selectedDynamicIsoscelesTriangleDegrees.map(Double.init)
-        dynamicTrianglePlaying = canvas?.isSelectedDynamicIsoscelesTrianglePlaying ?? false
     }
 }
