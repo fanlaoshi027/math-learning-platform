@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,6 +45,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-macOS-dmg
+          name: Mosuan-Board-0.1.0.dmg
           path: dist/Mosuan-Board-0.1.0.dmg
           if-no-files-found: error
