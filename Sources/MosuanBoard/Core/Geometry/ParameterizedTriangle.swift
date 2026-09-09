@@ -65,6 +65,17 @@ struct ParameterizedTriangle: Codable, Equatable, Identifiable {
         }
     }
 
+    /// Position of the orange apex-angle control point.
+    func angleControlPoint(radius: CGFloat = 58) -> CGPoint {
+        let r = max(8, radius)
+        let c = cos(rotation)
+        let s = sin(rotation)
+        return CGPoint(
+            x: anchor.x - r * s,
+            y: anchor.y + r * c
+        )
+    }
+
     mutating func setApexAngle(_ degrees: CGFloat) {
         guard !lockedApexAngle else { return }
         let newAngle = Self.clampAngle(degrees)
@@ -75,7 +86,6 @@ struct ParameterizedTriangle: Codable, Equatable, Identifiable {
             legLength = max(1, baseLength)
         case .isosceles:
             if lockedBaseLength && lockedLegLength {
-                // Both lengths determine the apex angle; neither can be moved.
                 apexAngleDegrees = Self.angleFor(base: baseLength, leg: legLength)
             } else if lockedBaseLength {
                 apexAngleDegrees = newAngle
