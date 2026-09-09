@@ -30,6 +30,7 @@ struct DynamicAngleParameterPanel: View {
             Slider(value: $degrees, in: minimum...maximum, step: normalizedStep)
                 .accessibilityLabel("动态角度")
                 .accessibilityValue("\(degrees, specifier: "%.0f")度")
+                .disabled(isPlaying)
 
             HStack(spacing: 6) {
                 Text("范围")
@@ -63,6 +64,11 @@ struct DynamicAngleParameterPanel: View {
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(.quaternary, lineWidth: 1)
+        }
+        .onDisappear {
+            if isPlaying {
+                onPlayPause?()
+            }
         }
     }
 }
