@@ -7,6 +7,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  diagnose-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner diagnostic
+        run: |
+          echo "GitHub Actions runner started successfully"
+          uname -a
+          echo "Architecture: $(uname -m)"
+
   build-macos:
     runs-on: macos-26-intel
     steps:
