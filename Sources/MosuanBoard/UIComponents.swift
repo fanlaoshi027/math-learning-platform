@@ -133,12 +133,13 @@ struct MetalInkCanvas: NSViewRepresentable {
     }
 
     private func configure(_ view: InkMetalView) {
-        view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine || tool == .polygon || tool == .dynamicAngle
+        // Dynamic angle currently owns its input through a SwiftUI overlay.
+        // Keeping it out of InkMetalView preserves the existing Metal input path.
+        view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine || tool == .polygon
         view.isSelectionTool = tool == .select
         view.isLineTool = tool == .line
         view.isSmartLineTool = tool == .smartLine
         view.isPolygonTool = tool == .polygon
-        view.isDynamicAngleTool = tool == .dynamicAngle
         view.isEraserTool = tool == .eraser
         view.penStyle = penStyle
         view.boardBackground = background
