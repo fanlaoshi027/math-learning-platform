@@ -58,7 +58,14 @@ struct BoardScreen: View {
                                 degrees: Binding(
                                     get: { degrees },
                                     set: { controller.setDynamicTriangleDegrees($0) }
-                                )
+                                ),
+                                onPlaybackChanged: { playing in
+                                    if playing {
+                                        controller.beginDynamicTrianglePlaybackHistory()
+                                    } else {
+                                        controller.endDynamicTrianglePlaybackHistory()
+                                    }
+                                }
                             )
                             .frame(width: 280)
                             .padding(16)
