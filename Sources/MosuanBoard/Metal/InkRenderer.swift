@@ -33,7 +33,6 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var pasteCascadeIndex = 0
     private var lastClipboardPayloadData: Data?
     private var dynamicAngleAnimationDriver = GeometryParameterAnimationDriver()
-    private var dynamicTriangleAnimationDriver = GeometryParameterAnimationDriver()
     private var animationTimer: Timer?
     private weak var attachedView: MTKView?
 
@@ -73,14 +72,14 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func resetZoom(centeredIn size: CGSize) { zoomScale = 1; panOffset = SIMD2(Float(size.width / 2), Float(size.height / 2)); rebuildGeometry() }
 
     func exportPageState() -> CanvasPageState { CanvasPageState(strokes: committedStrokes.map { CanvasStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }, objects: objectStore.exportObjects()) }
-    func importPageState(_ state: CanvasPageState) { stopAllDynamicAnimations(); committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }; objectStore.importObjects(state.objects); activeStroke = []; selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; undoStack = []; redoStack = []; transactionStart = nil; pasteCascadeIndex = 0; lastClipboardPayloadData = nil; rebuildGeometry() }
+    func importPageState(_ state: CanvasPageState) { stopAllDynamicAngleAnimations(); committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }; objectStore.importObjects(state.objects); activeStroke = []; selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; undoStack = []; redoStack = []; transactionStart = nil; pasteCascadeIndex = 0; lastClipboardPayloadData = nil; rebuildGeometry() }
     func beginHistoryTransaction() { if transactionStart == nil { transactionStart = captureState() } }
     func endHistoryTransaction() { guard let before = transactionStart else { return }; transactionStart = nil; let after = captureState(); if before.strokes != after.strokes || before.objects != after.objects || before.selection != after.selection || before.objectSelection != after.objectSelection { undoStack.append(before); redoStack.removeAll() } }
     private func recordMutation() { guard transactionStart == nil else { return }; undoStack.append(captureState()); redoStack.removeAll() }
     private func captureState() -> HistoryState { HistoryState(strokes: committedStrokes, objects: objectStore.exportObjects(), selection: selectedStrokeIndices, objectSelection: selectedObjectIDs) }
     private func restore(_ state: HistoryState) { committedStrokes = state.strokes; objectStore.importObjects(state.objects); selectedStrokeIndices = state.selection.filter { committedStrokes.indices.contains($0) }; selectedObjectIDs = state.objectSelection.filter { objectStore.object(with: $0) != nil }; customRotationCenter = nil; rebuildGeometry() }
-    func undo() { stopAllDynamicAnimations(); guard let state = undoStack.popLast() else { return }; redoStack.append(captureState()); restore(state) }
-    func redo() { stopAllDynamicAnimations(); guard let state = redoStack.popLast() else { return }; undoStack.append(captureState()); restore(state) }
+    func undo() { guard let state = undoStack.popLast() else { return }; redoStack.append(captureState()); restore(state) }
+    func redo() { guard let state = redoStack.popLast() else { return }; undoStack.append(captureState()); restore(state) }
 
     func commitStroke(_ points: [InkPoint]) { guard points.count >= 2 else { activeStroke = []; rebuildGeometry(); return }; recordMutation(); committedStrokes.append(StoredStroke(id: UUID(), points: points, style: penStyle)); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
     func commitLine(from start: SIMD2<Float>, to end: SIMD2<Float>) { recordMutation(); let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0); _ = objectStore.addLine(from: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)), to: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)), style: style); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
@@ -102,94 +101,31 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func selectedDynamicAngleDegrees() -> CGFloat? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return nil }; return objectStore.dynamicAngleParameter(id: id)?.value }
     @discardableResult func setSelectedDynamicAngleDegrees(_ degrees: CGFloat) -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; guard objectStore.setDynamicAngle(id: id, degrees: degrees) else { return false }; rebuildGeometry(); return true }
     func isSelectedDynamicAnglePlaying() -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let parameter = objectStore.dynamicAngleParameter(id: id) else { return false }; return dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) }
-    func toggleSelectedDynamicAnglePlayback() { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let parameter = objectStore.dynamicAngleParameter(id: id) else { return }; if dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) { dynamicAngleAnimationDriver.stop(parameterID: parameter.id); finishAnimationHistoryIfNeeded() } else { beginHistoryTransaction(); dynamicAngleAnimationDriver.toggle(parameterID: parameter.id); startAnimationTimerIfNeeded() }; rebuildGeometry() }
-    func stopAllDynamicAngleAnimations() { dynamicAngleAnimationDriver.stopAll(); finishAnimationHistoryIfNeeded() }
-
-    // MARK: - Shared animation loop
-    private func startAnimationTimerIfNeeded() {
-        guard animationTimer == nil else { return }
-        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in
-            guard let self else { timer.invalidate(); return }
-            self.advanceAnimations(deltaTime: 1.0 / 30.0)
-        }
-        animationTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
-    }
-
-    private func advanceAnimations(deltaTime: CGFloat) {
-        var changed = false
-        for object in objectStore.objects where object.kind == .dynamicAngle {
-            guard var dynamic = object.dynamicAngleModel, let parameter = dynamic.parameter, dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) else { continue }
-            dynamicAngleAnimationDriver.advance(model: &dynamic.model, deltaTime: deltaTime)
-            if let value = dynamic.model.parameter(id: parameter.id)?.value, objectStore.setDynamicAngle(id: object.id, degrees: value) { changed = true }
-        }
-        for object in objectStore.objects where object.kind == .parameterizedTriangle {
-            guard let model = object.triangleModel else { continue }
-            let parameterID = UUID(uuidString: "00000000-0000-0000-0000-000000000000") ?? UUID()
-            _ = model
-            _ = parameterID
-        }
-        if changed { rebuildGeometry(); attachedView?.draw() }
-        let anglePlaying = dynamicAngleAnimationDriver.isPlayingAny
-        let trianglePlaying = dynamicTriangleAnimationDriver.isPlayingAny
-        if !anglePlaying && !trianglePlaying {
-            animationTimer?.invalidate(); animationTimer = nil
-            finishAnimationHistoryIfNeeded()
-        }
-    }
-
-    private func finishAnimationHistoryIfNeeded() {
-        if !dynamicAngleAnimationDriver.isPlayingAny && !dynamicTriangleAnimationDriver.isPlayingAny {
-            endHistoryTransaction()
-            animationTimer?.invalidate()
-            animationTimer = nil
-        }
-    }
+    func toggleSelectedDynamicAnglePlayback() { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let parameter = objectStore.dynamicAngleParameter(id: id) else { return }; dynamicAngleAnimationDriver.toggle(parameterID: parameter.id); if dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) { startAnimationTimerIfNeeded() } else if !dynamicAngleAnimationDriver.isPlayingAny { animationTimer?.invalidate(); animationTimer = nil }; rebuildGeometry() }
+    func stopAllDynamicAngleAnimations() { dynamicAngleAnimationDriver.stopAll(); animationTimer?.invalidate(); animationTimer = nil }
+    private func startAnimationTimerIfNeeded() { guard animationTimer == nil else { return }; let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in guard let self else { timer.invalidate(); return }; self.advanceDynamicAngleAnimation(deltaTime: 1.0 / 30.0) }; animationTimer = timer; RunLoop.main.add(timer, forMode: .common) }
+    private func advanceDynamicAngleAnimation(deltaTime: CGFloat) { var changed = false; for object in objectStore.objects where object.kind == .dynamicAngle { guard var dynamic = object.dynamicAngleModel, let parameter = dynamic.parameter, dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) else { continue }; dynamicAngleAnimationDriver.advance(model: &dynamic.model, deltaTime: deltaTime); guard let value = dynamic.model.parameter(id: parameter.id)?.value else { continue }; if objectStore.setDynamicAngle(id: object.id, degrees: value) { changed = true } }; if changed { rebuildGeometry(); attachedView?.draw() }; if !dynamicAngleAnimationDriver.isPlayingAny { animationTimer?.invalidate(); animationTimer = nil } }
 
     // MARK: - Dynamic isosceles triangle
     @discardableResult func commitDynamicIsoscelesTriangle(at viewPoint: SIMD2<Float>, apexAngleDegrees: CGFloat = 60) -> UUID {
-        let canvas = canvasPoint(from: viewPoint); recordMutation()
+        let canvas = canvasPoint(from: viewPoint)
+        recordMutation()
         let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0)
         let id = objectStore.addDynamicIsoscelesTriangle(anchor: CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), legLength: 150 / CGFloat(zoomScale), apexAngleDegrees: apexAngleDegrees, minimum: 30, maximum: 150, step: 1, style: style)
-        selectedStrokeIndices = []; selectedObjectIDs = [id]; activeStroke = []; rebuildGeometry(); return id
+        selectedStrokeIndices = []
+        selectedObjectIDs = [id]
+        activeStroke = []
+        rebuildGeometry()
+        return id
     }
     func selectedDynamicIsoscelesTriangleDegrees() -> CGFloat? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return nil }; return objectStore.triangleParameter(id: id) }
     @discardableResult func setSelectedDynamicIsoscelesTriangleDegrees(_ degrees: CGFloat) -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; guard objectStore.setDynamicTriangleAngle(id: id, degrees: degrees) else { return false }; rebuildGeometry(); return true }
-    func isSelectedDynamicIsoscelesTrianglePlaying() -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; return dynamicTriangleAnimationDriver.isPlaying(parameterID: id) }
-    func toggleSelectedDynamicIsoscelesTrianglePlayback() {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
-        if dynamicTriangleAnimationDriver.isPlaying(parameterID: id) {
-            dynamicTriangleAnimationDriver.stop(parameterID: id)
-            finishAnimationHistoryIfNeeded()
-        } else {
-            beginHistoryTransaction()
-            dynamicTriangleAnimationDriver.toggle(parameterID: id)
-            startAnimationTimerIfNeeded()
-        }
-        rebuildGeometry()
-    }
-    func stopAllDynamicIsoscelesTriangleAnimations() { dynamicTriangleAnimationDriver.stopAll(); finishAnimationHistoryIfNeeded() }
-    private func advanceDynamicTriangleAnimation(deltaTime: CGFloat) {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, var object = objectStore.object(with: id), object.kind == .parameterizedTriangle, var model = object.triangleModel, dynamicTriangleAnimationDriver.isPlaying(parameterID: id) else { return }
-        let current = model.apexAngleDegrees
-        let direction: CGFloat = current >= 150 ? -1 : current <= 30 ? 1 : 1
-        let next = max(30, min(150, current + direction))
-        if next != current { model.setApexAngle(next); if objectStore.updateTriangleModel(id: id, { $0 = model }) { rebuildGeometry(); attachedView?.draw() } }
-        _ = deltaTime
-    }
-
-    @discardableResult func dynamicIsoscelesTriangleControlPoint(at point: SIMD2<Float>, tolerance: Float = 18) -> UUID? {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, let model = object.triangleModel else { return nil }
-        let raw = transformPoint(model.angleControlPoint(), by: object.transform); let handle = viewPoint(from: SIMD2(Float(raw.x), Float(raw.y))); return simd_distance(point, handle) <= tolerance ? id : nil
-    }
-    @discardableResult func moveDynamicIsoscelesTriangleControlPoint(id: UUID, to point: SIMD2<Float>) -> Bool {
-        guard let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, var model = object.triangleModel else { return false }
-        let canvas = canvasPoint(from: point); let raw = inverseTransformPoint(CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), by: object.transform); let dx = raw.x - model.anchor.x; let dy = raw.y - model.anchor.y; let c = cos(model.rotation); let s = sin(model.rotation); let localX = dx * c + dy * s; let localY = -dx * s + dy * c; guard hypot(localX, localY) > 0.001 else { return false }; let degrees = 2 * atan2(abs(localX), max(0.001, localY)) * 180 / .pi; model.setApexAngle(max(30, min(150, degrees))); guard objectStore.updateTriangleModel(id: id, { $0 = model }) else { return false }; rebuildGeometry(); return true
-    }
+    @discardableResult func dynamicIsoscelesTriangleControlPoint(at point: SIMD2<Float>, tolerance: Float = 18) -> UUID? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, let model = object.triangleModel else { return nil }; let p = canvasPoint(from: point); let raw = transformPoint(model.angleControlPoint(), by: object.transform); let handle = viewPoint(from: SIMD2(Float(raw.x), Float(raw.y))); return simd_distance(point, handle) <= tolerance ? id : nil }
+    @discardableResult func moveDynamicIsoscelesTriangleControlPoint(id: UUID, to point: SIMD2<Float>) -> Bool { guard let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, var model = object.triangleModel else { return false }; let canvas = canvasPoint(from: point); let raw = inverseTransformPoint(CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), by: object.transform); let dx = raw.x - model.anchor.x; let dy = raw.y - model.anchor.y; let c = cos(model.rotation); let s = sin(model.rotation); let localX = dx * c + dy * s; let localY = -dx * s + dy * c; guard hypot(localX, localY) > 0.001 else { return false }; let degrees = 2 * atan2(abs(localX), max(0.001, localY)) * 180 / .pi; model.setApexAngle(max(30, min(150, degrees))); guard objectStore.updateTriangleModel(id: id, { $0 = model }) else { return false }; rebuildGeometry(); return true }
     private func transformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let c = transform.rotationCenter; let t = CGPoint(x: point.x - c.x, y: point.y - c.y); let s = CGPoint(x: t.x * transform.scale.width, y: t.y * transform.scale.height); let co = cos(transform.rotation), si = sin(transform.rotation); return CGPoint(x: s.x * co - s.y * si + c.x + transform.position.x, y: s.x * si + s.y * co + c.y + transform.position.y) }
     private func inverseTransformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let p = CGPoint(x: point.x - transform.position.x - transform.rotationCenter.x, y: point.y - transform.position.y - transform.rotationCenter.y); let co = cos(transform.rotation), si = sin(transform.rotation); let rx = p.x * co + p.y * si; let ry = -p.x * si + p.y * co; let sx = abs(transform.scale.width) > 0.0001 ? rx / transform.scale.width : rx; let sy = abs(transform.scale.height) > 0.0001 ? ry / transform.scale.height : ry; return CGPoint(x: sx + transform.rotationCenter.x, y: sy + transform.rotationCenter.y) }
 
-    // MARK: - Remaining canvas operations
+    // MARK: - Clipboard and selection
     func makeSelectionClipboardData() -> Data? { let strokes = selectedStrokeIndices.compactMap { index -> CanvasStroke? in guard committedStrokes.indices.contains(index) else { return nil }; let stroke = committedStrokes[index]; return CanvasStroke(id: stroke.id, points: stroke.points, style: stroke.style, rotation: stroke.rotation) }; let objects = selectedObjectIDs.compactMap { objectStore.object(with: $0) }; let payload = SelectionClipboardPayload(strokes: strokes, objects: objects); guard !payload.isEmpty, let data = try? JSONEncoder().encode(payload) else { return nil }; pasteCascadeIndex = 0; lastClipboardPayloadData = data; return data }
     @discardableResult func pasteSelectionClipboardData(_ data: Data) -> Bool { guard let payload = try? JSONDecoder().decode(SelectionClipboardPayload.self, from: data), payload.version == SelectionClipboardPayload.currentVersion, !payload.isEmpty else { return false }; if lastClipboardPayloadData != data { pasteCascadeIndex = 0; lastClipboardPayloadData = data }; pasteCascadeIndex += 1; let screenOffset: Float = 24; let canvasOffset = screenOffset / max(zoomScale, 0.001); let delta = CGPoint(x: CGFloat(canvasOffset * Float(pasteCascadeIndex)), y: CGFloat(canvasOffset * Float(pasteCascadeIndex))); recordMutation(); let strokeStartIndex = committedStrokes.count; for stroke in payload.strokes { let shiftedPoints = stroke.points.map { InkPoint(x: $0.x + Float(delta.x), y: $0.y + Float(delta.y), pressure: $0.pressure) }; committedStrokes.append(StoredStroke(id: UUID(), points: shiftedPoints, style: stroke.style, rotation: stroke.rotation) ) }; var pastedObjectIDs: [UUID] = []; for object in payload.objects { let duplicated = duplicateObject(object, topLevelOffset: delta); pastedObjectIDs.append(duplicated.id); objectStore.update(duplicated) }; selectedStrokeIndices = Array(strokeStartIndex..<committedStrokes.count); selectedObjectIDs = pastedObjectIDs; customRotationCenter = nil; activeStroke = []; rebuildGeometry(); return true }
     private func duplicateObject(_ object: GraphicObject, topLevelOffset: CGPoint) -> GraphicObject { let children = object.children.map { duplicateObject($0, topLevelOffset: .zero) }; var transform = object.transform; transform.position.x += topLevelOffset.x; transform.position.y += topLevelOffset.y; return GraphicObject(id: UUID(), kind: object.kind, transform: transform, style: object.style, geometry: object.geometry, children: children) }
