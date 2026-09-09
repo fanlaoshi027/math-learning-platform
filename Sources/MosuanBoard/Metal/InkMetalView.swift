@@ -20,6 +20,7 @@ final class InkMetalView: MTKView {
     private var polygonVertexDrag: (id: UUID, vertexIndex: Int)?
     private var dynamicAngleDragID: UUID?
     private var dynamicIsoscelesTriangleDragID: UUID?
+    private var dynamicTrianglePlaybackHistoryActive = false
     private var rotationDrag = false
     private var rotationCenterDrag = false
     private var panDrag = false
@@ -93,6 +94,7 @@ final class InkMetalView: MTKView {
         polygonVertexDrag = nil
         dynamicAngleDragID = nil
         dynamicIsoscelesTriangleDragID = nil
+        dynamicTrianglePlaybackHistoryActive = false
         lassoActive = false
         lassoPoints.removeAll(keepingCapacity: true)
         lassoOverlay.update(points: [], visible: false)
@@ -110,7 +112,34 @@ final class InkMetalView: MTKView {
     func setSelectedDynamicAngleDegrees(_ d: CGFloat) { renderer.beginHistoryTransaction(); if renderer.setSelectedDynamicAngleDegrees(d) { renderer.endHistoryTransaction(); notifyState(); draw() } else { renderer.endHistoryTransaction() } }
     func toggleSelectedDynamicAnglePlayback() { renderer.toggleSelectedDynamicAnglePlayback(); onSelectionChanged?(); draw() }
     func stopDynamicAnglePlayback() { renderer.stopAllDynamicAngleAnimations(); onSelectionChanged?(); draw() }
-    func setSelectedDynamicIsoscelesTriangleDegrees(_ d: CGFloat) { renderer.beginHistoryTransaction(); if renderer.setSelectedDynamicIsoscelesTriangleDegrees(d) { renderer.endHistoryTransaction(); notifyState(); draw() } else { renderer.endHistoryTransaction() } }
+    func beginDynamicTrianglePlaybackHistory() {
+        guard !dynamicTrianglePlaybackHistoryActive else { return }
+        dynamicTrianglePlaybackHistoryActive = true
+        renderer.beginHistoryTransaction()
+    }
+    func endDynamicTrianglePlaybackHistory() {
+        guard dynamicTrianglePlaybackHistoryActive else { return }
+        dynamicTrianglePlaybackHistoryActive = false
+        renderer.endHistoryTransaction()
+        notifyState()
+        draw()
+    }
+    func setSelectedDynamicIsoscelesTriangleDegrees(_ d: CGFloat) {
+        let ownsTransaction = !dynamicTrianglePlaybackHistoryActive
+        if ownsTransaction { renderer.beginHistoryTransaction() }
+        if renderer.setSelectedDynamicIsoscelesTriangleDegrees(d) {
+            if ownsTransaction {
+                renderer.endHistoryTransaction()
+                notifyState()
+                draw()
+            } else {
+                onSelectionChanged?()
+                draw()
+            }
+        } else if ownsTransaction {
+            renderer.endHistoryTransaction()
+        }
+    }
     func scaleSelected(by factor: Float) { renderer.beginHistoryTransaction(); renderer.scaleSelected(by: factor); renderer.endHistoryTransaction(); notifyState(); draw() }
     func reflectSelected(horizontal: Bool) { renderer.beginHistoryTransaction(); renderer.reflectSelected(horizontal: horizontal); renderer.endHistoryTransaction(); notifyState(); draw() }
     func setRotationCenterToSelectionCenter() { if let c = renderer.selectionCenter() { renderer.setRotationCenter(to: renderer.viewPoint(from: c)); onSelectionChanged?(); draw() } }
@@ -353,7 +382,12 @@ final class InkMetalView: MTKView {
             active = false
             points.removeAll(keepingCapacity: true)
             renderer.setStroke([])
-            renderer.endHistoryTransaction()
+            if dynamicTrianglePlaybackHistoryActive {
+                dynamicTrianglePlaybackHistoryActive = false
+                renderer.endHistoryTransaction()
+            } else {
+                renderer.endHistoryTransaction()
+            }
             polygonModel.cancel()
             polygonVertexDrag = nil
             lineEndpointDrag = nil
