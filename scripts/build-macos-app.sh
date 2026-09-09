@@ -13,8 +13,7 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-# Keep the production source explicit about Float math in the dynamic-angle renderer.
-# This is a build-time safety net while the source is being normalized across branches.
+# Normalize the dynamic-angle renderer's trig/SIMD expressions before compilation.
 python3 - <<'PY'
 from pathlib import Path
 p = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
@@ -30,7 +29,16 @@ if old_current in s:
 p.write_text(s)
 PY
 
-swift build -c release
+BUILD_LOG="$ROOT_DIR/dist/swift-build.log"
+set +e
+swift build -c release 2>&1 | tee "$BUILD_LOG"
+BUILD_STATUS=${PIPESTATUS[0]}
+set -e
+if [ "$BUILD_STATUS" -ne 0 ]; then
+  echo "Swift build failed with status $BUILD_STATUS" >&2
+  exit "$BUILD_STATUS"
+fi
+
 BINARY="$ROOT_DIR/.build/release/MosuanBoard"
 if [ ! -x "$BINARY" ]; then
   echo "Release binary not found: $BINARY" >&2
