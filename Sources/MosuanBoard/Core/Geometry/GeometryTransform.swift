@@ -26,6 +26,11 @@ struct GeometryTranslation: Codable, Equatable, Identifiable {
     }
 }
 
+enum GeometryTranslationGuideLineStyle: String, Codable, CaseIterable {
+    case solid
+    case dashed
+}
+
 /// Controls whether a translation vector is shown as a teaching aid.
 /// The guide is visual-only and never becomes part of the geometry constraint graph.
 enum GeometryTranslationGuideMode: String, Codable, CaseIterable {
@@ -41,14 +46,14 @@ struct GeometryTranslationGuide: Codable, Equatable, Identifiable {
     let id: UUID
     var sourcePointID: UUID
     var mode: GeometryTranslationGuideMode
-    var lineStyle: GeometryLineStyle
+    var lineStyle: GeometryTranslationGuideLineStyle
     var arrowAtEnd: Bool
 
     init(
         id: UUID = UUID(),
         sourcePointID: UUID,
         mode: GeometryTranslationGuideMode = .vectorAndDistance,
-        lineStyle: GeometryLineStyle = .dashed,
+        lineStyle: GeometryTranslationGuideLineStyle = .dashed,
         arrowAtEnd: Bool = true
     ) {
         self.id = id
