@@ -16,5 +16,19 @@ jobs:
       - name: Select Swift toolchain
         run: swift --version
 
-      - name: Build
-        run: swift build -c release
+      - name: Build app bundle and DMG
+        run: bash scripts/build-macos-app.sh
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-macOS-app
+          path: dist/Mosuan Board.app
+          if-no-files-found: error
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-macOS-dmg
+          path: dist/Mosuan-Board-0.1.0.dmg
+          if-no-files-found: error
