@@ -19,6 +19,7 @@ final class InkMetalView: MTKView {
     private var lineEndpointDrag: (id: UUID, endpoint: Int)?
     private var polygonVertexDrag: (id: UUID, vertexIndex: Int)?
     private var dynamicAngleDragID: UUID?
+    private var dynamicIsoscelesTriangleDragID: UUID?
     private var rotationDrag = false
     private var rotationCenterDrag = false
     private var panDrag = false
@@ -36,6 +37,7 @@ final class InkMetalView: MTKView {
     var isSmartLineTool = false
     var isPolygonTool = false
     var isDynamicAngleTool = false
+    var isDynamicIsoscelesTriangleTool = false
     var isEraserTool = false
     var backgroundPattern = 0 { didSet { renderer.setBackgroundPattern(backgroundPattern) } }
     var onHistoryChanged: (() -> Void)?
@@ -52,6 +54,7 @@ final class InkMetalView: MTKView {
     var selectedRotationDegrees: Double { renderer.selectedRotationDegrees }
     var selectedDynamicAngleDegrees: CGFloat? { renderer.selectedDynamicAngleDegrees() }
     var isSelectedDynamicAnglePlaying: Bool { renderer.isSelectedDynamicAnglePlaying() }
+    var selectedDynamicIsoscelesTriangleDegrees: CGFloat? { renderer.selectedDynamicIsoscelesTriangleDegrees() }
     var zoomPercent: Int { renderer.zoomPercent }
     var selectionBoundsInView: CGRect? { renderer.selectionBoundsInView() }
     override var isFlipped: Bool { true }
@@ -89,6 +92,7 @@ final class InkMetalView: MTKView {
         polygonModel.cancel()
         polygonVertexDrag = nil
         dynamicAngleDragID = nil
+        dynamicIsoscelesTriangleDragID = nil
         lassoActive = false
         lassoPoints.removeAll(keepingCapacity: true)
         lassoOverlay.update(points: [], visible: false)
@@ -106,6 +110,7 @@ final class InkMetalView: MTKView {
     func setSelectedDynamicAngleDegrees(_ d: CGFloat) { renderer.beginHistoryTransaction(); if renderer.setSelectedDynamicAngleDegrees(d) { renderer.endHistoryTransaction(); notifyState(); draw() } else { renderer.endHistoryTransaction() } }
     func toggleSelectedDynamicAnglePlayback() { renderer.toggleSelectedDynamicAnglePlayback(); onSelectionChanged?(); draw() }
     func stopDynamicAnglePlayback() { renderer.stopAllDynamicAngleAnimations(); onSelectionChanged?(); draw() }
+    func setSelectedDynamicIsoscelesTriangleDegrees(_ d: CGFloat) { renderer.beginHistoryTransaction(); if renderer.setSelectedDynamicIsoscelesTriangleDegrees(d) { renderer.endHistoryTransaction(); notifyState(); draw() } else { renderer.endHistoryTransaction() } }
     func scaleSelected(by factor: Float) { renderer.beginHistoryTransaction(); renderer.scaleSelected(by: factor); renderer.endHistoryTransaction(); notifyState(); draw() }
     func reflectSelected(horizontal: Bool) { renderer.beginHistoryTransaction(); renderer.reflectSelected(horizontal: horizontal); renderer.endHistoryTransaction(); notifyState(); draw() }
     func setRotationCenterToSelectionCenter() { if let c = renderer.selectionCenter() { renderer.setRotationCenter(to: renderer.viewPoint(from: c)); onSelectionChanged?(); draw() } }
@@ -154,11 +159,21 @@ final class InkMetalView: MTKView {
             draw()
             return
         }
+        if isDynamicIsoscelesTriangleTool && !selectionModeActive {
+            renderer.beginHistoryTransaction()
+            dynamicIsoscelesTriangleDragID = renderer.commitDynamicIsoscelesTriangle(at: p)
+            active = true
+            lastPoint = p
+            onSelectionChanged?()
+            draw()
+            return
+        }
         if isPolygonTool && !selectionModeActive { handlePolygonClick(at: p); return }
         guard !isPolygonTool else { return }
 
         if selectionModeActive {
             if let dynamicID = renderer.dynamicAngleEndpoint(at: p) { renderer.beginHistoryTransaction(); dynamicAngleDragID = dynamicID; return }
+            if let triangleID = renderer.dynamicIsoscelesTriangleControlPoint(at: p) { renderer.beginHistoryTransaction(); dynamicIsoscelesTriangleDragID = triangleID; return }
             if let vertex = renderer.polygonVertex(at: p) { renderer.beginHistoryTransaction(); polygonVertexDrag = vertex; return }
             if let endpoint = renderer.lineEndpoint(at: p) { renderer.beginHistoryTransaction(); lineEndpointDrag = endpoint; return }
             if renderer.rotationCenterHandle(at: p) { renderer.beginHistoryTransaction(); rotationCenterDrag = true; return }
@@ -203,6 +218,9 @@ final class InkMetalView: MTKView {
         if isDynamicAngleTool || dynamicAngleDragID != nil {
             if let id = dynamicAngleDragID { _ = renderer.moveDynamicAngleEndpoint(id: id, to: p); onSelectionChanged?(); draw(); return }
         }
+        if isDynamicIsoscelesTriangleTool || dynamicIsoscelesTriangleDragID != nil {
+            if let id = dynamicIsoscelesTriangleDragID { _ = renderer.moveDynamicIsoscelesTriangleControlPoint(id: id, to: p); onSelectionChanged?(); draw(); return }
+        }
         if isPolygonTool { return }
         if selectionModeActive {
             if let vertex = polygonVertexDrag { _ = renderer.moveSelectedPolygonVertex(id: vertex.id, vertexIndex: vertex.vertexIndex, to: p); onSelectionChanged?(); draw(); return }
@@ -238,6 +256,14 @@ final class InkMetalView: MTKView {
             draw()
             return
         }
+        if isDynamicIsoscelesTriangleTool || dynamicIsoscelesTriangleDragID != nil {
+            dynamicIsoscelesTriangleDragID = nil
+            active = false
+            renderer.endHistoryTransaction()
+            notifyState()
+            draw()
+            return
+        }
         if isPolygonTool { return }
         if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); eraseAlongPath(eraserPoints); eraserPoints.removeAll(keepingCapacity: true); renderer.endHistoryTransaction(); notifyState(); return }
 
@@ -257,6 +283,7 @@ final class InkMetalView: MTKView {
             }
             polygonVertexDrag = nil
             lineEndpointDrag = nil
+            dynamicIsoscelesTriangleDragID = nil
             rotationCenterDrag = false
             rotationDrag = false
             resizeHandle = nil
@@ -331,6 +358,7 @@ final class InkMetalView: MTKView {
             polygonVertexDrag = nil
             lineEndpointDrag = nil
             dynamicAngleDragID = nil
+            dynamicIsoscelesTriangleDragID = nil
             lassoActive = false
             lassoPoints.removeAll(keepingCapacity: true)
             lassoOverlay.update(points: [], visible: false)
