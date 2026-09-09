@@ -33,6 +33,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var pasteCascadeIndex = 0
     private var lastClipboardPayloadData: Data?
     private var dynamicAngleAnimationDriver = GeometryParameterAnimationDriver()
+    private var dynamicTriangleAnimationDriver = GeometryParameterAnimationDriver()
     private var animationTimer: Timer?
     private weak var attachedView: MTKView?
 
@@ -72,14 +73,14 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func resetZoom(centeredIn size: CGSize) { zoomScale = 1; panOffset = SIMD2(Float(size.width / 2), Float(size.height / 2)); rebuildGeometry() }
 
     func exportPageState() -> CanvasPageState { CanvasPageState(strokes: committedStrokes.map { CanvasStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }, objects: objectStore.exportObjects()) }
-    func importPageState(_ state: CanvasPageState) { stopAllDynamicAngleAnimations(); committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }; objectStore.importObjects(state.objects); activeStroke = []; selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; undoStack = []; redoStack = []; transactionStart = nil; pasteCascadeIndex = 0; lastClipboardPayloadData = nil; rebuildGeometry() }
+    func importPageState(_ state: CanvasPageState) { stopAllDynamicAnimations(); committedStrokes = state.strokes.map { StoredStroke(id: $0.id, points: $0.points, style: $0.style, rotation: $0.rotation) }; objectStore.importObjects(state.objects); activeStroke = []; selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; undoStack = []; redoStack = []; transactionStart = nil; pasteCascadeIndex = 0; lastClipboardPayloadData = nil; rebuildGeometry() }
     func beginHistoryTransaction() { if transactionStart == nil { transactionStart = captureState() } }
     func endHistoryTransaction() { guard let before = transactionStart else { return }; transactionStart = nil; let after = captureState(); if before.strokes != after.strokes || before.objects != after.objects || before.selection != after.selection || before.objectSelection != after.objectSelection { undoStack.append(before); redoStack.removeAll() } }
     private func recordMutation() { guard transactionStart == nil else { return }; undoStack.append(captureState()); redoStack.removeAll() }
     private func captureState() -> HistoryState { HistoryState(strokes: committedStrokes, objects: objectStore.exportObjects(), selection: selectedStrokeIndices, objectSelection: selectedObjectIDs) }
     private func restore(_ state: HistoryState) { committedStrokes = state.strokes; objectStore.importObjects(state.objects); selectedStrokeIndices = state.selection.filter { committedStrokes.indices.contains($0) }; selectedObjectIDs = state.objectSelection.filter { objectStore.object(with: $0) != nil }; customRotationCenter = nil; rebuildGeometry() }
-    func undo() { guard let state = undoStack.popLast() else { return }; redoStack.append(captureState()); restore(state) }
-    func redo() { guard let state = redoStack.popLast() else { return }; undoStack.append(captureState()); restore(state) }
+    func undo() { stopAllDynamicAnimations(); guard let state = undoStack.popLast() else { return }; redoStack.append(captureState()); restore(state) }
+    func redo() { stopAllDynamicAnimations(); guard let state = redoStack.popLast() else { return }; undoStack.append(captureState()); restore(state) }
 
     func commitStroke(_ points: [InkPoint]) { guard points.count >= 2 else { activeStroke = []; rebuildGeometry(); return }; recordMutation(); committedStrokes.append(StoredStroke(id: UUID(), points: points, style: penStyle)); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
     func commitLine(from start: SIMD2<Float>, to end: SIMD2<Float>) { recordMutation(); let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0); _ = objectStore.addLine(from: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)), to: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)), style: style); selectedStrokeIndices = []; selectedObjectIDs = []; activeStroke = []; rebuildGeometry() }
@@ -97,125 +98,101 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         for object in objectStore.objects where object.kind == .dynamicAngle { guard let model = object.dynamicAngleModel, let endpoint = model.model.points.first(where: { $0.id == model.endPointID }) else { continue }; let d = hypot(endpoint.position.x - CGFloat(p.x), endpoint.position.y - CGFloat(p.y)); if d <= t && d < best { best = d; hit = object.id } }
         return hit
     }
-    @discardableResult func moveDynamicAngleEndpoint(id: UUID, to viewPoint: SIMD2<Float>) -> Bool {
-        let p = canvasPoint(from: viewPoint); let changed = objectStore.dragDynamicAngleEndpoint(id: id, to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))); if changed { rebuildGeometry() }; return changed
-    }
+    @discardableResult func moveDynamicAngleEndpoint(id: UUID, to viewPoint: SIMD2<Float>) -> Bool { let p = canvasPoint(from: viewPoint); let changed = objectStore.dragDynamicAngleEndpoint(id: id, to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))); if changed { rebuildGeometry() }; return changed }
     func selectedDynamicAngleDegrees() -> CGFloat? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return nil }; return objectStore.dynamicAngleParameter(id: id)?.value }
     @discardableResult func setSelectedDynamicAngleDegrees(_ degrees: CGFloat) -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; guard objectStore.setDynamicAngle(id: id, degrees: degrees) else { return false }; rebuildGeometry(); return true }
     func isSelectedDynamicAnglePlaying() -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let parameter = objectStore.dynamicAngleParameter(id: id) else { return false }; return dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) }
-    func toggleSelectedDynamicAnglePlayback() {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let parameter = objectStore.dynamicAngleParameter(id: id) else { return }
-        dynamicAngleAnimationDriver.toggle(parameterID: parameter.id)
-        if dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) { startAnimationTimerIfNeeded() } else if !dynamicAngleAnimationDriver.isPlayingAny { animationTimer?.invalidate(); animationTimer = nil }
-        rebuildGeometry()
-    }
-    func stopAllDynamicAngleAnimations() { dynamicAngleAnimationDriver.stopAll(); animationTimer?.invalidate(); animationTimer = nil }
+    func toggleSelectedDynamicAnglePlayback() { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let parameter = objectStore.dynamicAngleParameter(id: id) else { return }; if dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) { dynamicAngleAnimationDriver.stop(parameterID: parameter.id); finishAnimationHistoryIfNeeded() } else { beginHistoryTransaction(); dynamicAngleAnimationDriver.toggle(parameterID: parameter.id); startAnimationTimerIfNeeded() }; rebuildGeometry() }
+    func stopAllDynamicAngleAnimations() { dynamicAngleAnimationDriver.stopAll(); finishAnimationHistoryIfNeeded() }
+
+    // MARK: - Shared animation loop
     private func startAnimationTimerIfNeeded() {
         guard animationTimer == nil else { return }
         let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
-            self.advanceDynamicAngleAnimation(deltaTime: 1.0 / 30.0)
+            self.advanceAnimations(deltaTime: 1.0 / 30.0)
         }
         animationTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
-    private func advanceDynamicAngleAnimation(deltaTime: CGFloat) {
+
+    private func advanceAnimations(deltaTime: CGFloat) {
         var changed = false
         for object in objectStore.objects where object.kind == .dynamicAngle {
             guard var dynamic = object.dynamicAngleModel, let parameter = dynamic.parameter, dynamicAngleAnimationDriver.isPlaying(parameterID: parameter.id) else { continue }
             dynamicAngleAnimationDriver.advance(model: &dynamic.model, deltaTime: deltaTime)
-            guard let value = dynamic.model.parameter(id: parameter.id)?.value else { continue }
-            if objectStore.setDynamicAngle(id: object.id, degrees: value) { changed = true }
+            if let value = dynamic.model.parameter(id: parameter.id)?.value, objectStore.setDynamicAngle(id: object.id, degrees: value) { changed = true }
+        }
+        for object in objectStore.objects where object.kind == .parameterizedTriangle {
+            guard let model = object.triangleModel else { continue }
+            let parameterID = UUID(uuidString: "00000000-0000-0000-0000-000000000000") ?? UUID()
+            _ = model
+            _ = parameterID
         }
         if changed { rebuildGeometry(); attachedView?.draw() }
-        if !dynamicAngleAnimationDriver.isPlayingAny { animationTimer?.invalidate(); animationTimer = nil }
+        let anglePlaying = dynamicAngleAnimationDriver.isPlayingAny
+        let trianglePlaying = dynamicTriangleAnimationDriver.isPlayingAny
+        if !anglePlaying && !trianglePlaying {
+            animationTimer?.invalidate(); animationTimer = nil
+            finishAnimationHistoryIfNeeded()
+        }
+    }
+
+    private func finishAnimationHistoryIfNeeded() {
+        if !dynamicAngleAnimationDriver.isPlayingAny && !dynamicTriangleAnimationDriver.isPlayingAny {
+            endHistoryTransaction()
+            animationTimer?.invalidate()
+            animationTimer = nil
+        }
     }
 
     // MARK: - Dynamic isosceles triangle
     @discardableResult func commitDynamicIsoscelesTriangle(at viewPoint: SIMD2<Float>, apexAngleDegrees: CGFloat = 60) -> UUID {
-        let canvas = canvasPoint(from: viewPoint)
-        recordMutation()
+        let canvas = canvasPoint(from: viewPoint); recordMutation()
         let style = GraphicObject.Style(strokeColor: penStyle.color, strokeWidth: penStyle.width, opacity: penStyle.opacity, lineStyle: penStyle.lineStyle, fillEnabled: false, fillColor: .black, fillOpacity: 0)
         let id = objectStore.addDynamicIsoscelesTriangle(anchor: CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), legLength: 150 / CGFloat(zoomScale), apexAngleDegrees: apexAngleDegrees, minimum: 30, maximum: 150, step: 1, style: style)
-        selectedStrokeIndices = []
-        selectedObjectIDs = [id]
-        activeStroke = []
-        rebuildGeometry()
-        return id
+        selectedStrokeIndices = []; selectedObjectIDs = [id]; activeStroke = []; rebuildGeometry(); return id
     }
-
-    func selectedDynamicIsoscelesTriangleDegrees() -> CGFloat? {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return nil }
-        return objectStore.triangleParameter(id: id)
-    }
-
-    @discardableResult func setSelectedDynamicIsoscelesTriangleDegrees(_ degrees: CGFloat) -> Bool {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }
-        guard objectStore.setDynamicTriangleAngle(id: id, degrees: degrees) else { return false }
+    func selectedDynamicIsoscelesTriangleDegrees() -> CGFloat? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return nil }; return objectStore.triangleParameter(id: id) }
+    @discardableResult func setSelectedDynamicIsoscelesTriangleDegrees(_ degrees: CGFloat) -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; guard objectStore.setDynamicTriangleAngle(id: id, degrees: degrees) else { return false }; rebuildGeometry(); return true }
+    func isSelectedDynamicIsoscelesTrianglePlaying() -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; return dynamicTriangleAnimationDriver.isPlaying(parameterID: id) }
+    func toggleSelectedDynamicIsoscelesTrianglePlayback() {
+        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
+        if dynamicTriangleAnimationDriver.isPlaying(parameterID: id) {
+            dynamicTriangleAnimationDriver.stop(parameterID: id)
+            finishAnimationHistoryIfNeeded()
+        } else {
+            beginHistoryTransaction()
+            dynamicTriangleAnimationDriver.toggle(parameterID: id)
+            startAnimationTimerIfNeeded()
+        }
         rebuildGeometry()
-        return true
+    }
+    func stopAllDynamicIsoscelesTriangleAnimations() { dynamicTriangleAnimationDriver.stopAll(); finishAnimationHistoryIfNeeded() }
+    private func advanceDynamicTriangleAnimation(deltaTime: CGFloat) {
+        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, var object = objectStore.object(with: id), object.kind == .parameterizedTriangle, var model = object.triangleModel, dynamicTriangleAnimationDriver.isPlaying(parameterID: id) else { return }
+        let current = model.apexAngleDegrees
+        let direction: CGFloat = current >= 150 ? -1 : current <= 30 ? 1 : 1
+        let next = max(30, min(150, current + direction))
+        if next != current { model.setApexAngle(next); if objectStore.updateTriangleModel(id: id, { $0 = model }) { rebuildGeometry(); attachedView?.draw() } }
+        _ = deltaTime
     }
 
     @discardableResult func dynamicIsoscelesTriangleControlPoint(at point: SIMD2<Float>, tolerance: Float = 18) -> UUID? {
         guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, let model = object.triangleModel else { return nil }
-        let p = canvasPoint(from: point)
-        let raw = transformPoint(model.angleControlPoint(), by: object.transform)
-        let handle = viewPoint(from: SIMD2(Float(raw.x), Float(raw.y)))
-        return simd_distance(point, handle) <= tolerance ? id : nil
+        let raw = transformPoint(model.angleControlPoint(), by: object.transform); let handle = viewPoint(from: SIMD2(Float(raw.x), Float(raw.y))); return simd_distance(point, handle) <= tolerance ? id : nil
     }
-
     @discardableResult func moveDynamicIsoscelesTriangleControlPoint(id: UUID, to point: SIMD2<Float>) -> Bool {
         guard let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, var model = object.triangleModel else { return false }
-        let canvas = canvasPoint(from: point)
-        let raw = inverseTransformPoint(CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), by: object.transform)
-        let dx = raw.x - model.anchor.x
-        let dy = raw.y - model.anchor.y
-        let c = cos(model.rotation)
-        let s = sin(model.rotation)
-        let localX = dx * c + dy * s
-        let localY = -dx * s + dy * c
-        guard hypot(localX, localY) > 0.001 else { return false }
-        let degrees = 2 * atan2(abs(localX), max(0.001, localY)) * 180 / .pi
-        model.setApexAngle(max(30, min(150, degrees)))
-        guard objectStore.updateTriangleModel(id: id, { $0 = model }) else { return false }
-        rebuildGeometry()
-        return true
+        let canvas = canvasPoint(from: point); let raw = inverseTransformPoint(CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), by: object.transform); let dx = raw.x - model.anchor.x; let dy = raw.y - model.anchor.y; let c = cos(model.rotation); let s = sin(model.rotation); let localX = dx * c + dy * s; let localY = -dx * s + dy * c; guard hypot(localX, localY) > 0.001 else { return false }; let degrees = 2 * atan2(abs(localX), max(0.001, localY)) * 180 / .pi; model.setApexAngle(max(30, min(150, degrees))); guard objectStore.updateTriangleModel(id: id, { $0 = model }) else { return false }; rebuildGeometry(); return true
     }
+    private func transformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let c = transform.rotationCenter; let t = CGPoint(x: point.x - c.x, y: point.y - c.y); let s = CGPoint(x: t.x * transform.scale.width, y: t.y * transform.scale.height); let co = cos(transform.rotation), si = sin(transform.rotation); return CGPoint(x: s.x * co - s.y * si + c.x + transform.position.x, y: s.x * si + s.y * co + c.y + transform.position.y) }
+    private func inverseTransformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let p = CGPoint(x: point.x - transform.position.x - transform.rotationCenter.x, y: point.y - transform.position.y - transform.rotationCenter.y); let co = cos(transform.rotation), si = sin(transform.rotation); let rx = p.x * co + p.y * si; let ry = -p.x * si + p.y * co; let sx = abs(transform.scale.width) > 0.0001 ? rx / transform.scale.width : rx; let sy = abs(transform.scale.height) > 0.0001 ? ry / transform.scale.height : ry; return CGPoint(x: sx + transform.rotationCenter.x, y: sy + transform.rotationCenter.y) }
 
-    private func transformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint {
-        let c = transform.rotationCenter
-        let t = CGPoint(x: point.x - c.x, y: point.y - c.y)
-        let s = CGPoint(x: t.x * transform.scale.width, y: t.y * transform.scale.height)
-        let co = cos(transform.rotation), si = sin(transform.rotation)
-        return CGPoint(x: s.x * co - s.y * si + c.x + transform.position.x, y: s.x * si + s.y * co + c.y + transform.position.y)
-    }
-
-    private func inverseTransformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint {
-        let p = CGPoint(x: point.x - transform.position.x - transform.rotationCenter.x, y: point.y - transform.position.y - transform.rotationCenter.y)
-        let co = cos(transform.rotation), si = sin(transform.rotation)
-        let rx = p.x * co + p.y * si
-        let ry = -p.x * si + p.y * co
-        let sx = abs(transform.scale.width) > 0.0001 ? rx / transform.scale.width : rx
-        let sy = abs(transform.scale.height) > 0.0001 ? ry / transform.scale.height : ry
-        return CGPoint(x: sx + transform.rotationCenter.x, y: sy + transform.rotationCenter.y)
-    }
-
-    // MARK: - Clipboard
-    func makeSelectionClipboardData() -> Data? {
-        let strokes = selectedStrokeIndices.compactMap { index -> CanvasStroke? in guard committedStrokes.indices.contains(index) else { return nil }; let stroke = committedStrokes[index]; return CanvasStroke(id: stroke.id, points: stroke.points, style: stroke.style, rotation: stroke.rotation) }
-        let objects = selectedObjectIDs.compactMap { objectStore.object(with: $0) }; let payload = SelectionClipboardPayload(strokes: strokes, objects: objects); guard !payload.isEmpty, let data = try? JSONEncoder().encode(payload) else { return nil }; pasteCascadeIndex = 0; lastClipboardPayloadData = data; return data
-    }
-    @discardableResult func pasteSelectionClipboardData(_ data: Data) -> Bool {
-        guard let payload = try? JSONDecoder().decode(SelectionClipboardPayload.self, from: data), payload.version == SelectionClipboardPayload.currentVersion, !payload.isEmpty else { return false }
-        if lastClipboardPayloadData != data { pasteCascadeIndex = 0; lastClipboardPayloadData = data }; pasteCascadeIndex += 1
-        let screenOffset: Float = 24; let canvasOffset = screenOffset / max(zoomScale, 0.001); let delta = CGPoint(x: CGFloat(canvasOffset * Float(pasteCascadeIndex)), y: CGFloat(canvasOffset * Float(pasteCascadeIndex))); recordMutation()
-        let strokeStartIndex = committedStrokes.count
-        for stroke in payload.strokes { let shiftedPoints = stroke.points.map { InkPoint(x: $0.x + Float(delta.x), y: $0.y + Float(delta.y), pressure: $0.pressure) }; committedStrokes.append(StoredStroke(id: UUID(), points: shiftedPoints, style: stroke.style, rotation: stroke.rotation) ) }
-        var pastedObjectIDs: [UUID] = []; for object in payload.objects { let duplicated = duplicateObject(object, topLevelOffset: delta); pastedObjectIDs.append(duplicated.id); objectStore.update(duplicated) }
-        selectedStrokeIndices = Array(strokeStartIndex..<committedStrokes.count); selectedObjectIDs = pastedObjectIDs; customRotationCenter = nil; activeStroke = []; rebuildGeometry(); return true
-    }
+    // MARK: - Remaining canvas operations
+    func makeSelectionClipboardData() -> Data? { let strokes = selectedStrokeIndices.compactMap { index -> CanvasStroke? in guard committedStrokes.indices.contains(index) else { return nil }; let stroke = committedStrokes[index]; return CanvasStroke(id: stroke.id, points: stroke.points, style: stroke.style, rotation: stroke.rotation) }; let objects = selectedObjectIDs.compactMap { objectStore.object(with: $0) }; let payload = SelectionClipboardPayload(strokes: strokes, objects: objects); guard !payload.isEmpty, let data = try? JSONEncoder().encode(payload) else { return nil }; pasteCascadeIndex = 0; lastClipboardPayloadData = data; return data }
+    @discardableResult func pasteSelectionClipboardData(_ data: Data) -> Bool { guard let payload = try? JSONDecoder().decode(SelectionClipboardPayload.self, from: data), payload.version == SelectionClipboardPayload.currentVersion, !payload.isEmpty else { return false }; if lastClipboardPayloadData != data { pasteCascadeIndex = 0; lastClipboardPayloadData = data }; pasteCascadeIndex += 1; let screenOffset: Float = 24; let canvasOffset = screenOffset / max(zoomScale, 0.001); let delta = CGPoint(x: CGFloat(canvasOffset * Float(pasteCascadeIndex)), y: CGFloat(canvasOffset * Float(pasteCascadeIndex))); recordMutation(); let strokeStartIndex = committedStrokes.count; for stroke in payload.strokes { let shiftedPoints = stroke.points.map { InkPoint(x: $0.x + Float(delta.x), y: $0.y + Float(delta.y), pressure: $0.pressure) }; committedStrokes.append(StoredStroke(id: UUID(), points: shiftedPoints, style: stroke.style, rotation: stroke.rotation) ) }; var pastedObjectIDs: [UUID] = []; for object in payload.objects { let duplicated = duplicateObject(object, topLevelOffset: delta); pastedObjectIDs.append(duplicated.id); objectStore.update(duplicated) }; selectedStrokeIndices = Array(strokeStartIndex..<committedStrokes.count); selectedObjectIDs = pastedObjectIDs; customRotationCenter = nil; activeStroke = []; rebuildGeometry(); return true }
     private func duplicateObject(_ object: GraphicObject, topLevelOffset: CGPoint) -> GraphicObject { let children = object.children.map { duplicateObject($0, topLevelOffset: .zero) }; var transform = object.transform; transform.position.x += topLevelOffset.x; transform.position.y += topLevelOffset.y; return GraphicObject(id: UUID(), kind: object.kind, transform: transform, style: object.style, geometry: object.geometry, children: children) }
-
     private func applySelection(_ operation: SelectionOperation, objects: [UUID], strokes: [Int]) { switch operation { case .replace: selectedObjectIDs = objects; selectedStrokeIndices = strokes; case .add: for id in objects where !selectedObjectIDs.contains(id) { selectedObjectIDs.append(id) }; for index in strokes where !selectedStrokeIndices.contains(index) { selectedStrokeIndices.append(index) }; case .subtract: selectedObjectIDs.removeAll { objects.contains($0) }; selectedStrokeIndices.removeAll { strokes.contains($0) } }; customRotationCenter = nil; rebuildGeometry() }
     @discardableResult func selectObject(at point: SIMD2<Float>, tolerance: Float = 10, operation: SelectionOperation = .replace) -> Bool { let p = canvasPoint(from: point); guard let id = objectStore.hitTest(at: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { if operation == .replace { clearSelection() }; return false }; applySelection(operation, objects: [id], strokes: []); return true }
     @discardableResult func toggleObject(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { let p = canvasPoint(from: point); guard let id = objectStore.hitTest(at: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)), tolerance: CGFloat(tolerance / zoomScale)) else { return false }; if selectedObjectIDs.contains(id) { selectedObjectIDs.removeAll { $0 == id } } else { selectedObjectIDs.append(id) }; customRotationCenter = nil; rebuildGeometry(); return true }
@@ -226,7 +203,6 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     @discardableResult func moveSelectedPolygonVertex(id: UUID, vertexIndex: Int, to point: SIMD2<Float>) -> Bool { guard selectedObjectIDs.count == 1, selectedObjectIDs.first == id else { return false }; let p = canvasPoint(from: point); guard objectStore.movePolygonVertex(id: id, index: vertexIndex, to: CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) else { return false }; rebuildGeometry(); return true }
     func deleteSelectedObjects() { guard !selectedObjectIDs.isEmpty else { return }; recordMutation(); for id in selectedObjectIDs { objectStore.remove(id: id) }; selectedObjectIDs = []; rebuildGeometry() }
     @discardableResult func eraseObjectsByScribble(_ path: [SIMD2<Float>], tolerance: Float = 12) -> Bool { let p = path.map { let q = canvasPoint(from: $0); return CGPoint(x: CGFloat(q.x), y: CGFloat(q.y)) }; let ids = objectStore.eraseByScribble(p, tolerance: CGFloat(tolerance / zoomScale)); guard !ids.isEmpty else { return false }; selectedObjectIDs.removeAll { ids.contains($0) }; rebuildGeometry(); return true }
-
     private func strokeHit(at point: SIMD2<Float>, tolerance: Float) -> Int? { let p = canvasPoint(from: point); var hit: Int?; var best = tolerance / zoomScale; for i in committedStrokes.indices.reversed() { let s = committedStrokes[i].points; guard s.count > 1 else { continue }; for j in 0..<(s.count-1) { let d = distance(p, SIMD2(s[j].x,s[j].y), SIMD2(s[j+1].x,s[j+1].y)); if d <= best { best = d; hit = i; break } } }; return hit }
     @discardableResult func selectStroke(at point: SIMD2<Float>, tolerance: Float = 10, operation: SelectionOperation = .replace) -> Bool { guard let hit = strokeHit(at: point, tolerance: tolerance) else { if operation == .replace { clearSelection() }; return false }; applySelection(operation, objects: [], strokes: [hit]); return true }
     @discardableResult func toggleStroke(at point: SIMD2<Float>, tolerance: Float = 10) -> Bool { guard let hit = strokeHit(at: point, tolerance: tolerance) else { return false }; if selectedStrokeIndices.contains(hit) { selectedStrokeIndices.removeAll { $0 == hit } } else { selectedStrokeIndices.append(hit) }; customRotationCenter = nil; rebuildGeometry(); return true }
@@ -255,43 +231,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
 
     private func rebuildGeometry() { var out:[InkVertex]=[]; appendBackground(to:&out); for s in committedStrokes { appendStroke(s.points,style:s.style,to:&out) }; appendObjects(to:&out); if let r=selectionBounds() { appendSelection(r,to:&out) }; if !activeStroke.isEmpty { appendStroke(activeStroke,style:penStyle,to:&out) }; vertices=out; vertexBuffer=vertices.isEmpty ? nil : device.makeBuffer(bytes:vertices,length:vertices.count*MemoryLayout<InkVertex>.stride,options:.storageModeShared) }
     private func appendObjects(to out:inout[InkVertex]) { for o in objectStore.objects { let p=objectStore.transformedPoints(of:o); guard p.count>=2 else { continue }; let color=metalColor(o.style); if o.kind == .line || o.kind == .arrow { appendLine(viewPoint(from:SIMD2(Float(p[0].x),Float(p[0].y))),viewPoint(from:SIMD2(Float(p[1].x),Float(p[1].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } else if o.kind == .polygon { let limit=p.count; if limit >= 2 { for i in 0..<limit { let j=(i+1)%limit; appendLine(viewPoint(from:SIMD2(Float(p[i].x),Float(p[i].y))),viewPoint(from:SIMD2(Float(p[j].x),Float(p[j].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } } } else if o.kind == .parameterizedTriangle { let limit=min(3,p.count); if limit == 3 { for i in 0..<3 { let j=(i+1)%3; appendLine(viewPoint(from:SIMD2(Float(p[i].x),Float(p[i].y))),viewPoint(from:SIMD2(Float(p[j].x),Float(p[j].y))),width:Float(max(0.5,o.style.strokeWidth)),color:color,to:&out) } } } else if o.kind == .dynamicAngle { appendDynamicAngle(o,points:p,color:color,to:&out) } } }
-    private func appendDynamicAngle(_ object: GraphicObject, points:[CGPoint], color:SIMD4<Float>, to out:inout[InkVertex]) {
-        guard let model = object.dynamicAngleModel,
-              let vertex = model.model.points.first(where: { $0.id == model.vertexPointID }),
-              let start = model.model.points.first(where: { $0.id == model.startPointID }),
-              let end = model.model.points.first(where: { $0.id == model.endPointID }),
-              points.count >= 3 else { return }
-        let v = viewPoint(from: SIMD2(Float(vertex.position.x), Float(vertex.position.y)))
-        let s = viewPoint(from: SIMD2(Float(start.position.x), Float(start.position.y)))
-        let e = viewPoint(from: SIMD2(Float(end.position.x), Float(end.position.y)))
-        let lineWidth = Float(max(0.5, object.style.strokeWidth))
-        appendLine(v, s, width: lineWidth, color: color, to: &out)
-        appendLine(v, e, width: lineWidth, color: color, to: &out)
-        let startAngle = atan2(s.y - v.y, s.x - v.x)
-        let endAngle = atan2(e.y - v.y, e.x - v.x)
-        let cross = (s.x - v.x) * (e.y - v.y) - (s.y - v.y) * (e.x - v.x)
-        let signed: CGFloat = cross >= 0 ? 1 : -1
-        var delta = abs(endAngle - startAngle)
-        if delta > .pi { delta = 2 * .pi - delta }
-        let sourceRadius = hypot(s.x - v.x, s.y - v.y)
-        let radius = min(CGFloat(60), max(CGFloat(18), sourceRadius * CGFloat(0.32)))
-        let segmentCount = max(12, Int((delta * CGFloat(180.0 / .pi)) / CGFloat(4.0)))
-        let angleStep = delta / CGFloat(segmentCount)
-        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)
-        for index in 1...segmentCount {
-            let offset = angleStep * CGFloat(index)
-            let signedOffset = signed * offset
-            let angle = startAngle + signedOffset
-            let arcVector = SIMD2<Float>(Float(cos(angle)), Float(sin(angle)))
-            let current = v + arcVector * Float(radius)
-            appendLine(previous, current, width: Float(max(1.0, object.style.strokeWidth * 0.9)), color: color, to: &out)
-            previous = current
-        }
-        if selectedObjectIDs.contains(object.id) {
-            disk(v, 6, SIMD4<Float>(0.1, 0.45, 1, 0.9), to: &out)
-            disk(e, 7, SIMD4<Float>(0.95, 0.55, 0.05, 1), to: &out)
-        }
-    }
+    private func appendDynamicAngle(_ object: GraphicObject, points:[CGPoint], color:SIMD4<Float>, to out:inout[InkVertex]) { guard let model = object.dynamicAngleModel, let vertex = model.model.points.first(where: { $0.id == model.vertexPointID }), let start = model.model.points.first(where: { $0.id == model.startPointID }), let end = model.model.points.first(where: { $0.id == model.endPointID }), points.count >= 3 else { return }; let v = viewPoint(from: SIMD2(Float(vertex.position.x), Float(vertex.position.y))); let s = viewPoint(from: SIMD2(Float(start.position.x), Float(start.position.y))); let e = viewPoint(from: SIMD2(Float(end.position.x), Float(end.position.y))); let lineWidth = Float(max(0.5, object.style.strokeWidth)); appendLine(v, s, width: lineWidth, color: color, to: &out); appendLine(v, e, width: lineWidth, color: color, to: &out); let startAngle = atan2(s.y - v.y, s.x - v.x); let endAngle = atan2(e.y - v.y, e.x - v.x); let cross = (s.x - v.x) * (e.y - v.y) - (s.y - v.y) * (e.x - v.x); let signed: CGFloat = cross >= 0 ? 1 : -1; var delta = abs(endAngle - startAngle); if delta > .pi { delta = 2 * .pi - delta }; let sourceRadius = hypot(s.x - v.x, s.y - v.y); let radius = min(CGFloat(60), max(CGFloat(18), sourceRadius * CGFloat(0.32))); let segmentCount = max(12, Int((delta * CGFloat(180.0 / .pi)) / CGFloat(4.0))); let angleStep = delta / CGFloat(segmentCount); var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius); for index in 1...segmentCount { let offset = angleStep * CGFloat(index); let signedOffset = signed * offset; let angle = startAngle + signedOffset; let arcVector = SIMD2<Float>(Float(cos(angle)), Float(sin(angle))); let current = v + arcVector * Float(radius); appendLine(previous, current, width: Float(max(1.0, object.style.strokeWidth * 0.9)), color: color, to: &out); previous = current }; if selectedObjectIDs.contains(object.id) { disk(v, 6, SIMD4<Float>(0.1, 0.45, 1, 0.9), to: &out); disk(e, 7, SIMD4<Float>(0.95, 0.55, 0.05, 1), to: &out) } }
     private func appendBackground(to out:inout[InkVertex]) { guard backgroundPattern != 0 else { return }; let color=SIMD4<Float>(0.82,0.84,0.88,0.55); let step:Float=backgroundPattern == 3 ? 24:32; let e:Float=2000; if backgroundPattern == 1 { var y:Float = -e; while y<=e { appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.55,color:color,to:&out); y+=step } } else { var x:Float = -e; while x<=e { appendLine(viewPoint(from:SIMD2(x,-e)),viewPoint(from:SIMD2(x,e)),width:0.45,color:color,to:&out); x+=step }; var y:Float = -e; while y<=e { appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.45,color:color,to:&out); y+=step } } }
     private func appendStroke(_ s:[InkPoint],style:PenStyle,to out:inout[InkVertex]) { guard !s.isEmpty else { return }; let color=metalColor(style); if s.count>1 { for i in 0..<(s.count-1) { let p=s[i],q=s[i+1],dx=q.x-p.x,dy=q.y-p.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx = -dy/l,ny = dx/l,w0=strokeWidth(p.pressure,style),w1=strokeWidth(q.pressure,style),a=viewPoint(from:SIMD2(p.x+nx*w0,p.y+ny*w0)),b=viewPoint(from:SIMD2(p.x-nx*w0,p.y-ny*w0)),c=viewPoint(from:SIMD2(q.x+nx*w1,q.y+ny*w1)),d=viewPoint(from:SIMD2(q.x-nx*w1,q.y-ny*w1)); triangle(a,b,c,color:color,to:&out); triangle(c,b,d,color:color,to:&out) } }; for p in s { disk(viewPoint(from:SIMD2(p.x,p.y)), strokeWidth(p.pressure,style), color, to:&out) } }
     private func appendSelection(_ r:CGRect,to out:inout[InkVertex]) { let c=SIMD4<Float>(0.1,0.45,1,0.75),a=viewPoint(from:SIMD2(Float(r.minX),Float(r.minY))),b=viewPoint(from:SIMD2(Float(r.maxX),Float(r.maxY))),p0=SIMD2(a.x,a.y),p1=SIMD2(b.x,a.y),p2=SIMD2(b.x,b.y),p3=SIMD2(a.x,b.y); appendLine(p0,p1,width:1.5,color:c,to:&out);appendLine(p1,p2,width:1.5,color:c,to:&out);appendLine(p2,p3,width:1.5,color:c,to:&out);appendLine(p3,p0,width:1.5,color:c,to:&out);for p in [p0,p1,p2,p3] { disk(p,5,c,to:&out) };let rot=SIMD2((a.x+b.x)/2,a.y-28);appendLine(SIMD2((a.x+b.x)/2,a.y),rot,width:1,color:c,to:&out);disk(rot,7,c,to:&out);if let rc=customRotationCenter { disk(viewPoint(from:rc),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) };if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .line { for q in objectStore.transformedPoints(of:o).prefix(2) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) } } else if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .polygon { for q in objectStore.transformedPoints(of:o) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out) } } else if selectedObjectIDs.count == 1,let id=selectedObjectIDs.first,let o=objectStore.object(with:id),o.kind == .parameterizedTriangle,let model=o.triangleModel { for q in objectStore.transformedPoints(of:o) { disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out) }; let raw=transformPoint(model.angleControlPoint(),by:o.transform); let handle=viewPoint(from:SIMD2(Float(raw.x),Float(raw.y))); disk(handle,7,SIMD4<Float>(0.95,0.55,0.05,1),to:&out) } }
