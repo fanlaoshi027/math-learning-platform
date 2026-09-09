@@ -41,6 +41,34 @@ final class GraphicObjectStore {
     func setDynamicAngle(id:UUID,degrees:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false};guard m.setAngle(degrees) else{return false};objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true }
     func dynamicAngleParameter(id:UUID)->GeometryParameter? { guard let o=object(with:id),o.kind == .dynamicAngle,let m=o.dynamicAngleModel else{return nil};return m.parameter }
     @discardableResult
+    func updateDynamicAngleParameter(id:UUID,_ update:(inout GeometryParameter)->Void)->Bool {
+        guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel,
+              let parameterIndex=m.model.parameters.firstIndex(where:{$0.id==m.parameterID}) else { return false }
+        update(&m.model.parameters[parameterIndex])
+        GeometryConstraintSolver.apply(&m.model)
+        objects[i].dynamicAngleModel=m
+        objects[i].geometryModel=m.model
+        return true
+    }
+    @discardableResult
+    func setDynamicAngleRange(id:UUID,minimum:CGFloat,maximum:CGFloat,step:CGFloat)->Bool {
+        guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false}
+        guard m.setRange(minimum: minimum, maximum: maximum, step: step) else{return false}
+        objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true
+    }
+    @discardableResult
+    func setDynamicAngleLoop(id:UUID,loop:GeometryParameterLoop)->Bool {
+        guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false}
+        guard m.setAnimationLoop(loop) else{return false}
+        objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true
+    }
+    @discardableResult
+    func setDynamicAngleSpeed(id:UUID,speed:CGFloat)->Bool {
+        guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false}
+        guard m.setAnimationSpeed(speed) else{return false}
+        objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true
+    }
+    @discardableResult
     func dragDynamicAngleEndpoint(id:UUID,to point:CGPoint)->Bool {
         guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false}
         guard let ei=m.model.points.firstIndex(where:{$0.id==m.endPointID}),!m.model.points[ei].isFixed,let v=m.model.points.first(where:{$0.id==m.vertexPointID}),let s=m.model.points.first(where:{$0.id==m.startPointID}) else{return false}
