@@ -9,6 +9,8 @@ final class CanvasController: ObservableObject {
     @Published private(set) var selectionCount = 0
     @Published private(set) var rotationDegrees: Double = 0
     @Published private(set) var selectionFrame: CGRect = .zero
+    @Published private(set) var dynamicAngleDegrees: Double?
+    @Published private(set) var dynamicAnglePlaying = false
 
     func attach(_ canvas: InkMetalView) {
         self.canvas = canvas
@@ -23,6 +25,8 @@ final class CanvasController: ObservableObject {
             self.selectionCount = canvas.selectionCount
             self.rotationDegrees = canvas.selectedRotationDegrees
             self.selectionFrame = canvas.selectionBoundsInView ?? .zero
+            self.dynamicAngleDegrees = canvas.selectedDynamicAngleDegrees.map(Double.init)
+            self.dynamicAnglePlaying = canvas.isSelectedDynamicAnglePlaying
         }
         refreshState()
     }
@@ -36,6 +40,20 @@ final class CanvasController: ObservableObject {
     func reflectVertical() { canvas?.reflectSelected(horizontal: false); refreshState() }
     func resetRotationCenter() { canvas?.setRotationCenterToSelectionCenter(); refreshState() }
 
+    func setDynamicAngleDegrees(_ degrees: Double) {
+        canvas?.beginHistoryTransaction()
+        _ = canvas?.setSelectedDynamicAngleDegrees(degrees)
+        canvas?.endHistoryTransaction()
+        refreshState()
+        canvas?.draw()
+    }
+
+    func toggleDynamicAnglePlayback() {
+        canvas?.toggleSelectedDynamicAnglePlayback()
+        refreshState()
+        canvas?.draw()
+    }
+
     func refreshState() {
         canUndo = canvas?.canUndo ?? false
         canRedo = canvas?.canRedo ?? false
@@ -43,5 +61,7 @@ final class CanvasController: ObservableObject {
         selectionCount = canvas?.selectionCount ?? 0
         rotationDegrees = canvas?.selectedRotationDegrees ?? 0
         selectionFrame = canvas?.selectionBoundsInView ?? .zero
+        dynamicAngleDegrees = canvas?.selectedDynamicAngleDegrees.map(Double.init)
+        dynamicAnglePlaying = canvas?.isSelectedDynamicAnglePlaying ?? false
     }
 }
