@@ -39,9 +39,18 @@ struct BoardScreen: View {
                         MetalInkCanvas(tool:$tool, penStyle:preset.style, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
                             .padding(24)
 
-                        if tool == .dynamicAngle {
-                            DynamicAngleOverlay()
-                                .padding(24)
+                        if let degrees = controller.dynamicAngleDegrees, tool == .select {
+                            DynamicAngleParameterPanel(
+                                degrees: Binding(
+                                    get: { degrees },
+                                    set: { controller.setDynamicAngleDegrees($0) }
+                                ),
+                                onPlayPause: { controller.toggleDynamicAnglePlayback() },
+                                isPlaying: controller.dynamicAnglePlaying
+                            )
+                            .frame(width: 300)
+                            .padding(16)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         }
 
                         toolbar(in: proxy.size)
