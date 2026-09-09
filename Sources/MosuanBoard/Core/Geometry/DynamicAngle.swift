@@ -45,3 +45,17 @@ struct DynamicAngle: Codable, Equatable, Identifiable {
         return DynamicAngle(id: UUID(), model: model, vertexPointID: o.id, startPointID: a.id, endPointID: b.id, angleID: angle.id, parameterID: p.id)
     }
 }
+
+extension DynamicAngle {
+    /// Bridges the structured geometry model into the editable board object layer.
+    func graphicObject(style: GraphicObject.Style = GraphicObject.Style()) -> GraphicObject {
+        GraphicObject(
+            id: id,
+            kind: .dynamicAngle,
+            style: style,
+            geometry: GraphicObject.Geometry(points: model.points.map(\.position)),
+            geometryModel: model,
+            dynamicAngleModel: self
+        )
+    }
+}
