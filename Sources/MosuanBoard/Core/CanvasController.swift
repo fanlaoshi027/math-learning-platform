@@ -10,10 +10,6 @@ final class CanvasController: ObservableObject {
     @Published private(set) var rotationDegrees: Double = 0
     @Published private(set) var selectionFrame: CGRect = .zero
     @Published private(set) var dynamicAngleDegrees: Double?
-    @Published private(set) var dynamicAngleMinimum: Double = 10
-    @Published private(set) var dynamicAngleMaximum: Double = 170
-    @Published private(set) var dynamicAngleStep: Double = 1
-    @Published private(set) var dynamicAngleLoop: GeometryParameterLoop = .pingPong
     @Published private(set) var dynamicAnglePlaying = false
 
     func attach(_ canvas: InkMetalView) {
@@ -30,12 +26,6 @@ final class CanvasController: ObservableObject {
             self.rotationDegrees = canvas.selectedRotationDegrees
             self.selectionFrame = canvas.selectionBoundsInView ?? .zero
             self.dynamicAngleDegrees = canvas.selectedDynamicAngleDegrees.map(Double.init)
-            if let settings = canvas.selectedDynamicAngleSettings {
-                self.dynamicAngleMinimum = Double(settings.minimum)
-                self.dynamicAngleMaximum = Double(settings.maximum)
-                self.dynamicAngleStep = Double(settings.step)
-                self.dynamicAngleLoop = settings.loop
-            }
             self.dynamicAnglePlaying = canvas.isSelectedDynamicAnglePlaying
         }
         refreshState()
@@ -55,16 +45,6 @@ final class CanvasController: ObservableObject {
         refreshState()
     }
 
-    func setDynamicAngleRange(minimum: Double, maximum: Double, step: Double) {
-        canvas?.setSelectedDynamicAngleRange(minimum: CGFloat(minimum), maximum: CGFloat(maximum), step: CGFloat(step))
-        refreshState()
-    }
-
-    func setDynamicAngleLoop(_ loop: GeometryParameterLoop) {
-        canvas?.setSelectedDynamicAngleLoop(loop)
-        refreshState()
-    }
-
     func toggleDynamicAnglePlayback() {
         canvas?.toggleSelectedDynamicAnglePlayback()
         refreshState()
@@ -78,12 +58,6 @@ final class CanvasController: ObservableObject {
         rotationDegrees = canvas?.selectedRotationDegrees ?? 0
         selectionFrame = canvas?.selectionBoundsInView ?? .zero
         dynamicAngleDegrees = canvas?.selectedDynamicAngleDegrees.map(Double.init)
-        if let settings = canvas?.selectedDynamicAngleSettings {
-            dynamicAngleMinimum = Double(settings.minimum)
-            dynamicAngleMaximum = Double(settings.maximum)
-            dynamicAngleStep = Double(settings.step)
-            dynamicAngleLoop = settings.loop
-        }
         dynamicAnglePlaying = canvas?.isSelectedDynamicAnglePlaying ?? false
     }
 }
