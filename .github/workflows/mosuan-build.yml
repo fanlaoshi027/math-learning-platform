@@ -31,9 +31,6 @@ jobs:
               p.write_text(s.replace(old, new, 1))
           PY
 
-      - name: Build app bundle and DMG
-        run: bash scripts/build-macos-app.sh
-
       - name: Persist source fix
         run: |
           if git diff --quiet -- Sources/MosuanBoard/Metal/InkRenderer.swift; then
@@ -44,6 +41,9 @@ jobs:
           git add Sources/MosuanBoard/Metal/InkRenderer.swift
           git commit -m "fix: split dynamic angle start vector"
           git push
+
+      - name: Build app bundle and DMG
+        run: bash scripts/build-macos-app.sh
 
       - name: Upload app bundle
         uses: actions/upload-artifact@v4
