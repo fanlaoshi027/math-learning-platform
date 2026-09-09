@@ -3,14 +3,10 @@ import Foundation
 
 enum GeometryConstraintSolver {
     static func apply(_ model: inout GeometryModel) {
-        // Parameter-driven angle annotations are constraints in their own right.
-        // Applying them before the explicit constraint list keeps the parameter
-        // slider/animation path independent from UI code.
-        for annotation in model.angles {
-            if let target = GeometryAngleCalculator.targetDegrees(in: model, annotation: annotation) {
-                setAngle(&model, angleID: annotation.id, targetDegrees: target)
-            }
-        }
+        // Parameter references are the primary driver for interactive sliders and
+        // animation. Explicit constraints below may further relate those values.
+        applyParameterizedLengths(&model)
+        applyParameterizedAngles(&model)
 
         for constraint in model.constraints {
             switch constraint {
@@ -54,6 +50,23 @@ enum GeometryConstraintSolver {
         }
     }
 
+    private static func applyParameterizedLengths(_ model: inout GeometryModel) {
+        // A parameterized segment is treated like a target constraint. Direction
+        // is preserved while the movable endpoint changes its distance.
+        for line in model.lines where line.kind == .segment {
+            guard let reference = line.lengthReference,
+                  let target = reference.resolved(using: model.parameters) else { continue }
+            setLength(&model, lineID: line.id, targetLength: target)
+        }
+    }
+
+    private static func applyParameterizedAngles(_ model: inout GeometryModel) {
+        for annotation in model.angles {
+            guard let target = GeometryAngleCalculator.targetDegrees(in: model, annotation: annotation) else { continue }
+            setAngle(&model, angleID: annotation.id, targetDegrees: target)
+        }
+    }
+
     private static func set(_ model: inout GeometryModel, pointID: UUID, position: CGPoint) {
         guard let index = model.points.firstIndex(where: { $0.id == pointID }) else { return }
         if !model.points[index].isFixed { model.points[index].position = position }
@@ -84,21 +97,32 @@ enum GeometryConstraintSolver {
         return hypot(b.position.x - a.position.x, b.position.y - a.position.y)
     }
 
-    /// Keeps the line's start point fixed and moves its end point to the requested length.
+    /// Keeps the line direction and target length. If the end is fixed but the
+    /// start is movable, the start point is adjusted instead.
     private static func setLength(_ model: inout GeometryModel, lineID: UUID, targetLength: CGFloat) {
-        guard let lineIndex = model.lines.firstIndex(where: { $0.id == lineID }),
-              let start = model.points.first(where: { $0.id == model.lines[lineIndex].startPointID }),
-              let endIndex = model.points.firstIndex(where: { $0.id == model.lines[lineIndex].endPointID }),
-              !model.points[endIndex].isFixed else { return }
+        guard let line = model.lines.first(where: { $0.id == lineID }),
+              let startIndex = model.points.firstIndex(where: { $0.id == line.startPointID }),
+              let endIndex = model.points.firstIndex(where: { $0.id == line.endPointID }) else { return }
 
-        let dx = model.points[endIndex].position.x - start.position.x
-        let dy = model.points[endIndex].position.y - start.position.y
+        let start = model.points[startIndex].position
+        let end = model.points[endIndex].position
+        let dx = end.x - start.x
+        let dy = end.y - start.y
         let current = hypot(dx, dy)
         let angle = current > 0.0001 ? atan2(dy, dx) : 0
-        model.points[endIndex].position = CGPoint(
-            x: start.position.x + targetLength * cos(angle),
-            y: start.position.y + targetLength * sin(angle)
-        )
+        let target = max(0.001, targetLength)
+
+        if !model.points[endIndex].isFixed {
+            model.points[endIndex].position = CGPoint(
+                x: start.x + target * cos(angle),
+                y: start.y + target * sin(angle)
+            )
+        } else if !model.points[startIndex].isFixed {
+            model.points[startIndex].position = CGPoint(
+                x: end.x - target * cos(angle),
+                y: end.y - target * sin(angle)
+            )
+        }
     }
 
     private static func angleValue(in model: GeometryModel, id: UUID) -> CGFloat? {
@@ -115,12 +139,16 @@ enum GeometryConstraintSolver {
               let endIndex = model.points.firstIndex(where: { $0.id == annotation.endPointID }),
               !model.points[endIndex].isFixed else { return }
 
-        let startAngle = atan2(start.position.y - vertex.position.y, start.position.x - vertex.position.x)
+        let startVector = CGPoint(x: start.position.x - vertex.position.x, y: start.position.y - vertex.position.y)
         let endVector = CGPoint(x: model.points[endIndex].position.x - vertex.position.x,
                                 y: model.points[endIndex].position.y - vertex.position.y)
+        let startLength = hypot(startVector.x, startVector.y)
         let radius = max(0.001, hypot(endVector.x, endVector.y))
+        guard startLength > 0.0001 else { return }
+
+        let startAngle = atan2(startVector.y, startVector.x)
         let direction = max(0.001, min(179.999, targetDegrees)) * .pi / 180
-        let currentCross = (start.position.x - vertex.position.x) * endVector.y - (start.position.y - vertex.position.y) * endVector.x
+        let currentCross = startVector.x * endVector.y - startVector.y * endVector.x
         let signedDirection: CGFloat = currentCross >= 0 ? 1 : -1
         let angle = startAngle + signedDirection * direction
         model.points[endIndex].position = CGPoint(
