@@ -15,9 +15,7 @@ final class CanvasController: ObservableObject {
     @Published private(set) var dynamicAnglePlaying = false
     @Published private(set) var dynamicTriangleDegrees: Double?
 
-    deinit {
-        dynamicTrianglePlayback.stop()
-    }
+    deinit { dynamicTrianglePlayback.stop() }
 
     func attach(_ canvas: InkMetalView) {
         dynamicTrianglePlayback.stop()
@@ -43,6 +41,7 @@ final class CanvasController: ObservableObject {
     func undo() {
         dynamicTrianglePlayback.stop()
         canvas?.endDynamicTrianglePlaybackHistory()
+        canvas?.endDynamicTriangleParameterEditHistory()
         canvas?.undo()
         refreshState()
     }
@@ -50,6 +49,7 @@ final class CanvasController: ObservableObject {
     func redo() {
         dynamicTrianglePlayback.stop()
         canvas?.endDynamicTrianglePlaybackHistory()
+        canvas?.endDynamicTriangleParameterEditHistory()
         canvas?.redo()
         refreshState()
     }
@@ -57,34 +57,16 @@ final class CanvasController: ObservableObject {
     func deleteSelected() {
         dynamicTrianglePlayback.stop()
         canvas?.endDynamicTrianglePlaybackHistory()
+        canvas?.endDynamicTriangleParameterEditHistory()
         canvas?.deleteSelected()
         refreshState()
     }
 
-    func setRotationDegrees(_ d: Double) {
-        canvas?.setSelectedRotationDegrees(d)
-        refreshState()
-    }
-
-    func scaleSelected(by f: Float) {
-        canvas?.scaleSelected(by: f)
-        refreshState()
-    }
-
-    func reflectHorizontal() {
-        canvas?.reflectSelected(horizontal: true)
-        refreshState()
-    }
-
-    func reflectVertical() {
-        canvas?.reflectSelected(horizontal: false)
-        refreshState()
-    }
-
-    func resetRotationCenter() {
-        canvas?.setRotationCenterToSelectionCenter()
-        refreshState()
-    }
+    func setRotationDegrees(_ d: Double) { canvas?.setSelectedRotationDegrees(d); refreshState() }
+    func scaleSelected(by f: Float) { canvas?.scaleSelected(by: f); refreshState() }
+    func reflectHorizontal() { canvas?.reflectSelected(horizontal: true); refreshState() }
+    func reflectVertical() { canvas?.reflectSelected(horizontal: false); refreshState() }
+    func resetRotationCenter() { canvas?.setRotationCenterToSelectionCenter(); refreshState() }
 
     func setDynamicAngleDegrees(_ degrees: Double) {
         canvas?.setSelectedDynamicAngleDegrees(CGFloat(degrees))
@@ -102,13 +84,22 @@ final class CanvasController: ObservableObject {
         refreshState()
     }
 
+    func beginDynamicTriangleParameterEditHistory() {
+        guard !dynamicTrianglePlayback.isPlaying else { return }
+        canvas?.beginDynamicTriangleParameterEditHistory()
+    }
+
+    func endDynamicTriangleParameterEditHistory() {
+        canvas?.endDynamicTriangleParameterEditHistory()
+        refreshState()
+    }
+
     func beginDynamicTrianglePlaybackHistory() {
         guard !dynamicTrianglePlayback.isPlaying else { return }
         guard let canvas, let initialAngle = canvas.selectedDynamicIsoscelesTriangleDegrees else {
             refreshState()
             return
         }
-
         canvas.beginDynamicTrianglePlaybackHistory()
         dynamicTrianglePlayback.start(currentAngle: initialAngle) { [weak self] degrees in
             guard let self else { return }

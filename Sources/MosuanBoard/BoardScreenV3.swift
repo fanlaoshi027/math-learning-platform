@@ -59,6 +59,13 @@ struct BoardScreen: View {
                                     get: { degrees },
                                     set: { controller.setDynamicTriangleDegrees($0) }
                                 ),
+                                onParameterEditingChanged: { editing in
+                                    if editing {
+                                        controller.beginDynamicTriangleParameterEditHistory()
+                                    } else {
+                                        controller.endDynamicTriangleParameterEditHistory()
+                                    }
+                                },
                                 onPlaybackChanged: { playing in
                                     if playing {
                                         controller.beginDynamicTrianglePlaybackHistory()

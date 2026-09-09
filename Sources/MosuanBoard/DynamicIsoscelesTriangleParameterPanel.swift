@@ -3,18 +3,14 @@ import SwiftUI
 struct DynamicIsoscelesTriangleParameterPanel: View {
     @Binding var degrees: Double
     var onValueChanged: (() -> Void)?
+    var onParameterEditingChanged: ((Bool) -> Void)?
     var onPlaybackChanged: ((Bool) -> Void)?
 
     @State private var isPlaying = false
     private let presets: [Int] = [30, 45, 60, 90, 120, 150]
 
-    private var apexAngle: Int {
-        Int(degrees.rounded())
-    }
-
-    private var baseAngle: Int {
-        Int(((180 - degrees) / 2).rounded())
-    }
+    private var apexAngle: Int { Int(degrees.rounded()) }
+    private var baseAngle: Int { Int(((180 - degrees) / 2).rounded()) }
 
     private func setAngle(_ value: Double) {
         if isPlaying {
@@ -39,6 +35,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
             Slider(value: $degrees, in: 30...150, step: 1) {
                 Text("顶角")
             } onEditingChanged: { editing in
+                onParameterEditingChanged?(editing)
                 if !editing { onValueChanged?() }
             }
 
@@ -50,12 +47,10 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
 
             HStack(spacing: 5) {
                 ForEach(presets, id: \.self) { value in
-                    Button("\(value)°") {
-                        setAngle(Double(value))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(apexAngle == value ? .accentColor : nil)
+                    Button("\(value)°") { setAngle(Double(value)) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .tint(apexAngle == value ? .accentColor : nil)
                 }
             }
 
@@ -78,10 +73,8 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button("回到 60°") {
-                    setAngle(60)
-                }
-                .buttonStyle(.bordered)
+                Button("回到 60°") { setAngle(60) }
+                    .buttonStyle(.bordered)
             }
         }
         .padding(14)

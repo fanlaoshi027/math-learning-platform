@@ -21,6 +21,7 @@ final class InkMetalView: MTKView {
     private var dynamicAngleDragID: UUID?
     private var dynamicIsoscelesTriangleDragID: UUID?
     private var dynamicTrianglePlaybackHistoryActive = false
+    private var dynamicTriangleParameterHistoryActive = false
     private var rotationDrag = false
     private var rotationCenterDrag = false
     private var panDrag = false
@@ -95,6 +96,7 @@ final class InkMetalView: MTKView {
         dynamicAngleDragID = nil
         dynamicIsoscelesTriangleDragID = nil
         dynamicTrianglePlaybackHistoryActive = false
+        dynamicTriangleParameterHistoryActive = false
         lassoActive = false
         lassoPoints.removeAll(keepingCapacity: true)
         lassoOverlay.update(points: [], visible: false)
@@ -124,8 +126,20 @@ final class InkMetalView: MTKView {
         notifyState()
         draw()
     }
+    func beginDynamicTriangleParameterEditHistory() {
+        guard !dynamicTriangleParameterHistoryActive else { return }
+        dynamicTriangleParameterHistoryActive = true
+        renderer.beginHistoryTransaction()
+    }
+    func endDynamicTriangleParameterEditHistory() {
+        guard dynamicTriangleParameterHistoryActive else { return }
+        dynamicTriangleParameterHistoryActive = false
+        renderer.endHistoryTransaction()
+        notifyState()
+        draw()
+    }
     func setSelectedDynamicIsoscelesTriangleDegrees(_ d: CGFloat) {
-        let ownsTransaction = !dynamicTrianglePlaybackHistoryActive
+        let ownsTransaction = !dynamicTrianglePlaybackHistoryActive && !dynamicTriangleParameterHistoryActive
         if ownsTransaction { renderer.beginHistoryTransaction() }
         if renderer.setSelectedDynamicIsoscelesTriangleDegrees(d) {
             if ownsTransaction {
@@ -388,6 +402,7 @@ final class InkMetalView: MTKView {
             } else {
                 renderer.endHistoryTransaction()
             }
+            dynamicTriangleParameterHistoryActive = false
             polygonModel.cancel()
             polygonVertexDrag = nil
             lineEndpointDrag = nil
