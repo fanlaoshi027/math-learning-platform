@@ -18,6 +18,7 @@ final class InkMetalView: MTKView {
     private var resizeHandle: InkRenderer.SelectionHandle?
     private var lineEndpointDrag: (id: UUID, endpoint: Int)?
     private var polygonVertexDrag: (id: UUID, vertexIndex: Int)?
+    private var dynamicAngleDragID: UUID?
     private var rotationDrag = false
     private var rotationCenterDrag = false
     private var panDrag = false
@@ -34,6 +35,7 @@ final class InkMetalView: MTKView {
     var isLineTool = false
     var isSmartLineTool = false
     var isPolygonTool = false
+    var isDynamicAngleTool = false
     var isEraserTool = false
     var backgroundPattern = 0 { didSet { renderer.setBackgroundPattern(backgroundPattern) } }
     var onHistoryChanged: (() -> Void)?
@@ -48,6 +50,8 @@ final class InkMetalView: MTKView {
     var hasSelection: Bool { renderer.hasSelection }
     var selectionCount: Int { renderer.selectionCount }
     var selectedRotationDegrees: Double { renderer.selectedRotationDegrees }
+    var selectedDynamicAngleDegrees: CGFloat? { renderer.selectedDynamicAngleDegrees() }
+    var isSelectedDynamicAnglePlaying: Bool { renderer.isSelectedDynamicAnglePlaying() }
     var zoomPercent: Int { renderer.zoomPercent }
     var selectionBoundsInView: CGRect? { renderer.selectionBoundsInView() }
     override var isFlipped: Bool { true }
@@ -84,6 +88,7 @@ final class InkMetalView: MTKView {
     func loadPageState(_ state: CanvasPageState) {
         polygonModel.cancel()
         polygonVertexDrag = nil
+        dynamicAngleDragID = nil
         lassoActive = false
         lassoPoints.removeAll(keepingCapacity: true)
         lassoOverlay.update(points: [], visible: false)
@@ -98,6 +103,9 @@ final class InkMetalView: MTKView {
     func redo() { renderer.redo(); notifyState(); draw() }
     func deleteSelected() { renderer.deleteSelected(); notifyState(); draw() }
     func setSelectedRotationDegrees(_ d: Double) { renderer.setSelectedRotationDegrees(d); notifyState(); draw() }
+    func setSelectedDynamicAngleDegrees(_ d: CGFloat) { renderer.beginHistoryTransaction(); if renderer.setSelectedDynamicAngleDegrees(d) { renderer.endHistoryTransaction(); notifyState(); draw() } else { renderer.endHistoryTransaction() } }
+    func toggleSelectedDynamicAnglePlayback() { renderer.toggleSelectedDynamicAnglePlayback(); onSelectionChanged?(); draw() }
+    func stopDynamicAnglePlayback() { renderer.stopAllDynamicAngleAnimations(); onSelectionChanged?(); draw() }
     func scaleSelected(by factor: Float) { renderer.beginHistoryTransaction(); renderer.scaleSelected(by: factor); renderer.endHistoryTransaction(); notifyState(); draw() }
     func reflectSelected(horizontal: Bool) { renderer.beginHistoryTransaction(); renderer.reflectSelected(horizontal: horizontal); renderer.endHistoryTransaction(); notifyState(); draw() }
     func setRotationCenterToSelectionCenter() { if let c = renderer.selectionCenter() { renderer.setRotationCenter(to: renderer.viewPoint(from: c)); onSelectionChanged?(); draw() } }
@@ -126,8 +134,7 @@ final class InkMetalView: MTKView {
     }
 
     private func pasteSelectionFromPasteboard() {
-        guard let data = NSPasteboard.general.data(forType: Self.mosuanClipboardType),
-              renderer.pasteSelectionClipboardData(data) else { return }
+        guard let data = NSPasteboard.general.data(forType: Self.mosuanClipboardType), renderer.pasteSelectionClipboardData(data) else { return }
         notifyState()
         draw()
     }
@@ -138,10 +145,20 @@ final class InkMetalView: MTKView {
         if event.buttonNumber == 2 { middleButtonHeld = true; panDrag = true; lastPoint = p; return }
         if spaceHeld { panDrag = true; lastPoint = p; return }
         if isEraserTool && !temporarySelectHeld { renderer.beginHistoryTransaction(); eraserPoints = [p]; return }
+        if isDynamicAngleTool && !selectionModeActive {
+            renderer.beginHistoryTransaction()
+            dynamicAngleDragID = renderer.commitDynamicAngle(at: p)
+            active = true
+            lastPoint = p
+            onSelectionChanged?()
+            draw()
+            return
+        }
         if isPolygonTool && !selectionModeActive { handlePolygonClick(at: p); return }
         guard !isPolygonTool else { return }
 
         if selectionModeActive {
+            if let dynamicID = renderer.dynamicAngleEndpoint(at: p) { renderer.beginHistoryTransaction(); dynamicAngleDragID = dynamicID; return }
             if let vertex = renderer.polygonVertex(at: p) { renderer.beginHistoryTransaction(); polygonVertexDrag = vertex; return }
             if let endpoint = renderer.lineEndpoint(at: p) { renderer.beginHistoryTransaction(); lineEndpointDrag = endpoint; return }
             if renderer.rotationCenterHandle(at: p) { renderer.beginHistoryTransaction(); rotationCenterDrag = true; return }
@@ -183,6 +200,9 @@ final class InkMetalView: MTKView {
         let p = makePoint(from: event)
         if panDrag { renderer.pan(by: p - lastPoint); lastPoint = p; draw(); return }
         if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); return }
+        if isDynamicAngleTool || dynamicAngleDragID != nil {
+            if let id = dynamicAngleDragID { _ = renderer.moveDynamicAngleEndpoint(id: id, to: p); onSelectionChanged?(); draw(); return }
+        }
         if isPolygonTool { return }
         if selectionModeActive {
             if let vertex = polygonVertexDrag { _ = renderer.moveSelectedPolygonVertex(id: vertex.id, vertexIndex: vertex.vertexIndex, to: p); onSelectionChanged?(); draw(); return }
@@ -210,6 +230,14 @@ final class InkMetalView: MTKView {
         let p = makePoint(from: event)
         if event.buttonNumber == 2 || middleButtonHeld { middleButtonHeld = false; panDrag = false; return }
         if panDrag { panDrag = false; return }
+        if isDynamicAngleTool || dynamicAngleDragID != nil {
+            dynamicAngleDragID = nil
+            active = false
+            renderer.endHistoryTransaction()
+            notifyState()
+            draw()
+            return
+        }
         if isPolygonTool { return }
         if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); eraseAlongPath(eraserPoints); eraserPoints.removeAll(keepingCapacity: true); renderer.endHistoryTransaction(); notifyState(); return }
 
@@ -264,24 +292,14 @@ final class InkMetalView: MTKView {
 
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
-
-        if event.modifierFlags.contains(.command),
-           let key = event.charactersIgnoringModifiers?.lowercased() {
+        if event.modifierFlags.contains(.command), let key = event.charactersIgnoringModifiers?.lowercased() {
             switch key {
-            case "c":
-                if renderer.hasSelection { copySelectionToPasteboard() }
-                return
-            case "x":
-                cutSelectionToPasteboard()
-                return
-            case "v":
-                pasteSelectionFromPasteboard()
-                return
-            default:
-                break
+            case "c": if renderer.hasSelection { copySelectionToPasteboard() }; return
+            case "x": cutSelectionToPasteboard(); return
+            case "v": pasteSelectionFromPasteboard(); return
+            default: break
             }
         }
-
         if event.keyCode == 53 && isPolygonTool && polygonModel.isConstructing { polygonModel.cancel(); renderer.setStroke([]); renderer.endHistoryTransaction(); draw(); return }
         if event.keyCode == 56 || event.keyCode == 60 { temporarySelectHeld = true; return }
         if event.keyCode == 49 { spaceHeld = true; return }
@@ -312,6 +330,7 @@ final class InkMetalView: MTKView {
             polygonModel.cancel()
             polygonVertexDrag = nil
             lineEndpointDrag = nil
+            dynamicAngleDragID = nil
             lassoActive = false
             lassoPoints.removeAll(keepingCapacity: true)
             lassoOverlay.update(points: [], visible: false)
@@ -366,8 +385,8 @@ private final class LassoOverlayView: NSView {
         let dash: [CGFloat] = [5, 4]
         path.setLineDash(dash, count: dash.count, phase: 0)
         NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
-        path.stroke()
         NSColor.controlAccentColor.withAlphaComponent(0.06).setFill()
+        path.stroke()
         path.fill()
     }
 }
