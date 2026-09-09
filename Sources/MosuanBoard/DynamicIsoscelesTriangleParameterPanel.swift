@@ -40,6 +40,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 onParameterEditingChanged?(editing)
                 if !editing { onValueChanged?() }
             }
+            .disabled(isPlaying)
 
             HStack {
                 Text("30°").font(.caption).foregroundStyle(.secondary)
