@@ -41,7 +41,16 @@ final class GraphicObjectStore {
     func setDynamicAngle(id:UUID,degrees:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false};guard m.setAngle(degrees) else{return false};objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true }
     func dynamicAngleParameter(id:UUID)->GeometryParameter? { guard let o=object(with:id),o.kind == .dynamicAngle,let m=o.dynamicAngleModel else{return nil};return m.parameter }
     @discardableResult
-    func dragDynamicAngleEndpoint(id:UUID,to point:CGPoint)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false};guard let ei=m.model.points.firstIndex(where:{$0.id==m.endPointID}),!m.model.points[ei].isFixed,let v=m.model.points.first(where:{$0.id==m.vertexPointID}),let s=m.model.points.first(where:{$0.id==m.startPointID}) else{return false};let dx=point.x-v.position.x,dy=point.y-v.position.y;guard hypot(dx,dy)>0.001 else{return false};let sx=s.position.x-v.position.x,sy=s.position.y-v.position.y;let degrees=min(170,max(10,atan2(abs(sx*dy-sy*dx),sx*dx+sy*dy)*180/.pi));guard m.setAngle(degrees) else{return false};objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true }
+    func dragDynamicAngleEndpoint(id:UUID,to point:CGPoint)->Bool {
+        guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .dynamicAngle,var m=objects[i].dynamicAngleModel else{return false}
+        guard let ei=m.model.points.firstIndex(where:{$0.id==m.endPointID}),!m.model.points[ei].isFixed,let v=m.model.points.first(where:{$0.id==m.vertexPointID}),let s=m.model.points.first(where:{$0.id==m.startPointID}) else{return false}
+        let dx=point.x-v.position.x,dy=point.y-v.position.y
+        guard hypot(dx,dy)>0.001 else{return false}
+        let sx=s.position.x-v.position.x,sy=s.position.y-v.position.y
+        let degrees=min(170,max(10,atan2(abs(sx*dy-sy*dx),sx*dx+sy*dy) * 180 / .pi))
+        guard m.setAngle(degrees) else{return false}
+        objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true
+    }
 
     func nearestLineEndpoint(to point:CGPoint,tolerance:CGFloat=12)->(id:UUID,endpoint:Int,distance:CGFloat)? { var best:(id:UUID,endpoint:Int,distance:CGFloat)?;for o in objects where o.kind == .line {guard o.geometry.points.count>=2 else{continue};for e in 0...1{let p=transformedPoint(o.geometry.points[e],in:o),d=hypot(p.x-point.x,p.y-point.y);if d<=tolerance && (best == nil || d<best!.distance){best=(o.id,e,d)}}};return best }
     func nearestPolygonVertex(to point:CGPoint,tolerance:CGFloat=12)->(id:UUID,index:Int,distance:CGFloat)? { var best:(id:UUID,index:Int,distance:CGFloat)?;for o in objects where o.kind == .polygon {for (i,raw) in o.geometry.points.enumerated(){let p=transformedPoint(raw,in:o),d=hypot(p.x-point.x,p.y-point.y);if d<=tolerance && (best == nil || d<best!.distance){best=(o.id,i,d)}}};return best }
