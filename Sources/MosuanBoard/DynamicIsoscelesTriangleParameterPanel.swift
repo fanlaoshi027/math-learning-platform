@@ -3,6 +3,7 @@ import SwiftUI
 struct DynamicIsoscelesTriangleParameterPanel: View {
     @Binding var degrees: Double
     var onValueChanged: (() -> Void)?
+    var onPlaybackChanged: ((Bool) -> Void)?
 
     @State private var isPlaying = false
     @State private var direction = 1.0
@@ -33,14 +34,23 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
 
             HStack(spacing: 8) {
                 Button {
-                    isPlaying.toggle()
+                    let next = !isPlaying
+                    if next {
+                        onPlaybackChanged?(true)
+                    } else {
+                        onPlaybackChanged?(false)
+                    }
+                    isPlaying = next
                 } label: {
                     Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
 
                 Button("回到 60°") {
-                    isPlaying = false
+                    if isPlaying {
+                        isPlaying = false
+                        onPlaybackChanged?(false)
+                    }
                     direction = 1
                     degrees = 60
                     onValueChanged?()
@@ -69,7 +79,10 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
             onValueChanged?()
         }
         .onDisappear {
-            isPlaying = false
+            if isPlaying {
+                isPlaying = false
+                onPlaybackChanged?(false)
+            }
         }
     }
 }
