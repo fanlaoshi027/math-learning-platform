@@ -9,10 +9,7 @@ struct GeometryParameterAnimationDriver: Equatable {
     private(set) var states: [UUID: GeometryParameterAnimationState] = [:]
 
     mutating func setPlaying(_ playing: Bool, parameterID: UUID) {
-        guard var state = states[parameterID] else {
-            states[parameterID] = GeometryParameterAnimationState(isPlaying: playing)
-            return
-        }
+        var state = states[parameterID] ?? GeometryParameterAnimationState()
         state.isPlaying = playing
         states[parameterID] = state
     }
@@ -30,9 +27,11 @@ struct GeometryParameterAnimationDriver: Equatable {
     }
 
     mutating func stopAll() {
-        for id in states.keys {
-            states[id]?.stop()
-        }
+        for id in states.keys { states[id]?.stop() }
+    }
+
+    func isPlaying(parameterID: UUID) -> Bool {
+        states[parameterID]?.isPlaying ?? false
     }
 
     var isPlayingAny: Bool {
