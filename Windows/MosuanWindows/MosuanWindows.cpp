@@ -21,10 +21,39 @@ Stroke g_active;
 UINT32 g_activePointer = 0;
 bool g_drawing = false;
 bool g_eraser = false;
+bool g_spaceDown = false;
+bool g_panning = false;
+POINT g_lastPan{};
+float g_scale = 1.0f;
+float g_offsetX = 0.0f;
+float g_offsetY = 0.0f;
+
+constexpr float kMinScale = 0.25f;
+constexpr float kMaxScale = 8.0f;
+
+float ClampScale(float value) { return std::clamp(value, kMinScale, kMaxScale); }
+
+POINT ClientPointFromPointer(UINT32 id) {
+    POINTER_INFO pi{};
+    POINT p{};
+    if (GetPointerInfo(id, &pi)) {
+        p = pi.ptPixelLocation;
+        ScreenToClient(GetActiveWindow(), &p);
+    }
+    return p;
+}
 
 float NormalizePressure(UINT32 raw) {
     if (raw == 0) return 0.5f;
     return std::clamp(static_cast<float>(raw) / 1024.0f, 0.05f, 1.0f);
+}
+
+Point ScreenToDocument(POINT p) {
+    return {(p.x - g_offsetX) / g_scale, (p.y - g_offsetY) / g_scale, 0.5f};
+}
+
+D2D1_POINT_2F DocumentToScreen(Point p) {
+    return D2D1::Point2F(p.x * g_scale + g_offsetX, p.y * g_scale + g_offsetY);
 }
 
 void ReleaseRenderResources() {
@@ -50,8 +79,10 @@ void DrawStroke(const Stroke& s) {
     for (size_t i=1; i<s.points.size(); ++i) {
         const auto& a=s.points[i-1]; const auto& b=s.points[i];
         float p=(a.pressure+b.pressure)*0.5f;
-        float width=1.6f + p*5.4f;
-        g_target->DrawLine(D2D1::Point2F(a.x,a.y), D2D1::Point2F(b.x,b.y), g_inkBrush, width);
+        float width=(1.6f + p*5.4f) * g_scale;
+        auto sa = DocumentToScreen(a);
+        auto sb = DocumentToScreen(b);
+        g_target->DrawLine(sa, sb, g_inkBrush, width);
     }
 }
 
@@ -68,11 +99,10 @@ bool HitStroke(const Stroke& s, float x, float y, float radius) {
     return Distance(s.points.front(), {x,y,0})<=radius;
 }
 
-void EraseAt(float x,float y) {
-    constexpr float radius=14.0f;
-    auto oldSize=g_strokes.size();
+void EraseAtDocument(float x,float y) {
+    constexpr float screenRadius=14.0f;
+    const float radius=screenRadius/g_scale;
     g_strokes.erase(std::remove_if(g_strokes.begin(), g_strokes.end(), [&](const Stroke& s){ return HitStroke(s,x,y,radius); }), g_strokes.end());
-    if (g_strokes.size()!=oldSize) g_redo.clear();
 }
 
 void Undo() {
@@ -84,6 +114,14 @@ void Redo() {
     if (g_redo.empty()) return;
     g_strokes.push_back(std::move(g_redo.back()));
     g_redo.pop_back();
+}
+
+void ZoomAt(HWND hwnd, float factor, POINT screenPoint) {
+    const Point before = ScreenToDocument(screenPoint);
+    g_scale = ClampScale(g_scale * factor);
+    g_offsetX = screenPoint.x - before.x * g_scale;
+    g_offsetY = screenPoint.y - before.y * g_scale;
+    InvalidateRect(hwnd,nullptr,FALSE);
 }
 
 void Render(HWND hwnd) {
@@ -100,7 +138,10 @@ bool ReadPointer(UINT32 id, Point& out, bool& pen) {
     POINTER_INFO pi{};
     if (!GetPointerInfo(id,&pi)) return false;
     pen=(pi.pointerType==PT_PEN);
-    out={float(pi.ptPixelLocation.x),float(pi.ptPixelLocation.y),0.5f};
+    POINT client=pi.ptPixelLocation;
+    HWND hwnd=GetActiveWindow();
+    ScreenToClient(hwnd,&client);
+    out=ScreenToDocument(client);
     if (pen) {
         POINTER_PEN_INFO pp{};
         if (GetPointerPenInfo(id,&pp)) out.pressure=NormalizePressure(pp.pressure);
@@ -109,7 +150,7 @@ bool ReadPointer(UINT32 id, Point& out, bool& pen) {
 }
 
 void AddPoint(Point p) {
-    if (!g_active.points.empty() && Distance(g_active.points.back(),p)<0.7f) return;
+    if (!g_active.points.empty() && Distance(g_active.points.back(),p)<0.7f/g_scale) return;
     g_active.points.push_back(p);
 }
 }
@@ -118,17 +159,46 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch(msg) {
     case WM_CREATE: EnsureRenderResources(hwnd); return 0;
     case WM_KEYDOWN:
+        if (wp==VK_SPACE) { g_spaceDown=true; return 0; }
         if ((GetKeyState(VK_CONTROL)&0x8000) && wp=='Z') Undo();
         else if ((GetKeyState(VK_CONTROL)&0x8000) && wp=='Y') Redo();
         else if (wp=='B') g_eraser=false;
         else if (wp=='E') g_eraser=true;
         InvalidateRect(hwnd,nullptr,FALSE); return 0;
+    case WM_KEYUP:
+        if (wp==VK_SPACE) { g_spaceDown=false; g_panning=false; ReleaseCapture(); return 0; }
+        break;
+    case WM_MOUSEWHEEL: {
+        POINT p{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+        ScreenToClient(hwnd,&p);
+        const float factor = GET_WHEEL_DELTA_WPARAM(wp) > 0 ? 1.12f : (1.0f/1.12f);
+        ZoomAt(hwnd,factor,p);
+        return 0;
+    }
+    case WM_LBUTTONDOWN:
+        if (g_spaceDown) {
+            g_panning=true; g_lastPan={GET_X_LPARAM(lp),GET_Y_LPARAM(lp)}; SetCapture(hwnd); return 0;
+        }
+        break;
+    case WM_MOUSEMOVE:
+        if (g_panning) {
+            POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
+            g_offsetX += float(p.x-g_lastPan.x);
+            g_offsetY += float(p.y-g_lastPan.y);
+            g_lastPan=p;
+            InvalidateRect(hwnd,nullptr,FALSE);
+            return 0;
+        }
+        break;
+    case WM_LBUTTONUP:
+        if (g_panning) { g_panning=false; ReleaseCapture(); return 0; }
+        break;
     case WM_POINTERDOWN: {
         UINT32 id=GET_POINTERID(wp); Point p{}; bool pen=false;
         if (!ReadPointer(id,p,pen)) return 0;
         if (pen) {
             g_activePointer=id; g_drawing=true; g_active.points.clear();
-            if (g_eraser) EraseAt(p.x,p.y); else { AddPoint(p); g_redo.clear(); }
+            if (g_eraser) EraseAtDocument(p.x,p.y); else { AddPoint(p); g_redo.clear(); }
             SetCapture(hwnd); InvalidateRect(hwnd,nullptr,FALSE); return 0;
         }
         break;
@@ -136,7 +206,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_POINTERUPDATE: {
         UINT32 id=GET_POINTERID(wp); if (!g_drawing || id!=g_activePointer) break;
         Point p{}; bool pen=false; if (!ReadPointer(id,p,pen)) break;
-        if (g_eraser) EraseAt(p.x,p.y); else AddPoint(p);
+        if (g_eraser) EraseAtDocument(p.x,p.y); else AddPoint(p);
         InvalidateRect(hwnd,nullptr,FALSE); return 0;
     }
     case WM_POINTERUP: {
