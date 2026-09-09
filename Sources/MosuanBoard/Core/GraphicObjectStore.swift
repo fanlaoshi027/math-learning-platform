@@ -40,15 +40,48 @@ final class GraphicObjectStore {
         objects[index] = object
     }
 
-    func remove(id: UUID) { objects.removeAll { $0.id == id } }
+    func remove(id: UUID) { objects.removeAll { $0.id != id } }
 
     func transformedPoints(of object: GraphicObject) -> [CGPoint] {
-        object.geometry.points.map { transformedPoint($0, in: object) }
+        if object.kind == .parameterizedTriangle, let triangle = object.triangleModel {
+            return triangle.vertices().map { transformedPoint($0, in: object) }
+        }
+        return object.geometry.points.map { transformedPoint($0, in: object) }
     }
 
     func transformedPoints(of id: UUID) -> [CGPoint]? {
         guard let object = object(with: id) else { return nil }
         return transformedPoints(of: object)
+    }
+
+    @discardableResult
+    func updateTriangleModel(id: UUID, _ update: (inout ParameterizedTriangle) -> Void) -> Bool {
+        guard let index = objects.firstIndex(where: { $0.id == id }),
+              objects[index].kind == .parameterizedTriangle,
+              var triangle = objects[index].triangleModel else { return false }
+        update(&triangle)
+        objects[index].triangleModel = triangle
+        return true
+    }
+
+    @discardableResult
+    func dragTriangleVertex(id: UUID, vertexIndex: Int, to point: CGPoint) -> Bool {
+        guard let index = objects.firstIndex(where: { $0.id == id }),
+              objects[index].kind == .parameterizedTriangle,
+              var triangle = objects[index].triangleModel else { return false }
+        guard GeometryInteractionEngine.dragTriangle(&triangle, vertexIndex: vertexIndex, to: point) else { return false }
+        objects[index].triangleModel = triangle
+        return true
+    }
+
+    @discardableResult
+    func setTriangleParameter(id: UUID, parameter: TriangleParameter, value: CGFloat) -> Bool {
+        guard let index = objects.firstIndex(where: { $0.id == id }),
+              objects[index].kind == .parameterizedTriangle,
+              var triangle = objects[index].triangleModel else { return false }
+        GeometryInteractionEngine.setTriangleParameter(&triangle, parameter: parameter, value: value)
+        objects[index].triangleModel = triangle
+        return true
     }
 
     func nearestLineEndpoint(to point: CGPoint, tolerance: CGFloat = 12) -> (id: UUID, endpoint: Int, distance: CGFloat)? {
@@ -98,10 +131,12 @@ final class GraphicObjectStore {
     private func hitTest(_ object: GraphicObject, at point: CGPoint, tolerance: CGFloat) -> Bool {
         let t = tolerance + object.style.strokeWidth
         switch object.kind {
-        case .line, .arrow:
+        case .line, .arrow, .parameterizedTriangle:
             let p = transformedPoints(of: object)
             guard p.count >= 2 else { return false }
-            return distance(point, toSegment: p[0], p[1]) <= t
+            return zip(p, p.dropFirst() + (object.kind == .parameterizedTriangle ? [p[0]] : [])).contains {
+                distance(point, toSegment: $0.0, $0.1) <= t
+            }
         case .polygon:
             let p = transformedPoints(of: object)
             guard p.count >= 3 else { return false }
@@ -116,7 +151,7 @@ final class GraphicObjectStore {
             return normalized <= 1.0 + (t / max(rx, ry))
         case .freehandStroke:
             let p = transformedPoints(of: object)
-            return zip(p, p.dropFirst()).contains { distance(point, toSegment: $0.0, $0.1) <= t }
+            return zip(p, p.dropFirst()).contains { distance(point, toSegment: $0.0, $1) <= t }
         case .coordinateSystem, .functionGraph:
             return bounds(of: object)?.insetBy(dx: -t, dy: -t).contains(point) ?? false
         case .group:
