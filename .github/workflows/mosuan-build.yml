@@ -1,4 +1,4 @@
-name: Mosuan Runner Diagnostic
+name: Mosuan Board Build
 
 on:
   push:
@@ -7,27 +7,53 @@ on:
   workflow_dispatch:
 
 jobs:
-  diagnose-ubuntu:
+  diagnose-runner:
     runs-on: ubuntu-latest
     steps:
       - name: Runner diagnostic
         run: |
-          echo "=== Ubuntu runner started ==="
-          date -u
+          echo "GitHub Actions runner started successfully"
           uname -a
           echo "Architecture: $(uname -m)"
-          echo "Runner OS: $RUNNER_OS"
-          echo "Runner architecture: $RUNNER_ARCH"
 
-  diagnose-macos:
-    runs-on: macos-15
+  build-macos:
+    runs-on: macos-26-intel
     steps:
-      - name: Runner diagnostic
-        run: |
-          echo "=== macOS runner started ==="
-          date -u
-          sw_vers
-          uname -a
-          echo "Architecture: $(uname -m)"
-          echo "Runner OS: $RUNNER_OS"
-          echo "Runner architecture: $RUNNER_ARCH"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Swift toolchain
+        run: swift --version
+
+      - name: Build app bundle and DMG
+        id: build
+        continue-on-error: true
+        run: bash scripts/build-macos-app.sh
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-build-diagnostics
+          path: dist/swift-build.log
+          if-no-files-found: warn
+
+      - name: Fail if build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
+
+      - name: Upload app bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-macOS-app
+          path: dist/Mosuan Board.app
+          if-no-files-found: error
+
+      - name: Upload DMG
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-0.1.0.dmg
+          path: dist/Mosuan-Board-0.1.0.dmg
+          if-no-files-found: error
