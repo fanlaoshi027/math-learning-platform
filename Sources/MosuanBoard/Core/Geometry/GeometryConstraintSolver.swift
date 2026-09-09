@@ -17,11 +17,24 @@ enum GeometryConstraintSolver {
             case let .pointOnCircle(pointID, circleID):
                 _ = pointID; _ = circleID
             case let .fixedLength(segmentID, length):
-                _ = segmentID; _ = length
+                setLength(&model, lineID: segmentID, targetLength: max(0.001, length))
             case let .equalLength(first, second):
-                _ = first; _ = second
+                if let length = lineLength(model, lineID: first) {
+                    setLength(&model, lineID: second, targetLength: length)
+                }
+            case let .lengthRatio(first, second, multiplier):
+                guard let firstLength = lineLength(model, lineID: first) else { continue }
+                setLength(&model, lineID: second, targetLength: firstLength / max(0.0001, multiplier))
             case let .fixedAngle(angleID, degrees):
-                _ = angleID; _ = degrees
+                setAngle(&model, angleID: angleID, targetDegrees: degrees)
+            case let .equalAngle(first, second):
+                if let value = angleValue(in: model, id: first) {
+                    setAngle(&model, angleID: second, targetDegrees: value)
+                }
+            case let .angleRatio(first, second, multiplier):
+                if let value = angleValue(in: model, id: first) {
+                    setAngle(&model, angleID: second, targetDegrees: value / max(0.0001, multiplier))
+                }
             case let .rotationAround(pointID, objectID):
                 _ = pointID; _ = objectID
             case let .parallel(first, second):
@@ -43,18 +56,67 @@ enum GeometryConstraintSolver {
               let start = model.points.first(where: { $0.id == line.startPointID }),
               let end = model.points.first(where: { $0.id == line.endPointID }) else { return }
 
-        let a = start.position
-        let b = end.position
-        let dx = b.x - a.x
-        let dy = b.y - a.y
+        let dx = end.position.x - start.position.x
+        let dy = end.position.y - start.position.y
         let denominator = dx * dx + dy * dy
         guard denominator > 0 else { return }
 
         let p = model.points[pointIndex].position
-        var t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / denominator
+        var t = ((p.x - start.position.x) * dx + (p.y - start.position.y) * dy) / denominator
         if let lowerBound { t = max(lowerBound, t) }
         if let upperBound { t = min(upperBound, t) }
+        model.points[pointIndex].position = CGPoint(x: start.position.x + t * dx, y: start.position.y + t * dy)
+    }
 
-        model.points[pointIndex].position = CGPoint(x: a.x + t * dx, y: a.y + t * dy)
+    private static func lineLength(_ model: GeometryModel, lineID: UUID) -> CGFloat? {
+        guard let line = model.lines.first(where: { $0.id == lineID }),
+              let a = model.points.first(where: { $0.id == line.startPointID }),
+              let b = model.points.first(where: { $0.id == line.endPointID }) else { return nil }
+        return hypot(b.position.x - a.position.x, b.position.y - a.position.y)
+    }
+
+    /// Keeps the line's start point fixed and moves its end point to the requested length.
+    private static func setLength(_ model: inout GeometryModel, lineID: UUID, targetLength: CGFloat) {
+        guard let lineIndex = model.lines.firstIndex(where: { $0.id == lineID }),
+              let start = model.points.first(where: { $0.id == model.lines[lineIndex].startPointID }),
+              let endIndex = model.points.firstIndex(where: { $0.id == model.lines[lineIndex].endPointID }),
+              !model.points[endIndex].isFixed else { return }
+
+        let dx = model.points[endIndex].position.x - start.position.x
+        let dy = model.points[endIndex].position.y - start.position.y
+        let current = hypot(dx, dy)
+        let angle = current > 0.0001 ? atan2(dy, dx) : 0
+        model.points[endIndex].position = CGPoint(
+            x: start.position.x + targetLength * cos(angle),
+            y: start.position.y + targetLength * sin(angle)
+        )
+    }
+
+    private static func angleValue(in model: GeometryModel, id: UUID) -> CGFloat? {
+        guard let annotation = model.angles.first(where: { $0.id == id }) else { return nil }
+        return GeometryAngleCalculator.value(in: model, annotation: annotation)?.degrees
+    }
+
+    /// Changes an angle by rotating its end ray around the angle vertex.
+    /// The start ray remains the reference ray.
+    private static func setAngle(_ model: inout GeometryModel, angleID: UUID, targetDegrees: CGFloat) {
+        guard let annotation = model.angles.first(where: { $0.id == angleID }),
+              let vertex = model.points.first(where: { $0.id == annotation.vertexID }),
+              let start = model.points.first(where: { $0.id == annotation.startPointID }),
+              let endIndex = model.points.firstIndex(where: { $0.id == annotation.endPointID }),
+              !model.points[endIndex].isFixed else { return }
+
+        let startAngle = atan2(start.position.y - vertex.position.y, start.position.x - vertex.position.x)
+        let endVector = CGPoint(x: model.points[endIndex].position.x - vertex.position.x,
+                                y: model.points[endIndex].position.y - vertex.position.y)
+        let radius = max(0.001, hypot(endVector.x, endVector.y))
+        let direction = targetDegrees * .pi / 180
+        let currentCross = (start.position.x - vertex.position.x) * endVector.y - (start.position.y - vertex.position.y) * endVector.x
+        let signedDirection: CGFloat = currentCross >= 0 ? 1 : -1
+        let angle = startAngle + signedDirection * direction
+        model.points[endIndex].position = CGPoint(
+            x: vertex.position.x + radius * cos(angle),
+            y: vertex.position.y + radius * sin(angle)
+        )
     }
 }
