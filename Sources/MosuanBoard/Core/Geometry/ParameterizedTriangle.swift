@@ -8,7 +8,9 @@ enum TriangleKind: String, Codable, CaseIterable {
     case right
 }
 
-/// A triangle whose geometry can be regenerated from teaching-friendly parameters.
+/// A triangle driven by geometric parameters rather than a fixed bitmap.
+/// For an isosceles triangle, base length, equal-leg length and apex angle are
+/// kept mathematically consistent according to whichever parameters are unlocked.
 struct ParameterizedTriangle: Codable, Equatable, Identifiable {
     let id: UUID
     var kind: TriangleKind
@@ -39,9 +41,9 @@ struct ParameterizedTriangle: Codable, Equatable, Identifiable {
         self.kind = kind
         self.anchor = anchor
         self.rotation = rotation
-        self.baseLength = baseLength
-        self.legLength = legLength
-        self.apexAngleDegrees = apexAngleDegrees
+        self.baseLength = max(1, baseLength)
+        self.legLength = max(1, legLength)
+        self.apexAngleDegrees = Self.clampAngle(apexAngleDegrees)
         self.lockedBaseLength = lockedBaseLength
         self.lockedLegLength = lockedLegLength
         self.lockedApexAngle = lockedApexAngle
@@ -50,12 +52,11 @@ struct ParameterizedTriangle: Codable, Equatable, Identifiable {
 
     /// Returns A, B, C in canvas coordinates. A is the anchored vertex.
     func vertices() -> [CGPoint] {
-        let angle = max(1, min(179, apexAngleDegrees)) * .pi / 180
+        let angle = Self.clampAngle(apexAngleDegrees) * .pi / 180
         let leg = max(1, legLength)
         let halfBase = leg * sin(angle / 2)
         let height = leg * cos(angle / 2)
 
-        // A is the apex/anchor. The local triangle is symmetric around +Y.
         let localA = CGPoint.zero
         let localB = CGPoint(x: -halfBase, y: height)
         let localC = CGPoint(x: halfBase, y: height)
@@ -66,26 +67,123 @@ struct ParameterizedTriangle: Codable, Equatable, Identifiable {
 
     mutating func setApexAngle(_ degrees: CGFloat) {
         guard !lockedApexAngle else { return }
-        apexAngleDegrees = max(1, min(179, degrees))
+        let newAngle = Self.clampAngle(degrees)
+
+        switch kind {
+        case .equilateral:
+            apexAngleDegrees = 60
+            legLength = max(1, baseLength)
+        case .isosceles:
+            if lockedBaseLength && lockedLegLength {
+                // Both lengths determine the apex angle; neither can be moved.
+                apexAngleDegrees = Self.angleFor(base: baseLength, leg: legLength)
+            } else if lockedBaseLength {
+                apexAngleDegrees = newAngle
+                legLength = Self.legFor(base: baseLength, angleDegrees: newAngle)
+            } else {
+                apexAngleDegrees = newAngle
+                baseLength = Self.baseFor(leg: legLength, angleDegrees: newAngle)
+            }
+        default:
+            apexAngleDegrees = newAngle
+        }
     }
 
     mutating func setLegLength(_ length: CGFloat) {
         guard !lockedLegLength else { return }
-        legLength = max(1, length)
+        let newLeg = max(1, length)
+
+        switch kind {
+        case .equilateral:
+            legLength = newLeg
+            baseLength = newLeg
+            apexAngleDegrees = 60
+        case .isosceles:
+            if lockedBaseLength {
+                legLength = max(newLeg, baseLength / 2)
+                if !lockedApexAngle {
+                    apexAngleDegrees = Self.angleFor(base: baseLength, leg: legLength)
+                }
+            } else {
+                legLength = newLeg
+                baseLength = Self.baseFor(leg: legLength, angleDegrees: apexAngleDegrees)
+            }
+        default:
+            legLength = newLeg
+        }
     }
 
     mutating func setBaseLength(_ length: CGFloat) {
         guard !lockedBaseLength else { return }
-        baseLength = max(1, length)
-        guard kind == .isosceles else { return }
-        let half = baseLength / 2
-        let angle = max(1, min(179, apexAngleDegrees)) * .pi / 180
-        let requiredLeg = half / max(sin(angle / 2), 0.001)
-        if !lockedLegLength { legLength = requiredLeg }
+        let newBase = max(1, length)
+
+        switch kind {
+        case .equilateral:
+            baseLength = newBase
+            legLength = newBase
+            apexAngleDegrees = 60
+        case .isosceles:
+            if lockedLegLength {
+                baseLength = min(newBase, 2 * legLength - 0.001)
+                if !lockedApexAngle {
+                    apexAngleDegrees = Self.angleFor(base: baseLength, leg: legLength)
+                }
+            } else {
+                baseLength = newBase
+                legLength = Self.legFor(base: baseLength, angleDegrees: apexAngleDegrees)
+            }
+        default:
+            baseLength = newBase
+        }
     }
 
     mutating func setRotation(_ radians: CGFloat) {
         rotation = radians
+    }
+
+    /// Normalizes an isosceles triangle after loading or changing its type.
+    mutating func normalize() {
+        switch kind {
+        case .equilateral:
+            apexAngleDegrees = 60
+            if lockedBaseLength {
+                legLength = baseLength
+            } else if lockedLegLength {
+                baseLength = legLength
+            } else {
+                baseLength = max(1, baseLength)
+                legLength = baseLength
+            }
+        case .isosceles:
+            if lockedBaseLength && lockedLegLength {
+                apexAngleDegrees = Self.angleFor(base: baseLength, leg: legLength)
+            } else if lockedBaseLength {
+                legLength = Self.legFor(base: baseLength, angleDegrees: apexAngleDegrees)
+            } else {
+                baseLength = Self.baseFor(leg: legLength, angleDegrees: apexAngleDegrees)
+            }
+        default:
+            break
+        }
+    }
+
+    private static func clampAngle(_ degrees: CGFloat) -> CGFloat {
+        max(1, min(179, degrees))
+    }
+
+    private static func baseFor(leg: CGFloat, angleDegrees: CGFloat) -> CGFloat {
+        let angle = clampAngle(angleDegrees) * .pi / 180
+        return max(1, 2 * max(1, leg) * sin(angle / 2))
+    }
+
+    private static func legFor(base: CGFloat, angleDegrees: CGFloat) -> CGFloat {
+        let angle = clampAngle(angleDegrees) * .pi / 180
+        return max(1, (max(1, base) / 2) / max(sin(angle / 2), 0.0001))
+    }
+
+    private static func angleFor(base: CGFloat, leg: CGFloat) -> CGFloat {
+        let ratio = max(0.0001, min(1, max(1, base) / (2 * max(1, leg))))
+        return clampAngle(2 * asin(ratio) * 180 / .pi)
     }
 
     private func rotate(_ point: CGPoint) -> CGPoint {
