@@ -14,9 +14,7 @@ rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 # Normalize the dynamic-angle renderer's trig/SIMD expression before compilation.
-if grep -Fq 'var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)' Sources/MosuanBoard/Metal/InkRenderer.swift; then
-  sed -i '' 's/        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)/        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat/' Sources/MosuanBoard/Metal/InkRenderer.swift
-fi
+perl -0pi -e 's/        var previous = v \+ SIMD2\(cos\(startAngle\), sin\(startAngle\)\) \* Float\(radius\)/        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat/' Sources/MosuanBoard/Metal/InkRenderer.swift
 
 BUILD_LOG="$ROOT_DIR/dist/swift-build.log"
 set +e
