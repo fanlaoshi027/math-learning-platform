@@ -24,11 +24,7 @@ final class GraphicObjectStore {
         return object.id
     }
 
-    /// Inserts an already-created object, preserving its UUID.
-    /// Used by clipboard/import flows that create a fresh UUID before insertion.
-    func insert(_ object: GraphicObject) {
-        objects.append(object)
-    }
+    func insert(_ object: GraphicObject) { objects.append(object) }
 
     func object(with id: UUID) -> GraphicObject? { objects.first { $0.id == id } }
 
@@ -40,7 +36,7 @@ final class GraphicObjectStore {
         objects[index] = object
     }
 
-    func remove(id: UUID) { objects.removeAll { $0.id != id } }
+    func remove(id: UUID) { objects.removeAll { $0.id == id } }
 
     func transformedPoints(of object: GraphicObject) -> [CGPoint] {
         if object.kind == .parameterizedTriangle, let triangle = object.triangleModel {
@@ -120,7 +116,6 @@ final class GraphicObjectStore {
         }
     }
 
-    /// Hit-tests the topmost structured object at a world-space point.
     func hitTest(at point: CGPoint, tolerance: CGFloat = 10) -> UUID? {
         for object in objects.reversed() where hitTest(object, at: point, tolerance: tolerance) {
             return object.id
@@ -134,9 +129,8 @@ final class GraphicObjectStore {
         case .line, .arrow, .parameterizedTriangle:
             let p = transformedPoints(of: object)
             guard p.count >= 2 else { return false }
-            return zip(p, p.dropFirst() + (object.kind == .parameterizedTriangle ? [p[0]] : [])).contains {
-                distance(point, toSegment: $0.0, $0.1) <= t
-            }
+            let closingPoints = object.kind == .parameterizedTriangle ? p.dropFirst() + [p[0]] : p.dropFirst()
+            return zip(p, closingPoints).contains { distance(point, toSegment: $0.0, $0.1) <= t }
         case .polygon:
             let p = transformedPoints(of: object)
             guard p.count >= 3 else { return false }
@@ -151,7 +145,7 @@ final class GraphicObjectStore {
             return normalized <= 1.0 + (t / max(rx, ry))
         case .freehandStroke:
             let p = transformedPoints(of: object)
-            return zip(p, p.dropFirst()).contains { distance(point, toSegment: $0.0, $1) <= t }
+            return zip(p, p.dropFirst()).contains { distance(point, toSegment: $0.0, $0.1) <= t }
         case .coordinateSystem, .functionGraph:
             return bounds(of: object)?.insetBy(dx: -t, dy: -t).contains(point) ?? false
         case .group:
