@@ -17,11 +17,18 @@ jobs:
         run: swift --version
 
       - name: Build app bundle and DMG
-        env:
-          SWIFT_FRONTEND_FLAGS: "-Xfrontend -solver-expression-time-threshold=10"
         run: bash scripts/build-macos-app.sh
 
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-build-diagnostics
+          path: dist/swift-build.log
+          if-no-files-found: warn
+
       - name: Upload app bundle
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Mosuan-Board-macOS-app
@@ -29,6 +36,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload DMG
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Mosuan-Board-macOS-dmg
