@@ -9,7 +9,10 @@ enum GeometryConstraint: Codable, Equatable, Identifiable {
     case pointOnCircle(pointID: UUID, circleID: UUID)
     case fixedLength(segmentID: UUID, length: CGFloat)
     case equalLength(first: UUID, second: UUID)
+    case lengthRatio(first: UUID, second: UUID, multiplier: CGFloat)
     case fixedAngle(angleID: UUID, degrees: CGFloat)
+    case equalAngle(first: UUID, second: UUID)
+    case angleRatio(first: UUID, second: UUID, multiplier: CGFloat)
     case rotationAround(pointID: UUID, objectID: UUID)
     case parallel(first: UUID, second: UUID)
     case perpendicular(first: UUID, second: UUID)
@@ -23,7 +26,10 @@ enum GeometryConstraint: Codable, Equatable, Identifiable {
         case let .pointOnCircle(pointID, circleID): return "pointOnCircle:\(pointID.uuidString):\(circleID.uuidString)"
         case let .fixedLength(segmentID, _): return "fixedLength:\(segmentID.uuidString)"
         case let .equalLength(first, second): return "equalLength:\(first.uuidString):\(second.uuidString)"
+        case let .lengthRatio(first, second, multiplier): return "lengthRatio:\(first.uuidString):\(second.uuidString):\(multiplier)"
         case let .fixedAngle(angleID, _): return "fixedAngle:\(angleID.uuidString)"
+        case let .equalAngle(first, second): return "equalAngle:\(first.uuidString):\(second.uuidString)"
+        case let .angleRatio(first, second, multiplier): return "angleRatio:\(first.uuidString):\(second.uuidString):\(multiplier)"
         case let .rotationAround(pointID, objectID): return "rotationAround:\(pointID.uuidString):\(objectID.uuidString)"
         case let .parallel(first, second): return "parallel:\(first.uuidString):\(second.uuidString)"
         case let .perpendicular(first, second): return "perpendicular:\(first.uuidString):\(second.uuidString)"
@@ -59,22 +65,25 @@ struct GeometryModel: Codable, Equatable, Identifiable {
     let id: UUID
     var points: [GeometryPoint]
     var lines: [GeometryLine]
+    var angles: [GeometryAngleAnnotation]
     var constraints: [GeometryConstraint]
 
-    init(id: UUID = UUID(), points: [GeometryPoint] = [], lines: [GeometryLine] = [], constraints: [GeometryConstraint] = []) {
+    init(id: UUID = UUID(), points: [GeometryPoint] = [], lines: [GeometryLine] = [], angles: [GeometryAngleAnnotation] = [], constraints: [GeometryConstraint] = []) {
         self.id = id
         self.points = points
         self.lines = lines
+        self.angles = angles
         self.constraints = constraints
     }
 
-    private enum CodingKeys: String, CodingKey { case id, points, lines, constraints }
+    private enum CodingKeys: String, CodingKey { case id, points, lines, angles, constraints }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         points = try container.decode([GeometryPoint].self, forKey: .points)
         lines = try container.decodeIfPresent([GeometryLine].self, forKey: .lines) ?? []
+        angles = try container.decodeIfPresent([GeometryAngleAnnotation].self, forKey: .angles) ?? []
         constraints = try container.decode([GeometryConstraint].self, forKey: .constraints)
     }
 
@@ -87,6 +96,15 @@ struct GeometryModel: Codable, Equatable, Identifiable {
             return false
         }
         constraints.append(.fixedPoint(pointID: pointID, position: points[index].position))
+    }
+
+    mutating func setMovable(_ pointID: UUID) {
+        guard let index = points.firstIndex(where: { $0.id == pointID }) else { return }
+        points[index].isFixed = false
+        constraints.removeAll { constraint in
+            if case let .fixedPoint(id, _) = constraint { return id == pointID }
+            return false
+        }
     }
 
     mutating func bind(master: UUID, follower: UUID) {
