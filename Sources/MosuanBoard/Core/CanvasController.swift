@@ -40,6 +40,7 @@ final class CanvasController: ObservableObject {
 
     func undo() {
         dynamicTrianglePlayback.stop()
+        canvas?.stopDynamicAnglePlayback()
         canvas?.endDynamicTrianglePlaybackHistory()
         canvas?.endDynamicTriangleParameterEditHistory()
         canvas?.undo()
@@ -48,6 +49,7 @@ final class CanvasController: ObservableObject {
 
     func redo() {
         dynamicTrianglePlayback.stop()
+        canvas?.stopDynamicAnglePlayback()
         canvas?.endDynamicTrianglePlaybackHistory()
         canvas?.endDynamicTriangleParameterEditHistory()
         canvas?.redo()
@@ -56,6 +58,7 @@ final class CanvasController: ObservableObject {
 
     func deleteSelected() {
         dynamicTrianglePlayback.stop()
+        canvas?.stopDynamicAnglePlayback()
         canvas?.endDynamicTrianglePlaybackHistory()
         canvas?.endDynamicTriangleParameterEditHistory()
         canvas?.deleteSelected()
@@ -69,6 +72,7 @@ final class CanvasController: ObservableObject {
     func resetRotationCenter() { canvas?.setRotationCenterToSelectionCenter(); refreshState() }
 
     func setDynamicAngleDegrees(_ degrees: Double) {
+        guard !dynamicAnglePlaying else { return }
         canvas?.setSelectedDynamicAngleDegrees(CGFloat(degrees))
         refreshState()
     }
