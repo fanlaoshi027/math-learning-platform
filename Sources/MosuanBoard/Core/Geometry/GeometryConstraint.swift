@@ -1,8 +1,6 @@
 import CoreGraphics
 import Foundation
 
-/// Reusable constraints for editable middle-school geometry.
-/// Constraints describe relationships; the renderer remains responsible for drawing.
 enum GeometryConstraint: Codable, Equatable, Identifiable {
     case fixedPoint(pointID: UUID, position: CGPoint)
     case pointBinding(master: UUID, follower: UUID, offset: CGPoint)
@@ -38,53 +36,46 @@ struct GeometryPoint: Codable, Equatable, Identifiable {
     var name: String?
     var position: CGPoint
     var isFixed: Bool
-    /// GGB-style point label: hidden or named. The label is presentation data,
-    /// not a separate drawing stroke, so it remains dynamic with the point.
     var label: GeometryPointLabel
 
-    init(
-        id: UUID = UUID(),
-        name: String? = nil,
-        position: CGPoint,
-        isFixed: Bool = false,
-        label: GeometryPointLabel? = nil
-    ) {
+    init(id: UUID = UUID(), name: String? = nil, position: CGPoint, isFixed: Bool = false, label: GeometryPointLabel? = nil) {
         self.id = id
         self.name = name
         self.position = position
         self.isFixed = isFixed
-        self.label = label ?? GeometryPointLabel(
-            mode: name == nil ? .hidden : .name,
-            text: name ?? ""
-        )
+        self.label = label ?? GeometryPointLabel(mode: name == nil ? .hidden : .name, text: name ?? "")
     }
 
-    var isLabelVisible: Bool {
-        label.mode != .hidden && !label.text.isEmpty
-    }
-
-    mutating func setLabelVisible(_ visible: Bool) {
-        label.mode = visible ? .name : .hidden
-    }
-
+    var isLabelVisible: Bool { label.mode != .hidden && !label.text.isEmpty }
+    mutating func setLabelVisible(_ visible: Bool) { label.mode = visible ? .name : .hidden }
     mutating func setLabelText(_ text: String) {
         name = text.isEmpty ? nil : text
         label.text = text
-        if !text.isEmpty && label.mode == .hidden {
-            label.mode = .name
-        }
+        if !text.isEmpty && label.mode == .hidden { label.mode = .name }
     }
 }
 
 struct GeometryModel: Codable, Equatable, Identifiable {
     let id: UUID
     var points: [GeometryPoint]
+    var lines: [GeometryLine]
     var constraints: [GeometryConstraint]
 
-    init(id: UUID = UUID(), points: [GeometryPoint] = [], constraints: [GeometryConstraint] = []) {
+    init(id: UUID = UUID(), points: [GeometryPoint] = [], lines: [GeometryLine] = [], constraints: [GeometryConstraint] = []) {
         self.id = id
         self.points = points
+        self.lines = lines
         self.constraints = constraints
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, points, lines, constraints }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        points = try container.decode([GeometryPoint].self, forKey: .points)
+        lines = try container.decodeIfPresent([GeometryLine].self, forKey: .lines) ?? []
+        constraints = try container.decode([GeometryConstraint].self, forKey: .constraints)
     }
 
     mutating func setFixed(_ pointID: UUID, position: CGPoint? = nil) {
@@ -99,10 +90,8 @@ struct GeometryModel: Codable, Equatable, Identifiable {
     }
 
     mutating func bind(master: UUID, follower: UUID) {
-        guard let masterPoint = points.first(where: { $0.id == master }),
-              let followerPoint = points.first(where: { $0.id == follower }) else { return }
-        let offset = CGPoint(x: followerPoint.position.x - masterPoint.position.x,
-                             y: followerPoint.position.y - masterPoint.position.y)
+        guard let masterPoint = points.first(where: { $0.id == master }), let followerPoint = points.first(where: { $0.id == follower }) else { return }
+        let offset = CGPoint(x: followerPoint.position.x - masterPoint.position.x, y: followerPoint.position.y - masterPoint.position.y)
         constraints.removeAll { constraint in
             if case let .pointBinding(existingMaster, existingFollower, _) = constraint {
                 return existingMaster == master || existingFollower == follower
@@ -110,5 +99,12 @@ struct GeometryModel: Codable, Equatable, Identifiable {
             return false
         }
         constraints.append(.pointBinding(master: master, follower: follower, offset: offset))
+    }
+
+    mutating func addLine(from startPointID: UUID, to endPointID: UUID, kind: GeometryLine.Kind = .segment) -> UUID? {
+        guard points.contains(where: { $0.id == startPointID }), points.contains(where: { $0.id == endPointID }), startPointID != endPointID else { return nil }
+        let line = GeometryLine(startPointID: startPointID, endPointID: endPointID, kind: kind)
+        lines.append(line)
+        return line.id
     }
 }
