@@ -1,0 +1,36 @@
+name: Mosuan Board Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - mosuan-board-dev
+    paths:
+      - 'Windows/**'
+      - '.github/workflows/mosuan-windows.yml'
+
+jobs:
+  windows-build:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inspect Windows toolchain
+        shell: pwsh
+        run: |
+          Write-Host "Runner: $env:RUNNER_OS"
+          Write-Host "Architecture: $env:PROCESSOR_ARCHITECTURE"
+          dotnet --info
+
+      - name: Validate Windows source boundary
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'Windows/MosuanWindows/README.md')) {
+            throw 'Windows platform boundary is missing.'
+          }
+          Write-Host 'Windows platform boundary OK.'
+
+      # WinUI 3 project build will be enabled here after the native
+      # application shell is added. Keeping this workflow separate from
+      # the Swift/macOS workflow prevents platform toolchains from mixing.
