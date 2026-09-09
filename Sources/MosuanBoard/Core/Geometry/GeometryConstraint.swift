@@ -38,12 +38,41 @@ struct GeometryPoint: Codable, Equatable, Identifiable {
     var name: String?
     var position: CGPoint
     var isFixed: Bool
+    /// GGB-style point label: hidden or named. The label is presentation data,
+    /// not a separate drawing stroke, so it remains dynamic with the point.
+    var label: GeometryPointLabel
 
-    init(id: UUID = UUID(), name: String? = nil, position: CGPoint, isFixed: Bool = false) {
+    init(
+        id: UUID = UUID(),
+        name: String? = nil,
+        position: CGPoint,
+        isFixed: Bool = false,
+        label: GeometryPointLabel? = nil
+    ) {
         self.id = id
         self.name = name
         self.position = position
         self.isFixed = isFixed
+        self.label = label ?? GeometryPointLabel(
+            mode: name == nil ? .hidden : .name,
+            text: name ?? ""
+        )
+    }
+
+    var isLabelVisible: Bool {
+        label.mode != .hidden && !label.text.isEmpty
+    }
+
+    mutating func setLabelVisible(_ visible: Bool) {
+        label.mode = visible ? .name : .hidden
+    }
+
+    mutating func setLabelText(_ text: String) {
+        name = text.isEmpty ? nil : text
+        label.text = text
+        if !text.isEmpty && label.mode == .hidden {
+            label.mode = .name
+        }
     }
 }
 
