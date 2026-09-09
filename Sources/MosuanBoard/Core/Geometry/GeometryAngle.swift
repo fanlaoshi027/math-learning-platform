@@ -19,6 +19,8 @@ struct GeometryAngleAnnotation: Codable, Equatable, Identifiable {
     var endPointID: UUID
     var mode: GeometryAngleLabelMode
     var name: String
+    /// Optional fixed/shared parameter target for driving the end ray.
+    var angleReference: GeometryAngleReference?
     /// User-adjustable offset from the angle arc/label's automatically chosen anchor.
     var labelOffset: CGPoint
     var radius: CGFloat
@@ -31,6 +33,7 @@ struct GeometryAngleAnnotation: Codable, Equatable, Identifiable {
         endPointID: UUID,
         mode: GeometryAngleLabelMode = .degrees,
         name: String = "α",
+        angleReference: GeometryAngleReference? = nil,
         labelOffset: CGPoint = .zero,
         radius: CGFloat = 32,
         autoAvoid: Bool = true
@@ -41,6 +44,7 @@ struct GeometryAngleAnnotation: Codable, Equatable, Identifiable {
         self.endPointID = endPointID
         self.mode = mode
         self.name = name
+        self.angleReference = angleReference
         self.labelOffset = labelOffset
         self.radius = max(8, radius)
         self.autoAvoid = autoAvoid
@@ -71,6 +75,10 @@ enum GeometryAngleCalculator {
               let start = model.points.first(where: { $0.id == annotation.startPointID }),
               let end = model.points.first(where: { $0.id == annotation.endPointID }) else { return nil }
         return value(vertex: vertex.position, start: start.position, end: end.position)
+    }
+
+    static func targetDegrees(in model: GeometryModel, annotation: GeometryAngleAnnotation) -> CGFloat? {
+        annotation.angleReference?.resolved(using: model.parameters)
     }
 }
 
