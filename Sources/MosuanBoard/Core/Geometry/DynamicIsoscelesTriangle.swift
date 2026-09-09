@@ -50,10 +50,42 @@ struct DynamicIsoscelesTriangle: Codable, Equatable, Identifiable {
     var baseLength: CGFloat { triangle.baseLength }
     var vertices: [CGPoint] { triangle.vertices() }
 
+    /// A convenient handle position on the angle bisector.
+    /// The handle moves around A as the apex angle changes, while the triangle's
+    /// rotation and equal-leg length remain unchanged.
+    func angleControlPoint(radius: CGFloat = 58) -> CGPoint {
+        let r = max(8, radius)
+        let c = cos(triangle.rotation)
+        let s = sin(triangle.rotation)
+        return CGPoint(
+            x: triangle.anchor.x - r * s,
+            y: triangle.anchor.y + r * c
+        )
+    }
+
     mutating func setAngle(_ degrees: CGFloat) {
         let clamped = max(angleMinimum, min(angleMaximum, degrees))
         let snapped = angleMinimum + ((clamped - angleMinimum) / angleStep).rounded() * angleStep
         triangle.setApexAngle(max(angleMinimum, min(angleMaximum, snapped)))
+    }
+
+    /// Changes only the apex angle from a dragged angle-bisector control point.
+    /// The anchor, rotation and equal-leg length stay fixed.
+    mutating func setAngleFromControlPoint(_ point: CGPoint) {
+        let dx = point.x - triangle.anchor.x
+        let dy = point.y - triangle.anchor.y
+        let c = cos(triangle.rotation)
+        let s = sin(triangle.rotation)
+        // Convert the pointer into the triangle's local coordinate system.
+        let localX = dx * c + dy * s
+        let localY = -dx * s + dy * c
+        guard hypot(localX, localY) > 0.001 else { return }
+
+        // In local coordinates the symmetry axis is +Y.  The two equal legs
+        // therefore form +/- half the apex angle around that axis.
+        let halfAngle = atan2(abs(localX), max(0.001, localY))
+        let degrees = 2 * halfAngle * 180 / .pi
+        setAngle(degrees)
     }
 
     mutating func setLegLength(_ length: CGFloat) {
