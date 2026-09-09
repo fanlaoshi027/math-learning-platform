@@ -24,6 +24,33 @@ final class GraphicObjectStore {
         return object.id
     }
 
+    @discardableResult
+    func addDynamicAngle(
+        vertex: CGPoint,
+        startLength: CGFloat = 180,
+        endLength: CGFloat = 180,
+        angleDegrees: CGFloat = 45,
+        minimum: CGFloat = 10,
+        maximum: CGFloat = 170,
+        step: CGFloat = 1,
+        name: String = "α",
+        style: GraphicObject.Style = GraphicObject.Style()
+    ) -> UUID {
+        let object = DynamicAngleFactory.makeGraphicObject(
+            vertex: vertex,
+            startLength: startLength,
+            endLength: endLength,
+            angleDegrees: angleDegrees,
+            minimum: minimum,
+            maximum: maximum,
+            step: step,
+            name: name,
+            style: style
+        )
+        objects.append(object)
+        return object.id
+    }
+
     func insert(_ object: GraphicObject) { objects.append(object) }
 
     func object(with id: UUID) -> GraphicObject? { objects.first { $0.id == id } }
@@ -36,7 +63,7 @@ final class GraphicObjectStore {
         objects[index] = object
     }
 
-    func remove(id: UUID) { objects.removeAll { $0.id != id ? false : true } }
+    func remove(id: UUID) { objects.removeAll { $0.id == id } }
 
     func transformedPoints(of object: GraphicObject) -> [CGPoint] {
         if object.kind == .parameterizedTriangle, let triangle = object.triangleModel {
@@ -94,6 +121,13 @@ final class GraphicObjectStore {
         return true
     }
 
+    func dynamicAngleParameter(id: UUID) -> GeometryParameter? {
+        guard let object = object(with: id),
+              object.kind == .dynamicAngle,
+              let dynamicAngle = object.dynamicAngleModel else { return nil }
+        return dynamicAngle.parameter
+    }
+
     @discardableResult
     func dragDynamicAngleEndpoint(id: UUID, to point: CGPoint) -> Bool {
         guard let index = objects.firstIndex(where: { $0.id == id }),
@@ -110,9 +144,7 @@ final class GraphicObjectStore {
         let sy = start.position.y - vertex.position.y
         let cross = sx * dy - sy * dx
         let dot = sx * dx + sy * dy
-        var degrees = atan2(abs(cross), dot) * 180 / .pi
-        if degrees < 0 { degrees += 360 }
-        degrees = min(170, max(10, degrees))
+        let degrees = min(170, max(10, atan2(abs(cross), dot) * 180 / .pi))
         guard dynamicAngle.setAngle(degrees) else { return false }
         objects[index].dynamicAngleModel = dynamicAngle
         objects[index].geometryModel = dynamicAngle.model
