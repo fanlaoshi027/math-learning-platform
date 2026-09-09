@@ -13,7 +13,7 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-swift build -c release
+swift build -c release -Xswiftc -Xfrontend -Xswiftc -solver-expression-time-threshold=10
 BINARY="$ROOT_DIR/.build/release/MosuanBoard"
 if [ ! -x "$BINARY" ]; then
   echo "Release binary not found: $BINARY" >&2
@@ -24,7 +24,7 @@ cp "$BINARY" "$MACOS_DIR/MosuanBoard"
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
