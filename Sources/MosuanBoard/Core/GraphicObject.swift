@@ -14,6 +14,7 @@ struct GraphicObject: Identifiable, Codable, Equatable {
         case ellipse
         case coordinateSystem
         case functionGraph
+        case parameterizedTriangle
         case group
     }
 
@@ -51,13 +52,20 @@ struct GraphicObject: Identifiable, Codable, Equatable {
     var geometry: Geometry
     var children: [GraphicObject]
 
+    /// Optional dynamic-geometry data. Kept separate from raw drawing geometry
+    /// so ordinary objects remain lightweight and backward compatible.
+    var geometryModel: GeometryModel?
+    var triangleModel: ParameterizedTriangle?
+
     init(
         id: UUID = UUID(),
         kind: Kind,
         transform: Transform = Transform(),
         style: Style = Style(),
         geometry: Geometry = Geometry(),
-        children: [GraphicObject] = []
+        children: [GraphicObject] = [],
+        geometryModel: GeometryModel? = nil,
+        triangleModel: ParameterizedTriangle? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -65,6 +73,8 @@ struct GraphicObject: Identifiable, Codable, Equatable {
         self.style = style
         self.geometry = geometry
         self.children = children
+        self.geometryModel = geometryModel
+        self.triangleModel = triangleModel
     }
 }
 
@@ -98,6 +108,26 @@ extension GraphicObject {
             kind: .ellipse,
             style: style,
             geometry: Geometry(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
+        )
+    }
+
+    static func isoscelesTriangle(
+        anchor: CGPoint,
+        legLength: CGFloat = 120,
+        apexAngleDegrees: CGFloat = 60,
+        style: Style = Style()
+    ) -> GraphicObject {
+        let model = ParameterizedTriangle(
+            kind: .isosceles,
+            anchor: anchor,
+            legLength: legLength,
+            apexAngleDegrees: apexAngleDegrees
+        )
+        return GraphicObject(
+            kind: .parameterizedTriangle,
+            style: style,
+            geometry: Geometry(points: model.vertices()),
+            triangleModel: model
         )
     }
 }
