@@ -8,6 +8,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
     @State private var isPlaying = false
     @State private var direction = 1.0
     private let timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+    private let presets: [Int] = [30, 45, 60, 90, 120, 150]
 
     private var apexAngle: Int {
         Int(degrees.rounded())
@@ -15,6 +16,16 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
 
     private var baseAngle: Int {
         Int(((180 - degrees) / 2).rounded())
+    }
+
+    private func setAngle(_ value: Double) {
+        if isPlaying {
+            isPlaying = false
+            onPlaybackChanged?(false)
+        }
+        direction = 1
+        degrees = value
+        onValueChanged?()
     }
 
     var body: some View {
@@ -40,6 +51,17 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 Text("150°").font(.caption).foregroundStyle(.secondary)
             }
 
+            HStack(spacing: 5) {
+                ForEach(presets, id: \.self) { value in
+                    Button("\(value)°") {
+                        setAngle(Double(value))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(apexAngle == value ? .accentColor : nil)
+                }
+            }
+
             HStack(spacing: 10) {
                 Text("AB = AC")
                     .font(.system(size: 14, weight: .medium))
@@ -60,13 +82,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 .buttonStyle(.borderedProminent)
 
                 Button("回到 60°") {
-                    if isPlaying {
-                        isPlaying = false
-                        onPlaybackChanged?(false)
-                    }
-                    direction = 1
-                    degrees = 60
-                    onValueChanged?()
+                    setAngle(60)
                 }
                 .buttonStyle(.bordered)
             }
