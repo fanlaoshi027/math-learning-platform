@@ -14,7 +14,7 @@ struct DynamicAngleParameterPanel: View {
     private var normalizedStep: Double { max(step, 0.1) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(name)
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -28,8 +28,10 @@ struct DynamicAngleParameterPanel: View {
             }
 
             Slider(value: $degrees, in: minimum...maximum, step: normalizedStep)
+                .accessibilityLabel("动态角度")
+                .accessibilityValue("\(degrees, specifier: "%.0f")度")
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Text("范围")
                     .foregroundStyle(.secondary)
                 Text("\(minimum, specifier: "%.0f")°")
@@ -37,16 +39,30 @@ struct DynamicAngleParameterPanel: View {
                     .foregroundStyle(.secondary)
                 Text("\(maximum, specifier: "%.0f")°")
                 Spacer()
+                Text("步长 \(step, specifier: "%.0f")°")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 12))
+
+            HStack(spacing: 8) {
+                Label("往返", systemImage: "arrow.left.arrow.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
                 if let onPlayPause {
                     Button(action: onPlayPause) {
                         Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                            .frame(minWidth: 76)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                 }
             }
-            .font(.system(size: 12))
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(.quaternary, lineWidth: 1)
+        }
     }
 }
