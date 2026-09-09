@@ -164,7 +164,7 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     @discardableResult func selectStrokes(in viewRect: CGRect, fullyContained: Bool = false, operation: SelectionOperation = .replace) -> Int { let a = canvasPoint(from: SIMD2(Float(viewRect.minX),Float(viewRect.minY))); let b = canvasPoint(from: SIMD2(Float(viewRect.maxX),Float(viewRect.maxY))); let r = CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(a.x-b.x)), height: CGFloat(abs(a.y-b.y))); let result = committedStrokes.indices.filter { guard let b = bounds(committedStrokes[$0].points) else { return false }; return fullyContained ? r.contains(b) : r.intersects(b) }; applySelection(operation, objects: [], strokes: Array(result)); return selectionCount }
     @discardableResult func selectLasso(in viewPoints: [SIMD2<Float>], operation: SelectionOperation = .replace) -> Int { guard viewPoints.count >= 3 else { if operation == .replace { clearSelection() }; return selectionCount }; let lasso = viewPoints.map { p in let c = canvasPoint(from: p); return CGPoint(x: CGFloat(c.x), y: CGFloat(c.y)) }; let objects = objectStore.objectsIntersectingLasso(lasso); let strokes = committedStrokes.indices.filter { strokeIntersectsLasso(committedStrokes[$0].points, lasso) }; applySelection(operation, objects: objects, strokes: Array(strokes)); return selectionCount }
     func clearSelection() { selectedStrokeIndices = []; selectedObjectIDs = []; customRotationCenter = nil; rebuildGeometry() }
-    func selectionBounds() -> CGRect? { var result: CGRect?; for i in selectedStrokeIndices { if committedStrokes.indices.contains(i), let b = bounds(committedStrokes[i].points) { result = result?.union(b) ?? b } }; for id in selectedObjectIDs { if let b = objectStore.bounds(of: id) { result = result?.union(b) ?? b } }; return result?.insetBy(dx: -8, dy: -8) }
+    func selectionBounds() -> CGRect? { var result:CGRect?; for i in selectedStrokeIndices { if committedStrokes.indices.contains(i), let b = bounds(committedStrokes[i].points) { result = result?.union(b) ?? b } }; for id in selectedObjectIDs { if let b = objectStore.bounds(of: id) { result = result?.union(b) ?? b } }; return result?.insetBy(dx: -8, dy: -8) }
     func selectionBoundsInView() -> CGRect? { guard let r = selectionBounds() else { return nil }; let a = viewPoint(from: SIMD2(Float(r.minX),Float(r.minY))); let b = viewPoint(from: SIMD2(Float(r.maxX),Float(r.maxY))); return CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(b.x-a.x)), height: CGFloat(abs(b.y-a.y))) }
     func selectionCenter() -> SIMD2<Float>? { guard let r = selectionBounds() else { return nil }; return SIMD2(Float(r.midX),Float(r.midY)) }
     func setRotationCenter(to point: SIMD2<Float>) { customRotationCenter = canvasPoint(from: point); rebuildGeometry() }
@@ -213,7 +213,11 @@ final class InkRenderer: NSObject, MTKViewDelegate {
             let offset = angleStep * CGFloat(index)
             let signedOffset = signed * offset
             let angle = startAngle + signedOffset
-            let current = v + SIMD2(cos(angle), sin(angle)) * Float(radius)
+            let cosAngle = cos(angle)
+            let sinAngle = sin(angle)
+            let radiusFloat = Float(radius)
+            let arcVector = SIMD2<Float>(Float(cosAngle), Float(sinAngle))
+            let current = v + arcVector * radiusFloat
             appendLine(previous, current, width: Float(max(1.0, object.style.strokeWidth * 0.9)), color: color, to: &out)
             previous = current
         }
