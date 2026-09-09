@@ -13,6 +13,16 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
+# The renderer currently contains a compact declaration that Swift 5.10 parses
+# as the custom operator `=-`. Normalize only that token before compilation.
+python3 - <<'PY'
+from pathlib import Path
+p = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
+s = p.read_text()
+s = s.replace("nx=-dy/l,ny=dx/l", "nx = -dy/l,ny = dx/l")
+p.write_text(s)
+PY
+
 swift build -c release
 BINARY="$ROOT_DIR/.build/release/MosuanBoard"
 if [ ! -x "$BINARY" ]; then
