@@ -6,7 +6,12 @@ import simd
 /// rendering-only smoothing, pressure/speed dynamics, and transient prediction.
 final class MosuanMetalCanvasView: MTKView {
     private struct Vertex {
-        var position: SIMD2<Float>
+        var position: SIMD2<Float> // NDC position used by the vertex stage.
+        var point: SIMD2<Float>    // Screen-space pixel coordinate for SDF coverage.
+        var p0: SIMD2<Float>       // Circle center or segment start.
+        var p1: SIMD2<Float>       // Segment end; equal to p0 for a circle.
+        var radius: Float
+        var kind: UInt32            // 0 = round point, 1 = round segment.
         var color: SIMD4<Float>
     }
 
@@ -18,8 +23,7 @@ final class MosuanMetalCanvasView: MTKView {
     private var canvasScale: Float = 1
     private var canvasOffset: SIMD2<Float> = .zero
 
-    /// Display-only cache. Document samples remain the source of truth.
-    /// The mesh is invalidated when the viewport or rendering parameters change.
+    /// Display-only CPU mesh cache. Document samples remain the source of truth.
     private var committedMeshCache: [UInt64: [Vertex]] = [:]
 
     var smoothingEnabled = true
@@ -187,9 +191,18 @@ final class MosuanMetalCanvasView: MTKView {
             let p1 = stroke[index].position
             let p2 = stroke[index + 1].position
             let p3 = index + 2 < stroke.count ? stroke[index + 2].position : p2
-            let incoming = simd_normalize(p1 - p0)
-            let outgoing = simd_normalize(p3 - p2)
-            let turn = min(max((1 - simd_dot(incoming, outgoing)) * 0.5, 0), 1)
+            let incomingVector = p1 - p0
+            let outgoingVector = p3 - p2
+            let incomingLength = simd_length(incomingVector)
+            let outgoingLength = simd_length(outgoingVector)
+            let turn: Float
+            if incomingLength > 0.001, outgoingLength > 0.001 {
+                let incoming = incomingVector / incomingLength
+                let outgoing = outgoingVector / outgoingLength
+                turn = min(max((1 - simd_dot(incoming, outgoing)) * 0.5, 0), 1)
+            } else {
+                turn = 0
+            }
 
             for step in 0..<subdivisions {
                 let t = Float(step) / Float(subdivisions)
@@ -213,11 +226,17 @@ final class MosuanMetalCanvasView: MTKView {
         for i in stroke.indices {
             raw[i] = baseWidth(for: stroke[i], previous: i > 0 ? stroke[i - 1] : nil)
             if dynamicsEnabled, i > 0, i + 1 < stroke.count {
-                let a = simd_normalize(stroke[i].position - stroke[i - 1].position)
-                let b = simd_normalize(stroke[i + 1].position - stroke[i].position)
-                let dot = min(max(simd_dot(a, b), -1), 1)
-                let turn = (1 - dot) * 0.5
-                raw[i] *= 1 - min(max(turn, 0), 1) * (1 - turnWidthRecovery)
+                let aVector = stroke[i].position - stroke[i - 1].position
+                let bVector = stroke[i + 1].position - stroke[i].position
+                let aLength = simd_length(aVector)
+                let bLength = simd_length(bVector)
+                if aLength > 0.001, bLength > 0.001 {
+                    let a = aVector / aLength
+                    let b = bVector / bLength
+                    let dot = min(max(simd_dot(a, b), -1), 1)
+                    let turn = (1 - dot) * 0.5
+                    raw[i] *= 1 - min(max(turn, 0), 1) * (1 - turnWidthRecovery)
+                }
             }
         }
 
@@ -251,9 +270,8 @@ final class MosuanMetalCanvasView: MTKView {
         let renderStroke = smoothedEvents(for: stroke)
         guard !renderStroke.isEmpty else { return [] }
         let widths = widthEnvelope(for: renderStroke)
-        let sides = 16
         var vertices: [Vertex] = []
-        vertices.reserveCapacity(renderStroke.count * sides * 3 + max(renderStroke.count - 1, 0) * 6)
+        vertices.reserveCapacity(renderStroke.count * 6 + max(renderStroke.count - 1, 0) * 6)
 
         let baseColor = strokeStyle.strokeColor
         let color = SIMD4<Float>(Float(baseColor.red), Float(baseColor.green), Float(baseColor.blue), Float(baseColor.alpha) * opacity)
@@ -262,42 +280,49 @@ final class MosuanMetalCanvasView: MTKView {
             point * canvasScale + canvasOffset
         }
 
-        func appendDisk(center: SIMD2<Float>, radius: Float) {
-            let c = screenPoint(center)
-            for i in 0..<sides {
-                let a0 = Float(i) * 2 * .pi / Float(sides)
-                let a1 = Float(i + 1) * 2 * .pi / Float(sides)
-                vertices.append(Vertex(position: canvasToNDC(c), color: color))
-                vertices.append(Vertex(position: canvasToNDC(c + SIMD2<Float>(cos(a0), sin(a0)) * radius), color: color))
-                vertices.append(Vertex(position: canvasToNDC(c + SIMD2<Float>(cos(a1), sin(a1)) * radius), color: color))
+        func appendTriangle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>, p0: SIMD2<Float>, p1: SIMD2<Float>, radius: Float, kind: UInt32) {
+            let primitive = { (point: SIMD2<Float>) -> Vertex in
+                Vertex(position: canvasToNDC(point), point: point, p0: p0, p1: p1, radius: radius, kind: kind, color: color)
             }
+            vertices.append(primitive(a))
+            vertices.append(primitive(b))
+            vertices.append(primitive(c))
+        }
+
+        func appendCircle(center: SIMD2<Float>, radius: Float) {
+            let minPoint = center - SIMD2<Float>(radius, radius)
+            let maxPoint = center + SIMD2<Float>(radius, radius)
+            appendTriangle(minPoint, SIMD2<Float>(maxPoint.x, minPoint.y), maxPoint, p0: center, p1: center, radius: radius, kind: 0)
+            appendTriangle(minPoint, maxPoint, SIMD2<Float>(minPoint.x, maxPoint.y), p0: center, p1: center, radius: radius, kind: 0)
         }
 
         for index in renderStroke.indices {
             let current = renderStroke[index]
-            let radius = max(widths[index], 0.5) * canvasScale * 0.5
-            appendDisk(center: current.position, radius: radius)
+            let currentPoint = screenPoint(current.position)
+            let currentRadius = max(widths[index], 0.5) * canvasScale * 0.5
+            appendCircle(center: currentPoint, radius: currentRadius)
 
             guard index > 0 else { continue }
             let previous = renderStroke[index - 1]
             let a = screenPoint(previous.position)
-            let b = screenPoint(current.position)
+            let b = currentPoint
             let delta = b - a
             let length = simd_length(delta)
             guard length > 0.001 else { continue }
+
             let normal = SIMD2<Float>(-delta.y, delta.x) / length
             let r0 = max(widths[index - 1], 0.5) * canvasScale * 0.5
-            let r1 = radius
-            let p0 = a + normal * r0
-            let p1 = a - normal * r0
-            let p2 = b + normal * r1
-            let p3 = b - normal * r1
-            vertices.append(Vertex(position: canvasToNDC(p0), color: color))
-            vertices.append(Vertex(position: canvasToNDC(p1), color: color))
-            vertices.append(Vertex(position: canvasToNDC(p2), color: color))
-            vertices.append(Vertex(position: canvasToNDC(p2), color: color))
-            vertices.append(Vertex(position: canvasToNDC(p1), color: color))
-            vertices.append(Vertex(position: canvasToNDC(p3), color: color))
+            let r1 = currentRadius
+            let radius = max(r0, r1)
+            let minPoint = SIMD2<Float>(min(a.x, b.x), min(a.y, b.y)) - SIMD2<Float>(radius, radius)
+            let maxPoint = SIMD2<Float>(max(a.x, b.x), max(a.y, b.y)) + SIMD2<Float>(radius, radius)
+            appendTriangle(minPoint, SIMD2<Float>(maxPoint.x, minPoint.y), maxPoint, p0: a, p1: b, radius: radius, kind: 1)
+            appendTriangle(minPoint, maxPoint, SIMD2<Float>(minPoint.x, maxPoint.y), p0: a, p1: b, radius: radius, kind: 1)
+
+            // Keep the variable-width join fully covered by the endpoint circles.
+            _ = normal
+            _ = r0
+            _ = r1
         }
         return vertices
     }
