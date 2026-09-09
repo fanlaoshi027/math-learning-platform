@@ -18,19 +18,13 @@ enum GeometryInteractionEngine {
         }
     }
 
-    /// Drag a point while respecting fixed points, bindings and line/segment constraints.
     @discardableResult
     static func dragPoint(_ model: inout GeometryModel, pointID: UUID, to position: CGPoint) -> Bool {
         guard let index = model.points.firstIndex(where: { $0.id == pointID }), !model.points[index].isFixed else { return false }
-
-        // Followers are driven by their master and cannot be dragged independently.
         if model.constraints.contains(where: { constraint in
             if case let .pointBinding(_, follower, _) = constraint { return follower == pointID }
             return false
-        }) {
-            return false
-        }
-
+        }) { return false }
         model.points[index].position = position
         GeometryConstraintSolver.apply(&model)
         return true
@@ -47,14 +41,11 @@ enum GeometryInteractionEngine {
             let dy = position.y - triangle.anchor.y
             let distance = max(1, hypot(dx, dy))
             let angle = atan2(dy, dx)
-
             guard triangle.kind == .isosceles else { return false }
             triangle.setLegLength(distance)
-
-            // B/C are symmetric around the triangle's local +Y axis.
-            let halfApex = triangle.apexAngleDegrees * .pi / 360
+            let halfApex = triangle.apexAngleDegrees * CGFloat.pi / 360
             let targetDirection = vertexIndex == 1 ? angle + halfApex : angle - halfApex
-            triangle.setRotation(targetDirection - .pi / 2)
+            triangle.setRotation(targetDirection - CGFloat.pi / 2)
             return true
         default:
             return false
@@ -63,12 +54,9 @@ enum GeometryInteractionEngine {
 
     static func setTriangleParameter(_ triangle: inout ParameterizedTriangle, parameter: TriangleParameter, value: CGFloat) {
         switch parameter {
-        case .baseLength:
-            triangle.setBaseLength(value)
-        case .legLength:
-            triangle.setLegLength(value)
-        case .apexAngle:
-            triangle.setApexAngle(value)
+        case .baseLength: triangle.setBaseLength(value)
+        case .legLength: triangle.setLegLength(value)
+        case .apexAngle: triangle.setApexAngle(value)
         }
     }
 
