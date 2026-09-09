@@ -13,21 +13,10 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-# Normalize the dynamic-angle renderer's trig/SIMD expressions before compilation.
-python3 - <<'PY'
-from pathlib import Path
-p = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
-s = p.read_text()
-old_previous = "        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)"
-new_previous = "        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat"
-if old_previous in s:
-    s = s.replace(old_previous, new_previous, 1)
-old_current = "            let current = v + SIMD2(cos(angle), sin(angle)) * Float(radius)"
-new_current = "            let cosAngleFloat = Float(cos(angle))\n            let sinAngleFloat = Float(sin(angle))\n            let arcVector = SIMD2<Float>(cosAngleFloat, sinAngleFloat)\n            let current = v + arcVector * radiusFloat"
-if old_current in s:
-    s = s.replace(old_current, new_current, 1)
-p.write_text(s)
-PY
+# Normalize the dynamic-angle renderer's trig/SIMD expression before compilation.
+if grep -Fq 'var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)' Sources/MosuanBoard/Metal/InkRenderer.swift; then
+  sed -i '' 's/        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)/        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat/' Sources/MosuanBoard/Metal/InkRenderer.swift
+fi
 
 BUILD_LOG="$ROOT_DIR/dist/swift-build.log"
 set +e
