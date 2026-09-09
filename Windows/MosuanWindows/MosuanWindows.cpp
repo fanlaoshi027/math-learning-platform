@@ -2,248 +2,166 @@
 #include <windowsx.h>
 #include <d2d1.h>
 #include <vector>
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 #pragma comment(lib, "d2d1.lib")
 
 namespace {
-
-struct Point {
-    float x = 0;
-    float y = 0;
-    float pressure = 0.5f;
-};
-
-struct Stroke {
-    std::vector<Point> points;
-};
+struct Point { float x, y, pressure; };
+struct Stroke { std::vector<Point> points; };
 
 ID2D1Factory* g_factory = nullptr;
 ID2D1HwndRenderTarget* g_target = nullptr;
-ID2D1SolidColorBrush* g_brush = nullptr;
+ID2D1SolidColorBrush* g_inkBrush = nullptr;
 std::vector<Stroke> g_strokes;
-Stroke g_activeStroke;
-bool g_writing = false;
-UINT32 g_pointerId = 0;
-
-void ReleaseTarget() {
-    if (g_brush) { g_brush->Release(); g_brush = nullptr; }
-    if (g_target) { g_target->Release(); g_target = nullptr; }
-}
-
-bool EnsureTarget(HWND hwnd) {
-    if (g_target) return true;
-
-    RECT rc{};
-    GetClientRect(hwnd, &rc);
-    if (rc.right <= 0 || rc.bottom <= 0) return false;
-
-    const D2D1_SIZE_U size = D2D1::SizeU(
-        static_cast<UINT32>(rc.right - rc.left),
-        static_cast<UINT32>(rc.bottom - rc.top));
-
-    HRESULT hr = g_factory->CreateHwndRenderTarget(
-        D2D1::RenderTargetProperties(),
-        D2D1::HwndRenderTargetProperties(hwnd, size),
-        &g_target);
-    if (FAILED(hr)) return false;
-
-    hr = g_target->CreateSolidColorBrush(
-        D2D1::ColorF(0.08f, 0.10f, 0.13f, 1.0f), &g_brush);
-    if (FAILED(hr)) {
-        ReleaseTarget();
-        return false;
-    }
-    return true;
-}
+std::vector<Stroke> g_redo;
+Stroke g_active;
+UINT32 g_activePointer = 0;
+bool g_drawing = false;
+bool g_eraser = false;
 
 float NormalizePressure(UINT32 raw) {
     if (raw == 0) return 0.5f;
-    return min(1.0f, max(0.05f, static_cast<float>(raw) / 1024.0f));
+    return std::clamp(static_cast<float>(raw) / 1024.0f, 0.05f, 1.0f);
 }
 
-void AddPoint(float x, float y, float pressure) {
-    if (!g_writing) return;
-
-    const float p = min(1.0f, max(0.05f, pressure));
-    if (!g_activeStroke.points.empty()) {
-        const Point& last = g_activeStroke.points.back();
-        const float dx = x - last.x;
-        const float dy = y - last.y;
-        if ((dx * dx + dy * dy) < 1.0f) return;
-    }
-    g_activeStroke.points.push_back({x, y, p});
+void ReleaseRenderResources() {
+    if (g_inkBrush) { g_inkBrush->Release(); g_inkBrush = nullptr; }
+    if (g_target) { g_target->Release(); g_target = nullptr; }
 }
 
-void DrawStroke(const Stroke& stroke) {
-    if (!g_target || !g_brush || stroke.points.size() < 2) return;
+void EnsureRenderResources(HWND hwnd) {
+    if (!g_factory) D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &g_factory);
+    if (g_target) return;
+    RECT r{}; GetClientRect(hwnd, &r);
+    g_factory->CreateHwndRenderTarget(
+        D2D1::RenderTargetProperties(),
+        D2D1::HwndRenderTargetProperties(hwnd, D2D1::SizeF(float(r.right-r.left), float(r.bottom-r.top))),
+        &g_target);
+    if (g_target) g_target->CreateSolidColorBrush(D2D1::ColorF(0.08f,0.12f,0.18f,1.0f), &g_inkBrush);
+}
 
-    for (size_t i = 1; i < stroke.points.size(); ++i) {
-        const Point& a = stroke.points[i - 1];
-        const Point& b = stroke.points[i];
-        const float pressure = (a.pressure + b.pressure) * 0.5f;
-        const float width = 2.0f + pressure * 5.0f;
-        g_target->DrawLine(
-            D2D1::Point2F(a.x, a.y),
-            D2D1::Point2F(b.x, b.y),
-            g_brush,
-            width);
+float Distance(Point a, Point b) { return std::hypot(a.x-b.x, a.y-b.y); }
+
+void DrawStroke(const Stroke& s) {
+    if (!g_target || !g_inkBrush || s.points.size() < 2) return;
+    for (size_t i=1; i<s.points.size(); ++i) {
+        const auto& a=s.points[i-1]; const auto& b=s.points[i];
+        float p=(a.pressure+b.pressure)*0.5f;
+        float width=1.6f + p*5.4f;
+        g_target->DrawLine(D2D1::Point2F(a.x,a.y), D2D1::Point2F(b.x,b.y), g_inkBrush, width);
     }
+}
+
+bool HitStroke(const Stroke& s, float x, float y, float radius) {
+    if (s.points.empty()) return false;
+    for (size_t i=1;i<s.points.size();++i) {
+        float vx=s.points[i].x-s.points[i-1].x, vy=s.points[i].y-s.points[i-1].y;
+        float wx=x-s.points[i-1].x, wy=y-s.points[i-1].y;
+        float len2=vx*vx+vy*vy;
+        float t=len2>0 ? std::clamp((wx*vx+wy*vy)/len2,0.0f,1.0f) : 0.0f;
+        float dx=x-(s.points[i-1].x+t*vx), dy=y-(s.points[i-1].y+t*vy);
+        if (std::hypot(dx,dy)<=radius) return true;
+    }
+    return Distance(s.points.front(), {x,y,0})<=radius;
+}
+
+void EraseAt(float x,float y) {
+    constexpr float radius=14.0f;
+    auto oldSize=g_strokes.size();
+    g_strokes.erase(std::remove_if(g_strokes.begin(), g_strokes.end(), [&](const Stroke& s){ return HitStroke(s,x,y,radius); }), g_strokes.end());
+    if (g_strokes.size()!=oldSize) g_redo.clear();
+}
+
+void Undo() {
+    if (g_strokes.empty()) return;
+    g_redo.push_back(std::move(g_strokes.back()));
+    g_strokes.pop_back();
+}
+void Redo() {
+    if (g_redo.empty()) return;
+    g_strokes.push_back(std::move(g_redo.back()));
+    g_redo.pop_back();
 }
 
 void Render(HWND hwnd) {
-    if (!EnsureTarget(hwnd)) return;
-
+    EnsureRenderResources(hwnd); if (!g_target) return;
     g_target->BeginDraw();
-    g_target->Clear(D2D1::ColorF(0.98f, 0.98f, 0.97f, 1.0f));
-
-    for (const Stroke& stroke : g_strokes) DrawStroke(stroke);
-    DrawStroke(g_activeStroke);
-
-    const HRESULT hr = g_target->EndDraw();
-    if (hr == D2DERR_RECREATE_TARGET) ReleaseTarget();
+    g_target->Clear(D2D1::ColorF(0.97f,0.97f,0.95f,1.0f));
+    for (const auto& s:g_strokes) DrawStroke(s);
+    if (g_drawing && !g_eraser) DrawStroke(g_active);
+    HRESULT hr=g_target->EndDraw();
+    if (hr==D2DERR_RECREATE_TARGET) ReleaseRenderResources();
 }
 
-bool ReadPointer(HWND hwnd, UINT32 pointerId) {
-    POINTER_INFO info{};
-    if (!GetPointerInfo(pointerId, &info)) return false;
-
-    POINT pt = info.ptPixelLocation;
-    ScreenToClient(hwnd, &pt);
-
-    float pressure = 0.5f;
-    if (info.pointerType == PT_PEN) {
-        POINTER_PEN_INFO pen{};
-        if (GetPointerPenInfo(pointerId, &pen)) {
-            pressure = NormalizePressure(pen.pressure);
-        }
+bool ReadPointer(UINT32 id, Point& out, bool& pen) {
+    POINTER_INFO pi{};
+    if (!GetPointerInfo(id,&pi)) return false;
+    pen=(pi.pointerType==PT_PEN);
+    out={float(pi.ptPixelLocation.x),float(pi.ptPixelLocation.y),0.5f};
+    if (pen) {
+        POINTER_PEN_INFO pp{};
+        if (GetPointerPenInfo(id,&pp)) out.pressure=NormalizePressure(pp.pressure);
     }
-
-    AddPoint(static_cast<float>(pt.x), static_cast<float>(pt.y), pressure);
     return true;
 }
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_CREATE:
-        return 0;
-
-    case WM_SIZE:
-        if (g_target) {
-            const UINT width = LOWORD(lParam);
-            const UINT height = HIWORD(lParam);
-            g_target->Resize(D2D1::SizeU(width, height));
-        }
-        InvalidateRect(hwnd, nullptr, FALSE);
-        return 0;
-
-    case WM_ERASEBKGND:
-        return 1;
-
-    case WM_POINTERDOWN: {
-        const UINT32 pointerId = GET_POINTERID_WPARAM(wParam);
-        POINTER_INFO info{};
-        if (GetPointerInfo(pointerId, &info)) {
-            // Pen is the primary writing device. Mouse remains available as a development fallback.
-            if (info.pointerType == PT_PEN || info.pointerType == PT_MOUSE) {
-                g_writing = true;
-                g_pointerId = pointerId;
-                g_activeStroke.points.clear();
-                ReadPointer(hwnd, pointerId);
-                SetCapture(hwnd);
-                InvalidateRect(hwnd, nullptr, FALSE);
-            }
-        }
-        return 0;
-    }
-
-    case WM_POINTERUPDATE: {
-        const UINT32 pointerId = GET_POINTERID_WPARAM(wParam);
-        if (g_writing && pointerId == g_pointerId) {
-            ReadPointer(hwnd, pointerId);
-            InvalidateRect(hwnd, nullptr, FALSE);
-        }
-        return 0;
-    }
-
-    case WM_POINTERUP: {
-        const UINT32 pointerId = GET_POINTERID_WPARAM(wParam);
-        if (g_writing && pointerId == g_pointerId) {
-            ReadPointer(hwnd, pointerId);
-            if (g_activeStroke.points.size() >= 2) {
-                g_strokes.push_back(std::move(g_activeStroke));
-            }
-            g_activeStroke.points.clear();
-            g_writing = false;
-            g_pointerId = 0;
-            ReleaseCapture();
-            InvalidateRect(hwnd, nullptr, FALSE);
-        }
-        return 0;
-    }
-
-    case WM_PAINT: {
-        PAINTSTRUCT ps{};
-        BeginPaint(hwnd, &ps);
-        Render(hwnd);
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-
-    case WM_DESTROY:
-        ReleaseTarget();
-        if (g_factory) { g_factory->Release(); g_factory = nullptr; }
-        PostQuitMessage(0);
-        return 0;
-    }
-
-    return DefWindowProcW(hwnd, msg, wParam, lParam);
+void AddPoint(Point p) {
+    if (!g_active.points.empty() && Distance(g_active.points.back(),p)<0.7f) return;
+    g_active.points.push_back(p);
+}
 }
 
-} // namespace
-
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
-    HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &g_factory);
-    if (FAILED(hr)) return 1;
-
-    const wchar_t kClassName[] = L"MosuanWindowsCanvas";
-
-    WNDCLASSW wc{};
-    wc.hInstance = hInstance;
-    wc.lpfnWndProc = WndProc;
-    wc.lpszClassName = kClassName;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = nullptr;
-
-    if (!RegisterClassW(&wc)) {
-        g_factory->Release();
-        g_factory = nullptr;
-        return 1;
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    switch(msg) {
+    case WM_CREATE: EnsureRenderResources(hwnd); return 0;
+    case WM_KEYDOWN:
+        if ((GetKeyState(VK_CONTROL)&0x8000) && wp=='Z') Undo();
+        else if ((GetKeyState(VK_CONTROL)&0x8000) && wp=='Y') Redo();
+        else if (wp=='B') g_eraser=false;
+        else if (wp=='E') g_eraser=true;
+        InvalidateRect(hwnd,nullptr,FALSE); return 0;
+    case WM_POINTERDOWN: {
+        UINT32 id=GET_POINTERID(wp); Point p{}; bool pen=false;
+        if (!ReadPointer(id,p,pen)) return 0;
+        if (pen) {
+            g_activePointer=id; g_drawing=true; g_active.points.clear();
+            if (g_eraser) EraseAt(p.x,p.y); else { AddPoint(p); g_redo.clear(); }
+            SetCapture(hwnd); InvalidateRect(hwnd,nullptr,FALSE); return 0;
+        }
+        break;
     }
-
-    HWND hwnd = CreateWindowExW(
-        0,
-        kClassName,
-        L"墨算 · Windows 开发版",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        1280, 800,
-        nullptr, nullptr, hInstance, nullptr);
-
-    if (!hwnd) {
-        g_factory->Release();
-        g_factory = nullptr;
-        return 1;
+    case WM_POINTERUPDATE: {
+        UINT32 id=GET_POINTERID(wp); if (!g_drawing || id!=g_activePointer) break;
+        Point p{}; bool pen=false; if (!ReadPointer(id,p,pen)) break;
+        if (g_eraser) EraseAt(p.x,p.y); else AddPoint(p);
+        InvalidateRect(hwnd,nullptr,FALSE); return 0;
     }
-
-    ShowWindow(hwnd, nCmdShow);
-    UpdateWindow(hwnd);
-
-    MSG msg{};
-    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+    case WM_POINTERUP: {
+        UINT32 id=GET_POINTERID(wp); if (!g_drawing || id!=g_activePointer) break;
+        Point p{}; bool pen=false; if (ReadPointer(id,p,pen) && !g_eraser) AddPoint(p);
+        if (!g_eraser && g_active.points.size()>1) g_strokes.push_back(std::move(g_active));
+        g_active.points.clear(); g_drawing=false; g_activePointer=0; ReleaseCapture();
+        InvalidateRect(hwnd,nullptr,FALSE); return 0;
     }
+    case WM_SIZE:
+        if (g_target) g_target->Resize(D2D1::SizeU(LOWORD(lp),HIWORD(lp)));
+        return 0;
+    case WM_PAINT: { PAINTSTRUCT ps{}; BeginPaint(hwnd,&ps); Render(hwnd); EndPaint(hwnd,&ps); return 0; }
+    case WM_DESTROY:
+        ReleaseRenderResources(); if (g_factory) { g_factory->Release(); g_factory=nullptr; }
+        PostQuitMessage(0); return 0;
+    }
+    return DefWindowProc(hwnd,msg,wp,lp);
+}
 
-    return static_cast<int>(msg.wParam);
+int WINAPI wWinMain(HINSTANCE h,HINSTANCE, PWSTR,int) {
+    const wchar_t* cls=L"MosuanWindowsCanvas";
+    WNDCLASS wc{}; wc.lpfnWndProc=WndProc; wc.hInstance=h; wc.lpszClassName=cls; wc.hCursor=LoadCursor(nullptr,IDC_ARROW);
+    RegisterClass(&wc);
+    HWND hwnd=CreateWindowEx(0,cls,L"墨算 · Windows 开发版",WS_OVERLAPPEDWINDOW|WS_VISIBLE,CW_USEDEFAULT,CW_USEDEFAULT,1280,800,nullptr,nullptr,h,nullptr);
+    if(!hwnd) return 0;
+    MSG msg{}; while(GetMessage(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessage(&msg);} return 0;
 }
