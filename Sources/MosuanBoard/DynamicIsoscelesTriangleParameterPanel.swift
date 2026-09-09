@@ -9,13 +9,21 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
     @State private var direction = 1.0
     private let timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
+    private var apexAngle: Int {
+        Int(degrees.rounded())
+    }
+
+    private var baseAngle: Int {
+        Int(((180 - degrees) / 2).rounded())
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("∠A")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("等腰三角形")
                     .font(.system(size: 17, weight: .semibold))
                 Spacer()
-                Text("\(Int(degrees.rounded()))°")
+                Text("∠A = \(apexAngle)°")
                     .font(.system(size: 18, weight: .medium, design: .rounded))
                     .monospacedDigit()
             }
@@ -32,14 +40,19 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 Text("150°").font(.caption).foregroundStyle(.secondary)
             }
 
+            HStack(spacing: 10) {
+                Text("AB = AC")
+                    .font(.system(size: 14, weight: .medium))
+                Text("∠B = ∠C = \(baseAngle)°")
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
             HStack(spacing: 8) {
                 Button {
                     let next = !isPlaying
-                    if next {
-                        onPlaybackChanged?(true)
-                    } else {
-                        onPlaybackChanged?(false)
-                    }
+                    onPlaybackChanged?(next)
                     isPlaying = next
                 } label: {
                     Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
@@ -59,7 +72,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
             }
         }
         .padding(14)
-        .frame(minWidth: 260)
+        .frame(minWidth: 280)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
