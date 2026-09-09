@@ -18,12 +18,12 @@ final class MosuanMetalCanvasView: MTKView {
     private var canvasScale: Float = 1
     private var canvasOffset: SIMD2<Float> = .zero
 
-    /// Rendering-only smoothing. Original samples remain untouched for saving
-    /// and one-stroke recognition.
+    /// Display-only cache. Document samples remain the source of truth.
+    /// The mesh is invalidated when the viewport or rendering parameters change.
+    private var committedMeshCache: [UInt64: [Vertex]] = [:]
+
     var smoothingEnabled = true
     var smoothingSubdivisions = 3
-
-    /// Natural-ink tuning. Conservative defaults avoid the "rubber band" look.
     var dynamicsEnabled = true
     var entryTaperSamples = 5
     var exitTaperSamples = 5
@@ -116,7 +116,10 @@ final class MosuanMetalCanvasView: MTKView {
         let committer = OneStrokeCommitter(settings: oneStrokeSettings)
         let object = committer.commit(points: points, style: strokeStyle)
 
-        if object == nil { committed.append(finished) }
+        if object == nil {
+            committed.append(finished)
+            invalidateCommittedMeshCache()
+        }
         onCommittedStroke?(finished, object)
     }
 
@@ -124,11 +127,13 @@ final class MosuanMetalCanvasView: MTKView {
         committed.removeAll(keepingCapacity: true)
         active.removeAll(keepingCapacity: true)
         predicted.removeAll(keepingCapacity: true)
+        invalidateCommittedMeshCache()
         setNeedsDisplay()
     }
 
     func pan(_ delta: CGPoint) {
         canvasOffset += SIMD2<Float>(Float(delta.x), Float(delta.y))
+        invalidateCommittedMeshCache()
         setNeedsDisplay()
     }
 
@@ -139,7 +144,12 @@ final class MosuanMetalCanvasView: MTKView {
         let localPoint = (SIMD2<Float>(Float(point.x), Float(point.y)) - canvasOffset) / oldScale
         canvasScale = newScale
         canvasOffset = SIMD2<Float>(Float(point.x), Float(point.y)) - localPoint * newScale
+        invalidateCommittedMeshCache()
         setNeedsDisplay()
+    }
+
+    func invalidateCommittedMeshCache() {
+        committedMeshCache.removeAll(keepingCapacity: true)
     }
 
     private func baseWidth(for event: MosuanPointerEvent, previous: MosuanPointerEvent?) -> Float {
@@ -154,8 +164,6 @@ final class MosuanMetalCanvasView: MTKView {
         return Float(strokeStyle.strokeWidth) * (1.16 - 0.60 * speedT)
     }
 
-    /// Generates a display-only smooth path. Sharp turns are deliberately damped
-    /// instead of allowing Catmull-Rom to overshoot outside the user's path.
     private func smoothedEvents(for stroke: [MosuanPointerEvent]) -> [MosuanPointerEvent] {
         guard smoothingEnabled, stroke.count >= 3 else { return stroke }
         let subdivisions = min(max(smoothingSubdivisions, 1), 5)
@@ -187,8 +195,6 @@ final class MosuanMetalCanvasView: MTKView {
                 let t = Float(step) / Float(subdivisions)
                 var event = stroke[index]
                 let curvePoint = catmull(p0, p1, p2, p3, t)
-                // At sharp turns, blend toward the actual segment to prevent
-                // overshoot and preserve the teacher's intended corner.
                 let damp = min(turn * 0.70, 0.70)
                 event.position = lerp(curvePoint, lerp(p1, p2, t), damp)
                 event.pressure = stroke[index].pressure + (stroke[index + 1].pressure - stroke[index].pressure) * t
@@ -201,9 +207,6 @@ final class MosuanMetalCanvasView: MTKView {
         return result
     }
 
-    /// Width is smoothed independently from position. Entry/exit taper gives a
-    /// natural pen lift, while sharp turns recover conservatively rather than
-    /// producing a sudden thick blob.
     private func widthEnvelope(for stroke: [MosuanPointerEvent]) -> [Float] {
         guard !stroke.isEmpty else { return [] }
         var raw = [Float](repeating: Float(strokeStyle.strokeWidth), count: stroke.count)
@@ -303,10 +306,42 @@ final class MosuanMetalCanvasView: MTKView {
         let size = SIMD2<Float>(Float(max(drawableSize.width, 1)), Float(max(drawableSize.height, 1)))
         return SIMD2(point.x / size.x * 2 - 1, 1 - point.y / size.y * 2)
     }
+
+    private func cacheKey(for stroke: [MosuanPointerEvent]) -> UInt64 {
+        var hash: UInt64 = 1469598103934665603
+        func mix(_ value: UInt64) {
+            hash ^= value
+            hash &*= 1099511628211
+        }
+        mix(UInt64(stroke.count))
+        for sample in stroke {
+            mix(UInt64(sample.position.x.bitPattern))
+            mix(UInt64(sample.position.y.bitPattern))
+            mix(UInt64(sample.pressure.bitPattern))
+            mix(UInt64(sample.timestamp.bitPattern))
+        }
+        mix(UInt64(canvasScale.bitPattern))
+        mix(UInt64(canvasOffset.x.bitPattern))
+        mix(UInt64(canvasOffset.y.bitPattern))
+        mix(UInt64(strokeStyle.strokeWidth.bitPattern))
+        mix(UInt64(strokeStyle.strokeColor.red.bitPattern))
+        mix(UInt64(strokeStyle.strokeColor.green.bitPattern))
+        mix(UInt64(strokeStyle.strokeColor.blue.bitPattern))
+        mix(UInt64(strokeStyle.strokeColor.alpha.bitPattern))
+        mix(smoothingEnabled ? 1 : 0)
+        mix(UInt64(smoothingSubdivisions))
+        mix(dynamicsEnabled ? 1 : 0)
+        mix(UInt64(entryTaperSamples))
+        mix(UInt64(exitTaperSamples))
+        mix(UInt64(turnWidthRecovery.bitPattern))
+        return hash
+    }
 }
 
 extension MosuanMetalCanvasView: MTKViewDelegate {
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        invalidateCommittedMeshCache()
+    }
 
     func draw(in view: MTKView) {
         guard let drawable = currentDrawable,
@@ -318,9 +353,9 @@ extension MosuanMetalCanvasView: MTKViewDelegate {
         let encoder = commandBuffer?.makeRenderCommandEncoder(descriptor: pass)
         encoder?.setRenderPipelineState(pipeline)
 
-        drawStrokeLayer(committed, opacity: 1, encoder: encoder)
-        if !active.isEmpty { drawStrokeLayer([active], opacity: 1, encoder: encoder) }
-        if !predicted.isEmpty { drawStrokeLayer([predicted], opacity: 0.35, encoder: encoder) }
+        drawStrokeLayer(committed, opacity: 1, encoder: encoder, cacheCommitted: true)
+        if !active.isEmpty { drawStrokeLayer([active], opacity: 1, encoder: encoder, cacheCommitted: false) }
+        if !predicted.isEmpty { drawStrokeLayer([predicted], opacity: 0.35, encoder: encoder, cacheCommitted: false) }
 
         encoder?.endEncoding()
         commandBuffer?.present(drawable)
@@ -330,13 +365,27 @@ extension MosuanMetalCanvasView: MTKViewDelegate {
     private func drawStrokeLayer(
         _ strokes: [[MosuanPointerEvent]],
         opacity: Float,
-        encoder: MTLRenderCommandEncoder?
+        encoder: MTLRenderCommandEncoder?,
+        cacheCommitted: Bool
     ) {
-        for stroke in strokes where stroke.count > 0 {
-            var data = brushVertices(for: stroke, opacity: opacity)
+        for stroke in strokes where !stroke.isEmpty {
+            let data: [Vertex]
+            if cacheCommitted {
+                let key = cacheKey(for: stroke)
+                if let cached = committedMeshCache[key] {
+                    data = cached
+                } else {
+                    let generated = brushVertices(for: stroke, opacity: opacity)
+                    committedMeshCache[key] = generated
+                    data = generated
+                }
+            } else {
+                data = brushVertices(for: stroke, opacity: opacity)
+            }
+
             guard !data.isEmpty,
                   let buffer = device?.makeBuffer(
-                    bytes: &data,
+                    bytes: data,
                     length: MemoryLayout<Vertex>.stride * data.count,
                     options: .storageModeShared
                   ) else { continue }
