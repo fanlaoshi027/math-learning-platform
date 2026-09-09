@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 /// Convenience editing APIs for wiring named parameters to geometry elements.
 extension GeometryModel {
