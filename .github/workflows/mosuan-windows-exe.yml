@@ -1,0 +1,36 @@
+name: Mosuan Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - mosuan-board-dev
+    paths:
+      - 'Windows/MosuanWindows/**'
+      - '.github/workflows/mosuan-windows-exe.yml'
+
+jobs:
+  build-windows:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build x64 Release
+        run: msbuild Windows\MosuanWindows\MosuanWindows.sln /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Stage EXE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item Windows\MosuanWindows\bin\Release\MosuanWindows.exe dist\MosuanWindows-x64.exe
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Windows-x64
+          path: dist/MosuanWindows-x64.exe
+          if-no-files-found: error
