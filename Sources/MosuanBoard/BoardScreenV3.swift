@@ -41,10 +41,7 @@ struct BoardScreen: View {
 
                         if let degrees = controller.dynamicAngleDegrees, tool == .select {
                             DynamicAngleParameterPanel(
-                                degrees: Binding(
-                                    get: { degrees },
-                                    set: { controller.setDynamicAngleDegrees($0) }
-                                ),
+                                degrees: Binding(get: { degrees }, set: { controller.setDynamicAngleDegrees($0) }),
                                 onPlayPause: { controller.toggleDynamicAnglePlayback() },
                                 isPlaying: controller.dynamicAnglePlaying
                             )
@@ -53,28 +50,22 @@ struct BoardScreen: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         }
 
-                        if let degrees = controller.dynamicTriangleDegrees, tool == .select {
+                        if let degrees = controller.dynamicTriangleDegrees,
+                           let legLength = controller.dynamicTriangleLegLength,
+                           tool == .select {
                             DynamicIsoscelesTriangleParameterPanel(
-                                degrees: Binding(
-                                    get: { degrees },
-                                    set: { controller.setDynamicTriangleDegrees($0) }
-                                ),
+                                degrees: Binding(get: { degrees }, set: { controller.setDynamicTriangleDegrees($0) }),
+                                legLength: Binding(get: { legLength }, set: { controller.setDynamicTriangleLegLength($0) }),
                                 onParameterEditingChanged: { editing in
-                                    if editing {
-                                        controller.beginDynamicTriangleParameterEditHistory()
-                                    } else {
-                                        controller.endDynamicTriangleParameterEditHistory()
-                                    }
+                                    if editing { controller.beginDynamicTriangleParameterEditHistory() }
+                                    else { controller.endDynamicTriangleParameterEditHistory() }
                                 },
                                 onPlaybackChanged: { playing in
-                                    if playing {
-                                        controller.beginDynamicTrianglePlaybackHistory()
-                                    } else {
-                                        controller.endDynamicTrianglePlaybackHistory()
-                                    }
+                                    if playing { controller.beginDynamicTrianglePlaybackHistory() }
+                                    else { controller.endDynamicTrianglePlaybackHistory() }
                                 }
                             )
-                            .frame(width: 280)
+                            .frame(width: 300)
                             .padding(16)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         }
@@ -117,11 +108,8 @@ struct BoardScreen: View {
     }
 
     @ViewBuilder private func toolbar(in size:CGSize)->some View {
-        if toolbarIsVertical {
-            VStack(spacing:8) { toolbarDragHandle; toolbarContents }.padding(8)
-        } else {
-            HStack(spacing:10) { toolbarDragHandle; toolbarContents }.padding(.horizontal,12).padding(.vertical,8)
-        }
+        if toolbarIsVertical { VStack(spacing:8) { toolbarDragHandle; toolbarContents }.padding(8) }
+        else { HStack(spacing:10) { toolbarDragHandle; toolbarContents }.padding(.horizontal,12).padding(.vertical,8) }
     }
 
     private var toolbarDragHandle: some View {
@@ -131,14 +119,9 @@ struct BoardScreen: View {
             .frame(width:28, height:28)
             .contentShape(Rectangle())
             .help("拖动工具栏到上、下、左、右")
-            .gesture(
-                DragGesture(minimumDistance:3)
-                    .onChanged { value in toolbarDragOffset = value.translation }
-                    .onEnded { value in
-                        finishToolbarDrag(value.translation, in: NSScreen.main?.visibleFrame.size ?? CGSize(width:1100,height:700))
-                        toolbarDragOffset = .zero
-                    }
-            )
+            .gesture(DragGesture(minimumDistance:3).onChanged { value in toolbarDragOffset = value.translation }.onEnded { value in
+                finishToolbarDrag(value.translation, in: NSScreen.main?.visibleFrame.size ?? CGSize(width:1100,height:700)); toolbarDragOffset = .zero
+            })
     }
 
     @ViewBuilder private var toolbarContents:some View {
@@ -151,28 +134,14 @@ struct BoardScreen: View {
         ToolButton(title:"等腰三角",systemImage:"triangle",selected:tool == .dynamicIsoscelesTriangle) { tool = .dynamicIsoscelesTriangle }
         ToolButton(title:"橡皮",systemImage:"eraser",selected:tool == .eraser) { tool = .eraser }
         ForEach(PenPreset.defaults) { item in
-            Button { presetID=item.id; tool = .pen } label: {
-                Circle().fill(Color(red:item.style.color.red, green:item.style.color.green, blue:item.style.color.blue)).frame(width:18,height:18)
-            }.buttonStyle(.plain).help(item.name)
+            Button { presetID=item.id; tool = .pen } label: { Circle().fill(Color(red:item.style.color.red, green:item.style.color.green, blue:item.style.color.blue)).frame(width:18,height:18) }.buttonStyle(.plain).help(item.name)
         }
-        Menu {
-            ForEach(BoardBackground.allCases) { item in Button(item.title) { background=item; if item != .white { inverted=false } } }
-        } label: { Label("背景",systemImage:"rectangle.fill") }.menuStyle(.borderlessButton)
+        Menu { ForEach(BoardBackground.allCases) { item in Button(item.title) { background=item; if item != .white { inverted=false } } } } label: { Label("背景",systemImage:"rectangle.fill") }.menuStyle(.borderlessButton)
         if background == .white {
             Toggle("反色",isOn:$inverted).toggleStyle(.checkbox)
-            if inverted {
-                Menu { ForEach(EyeComfortBackground.allCases) { item in Button(item.title) { eyeComfortBackground=item } } } label: { Label(eyeComfortBackground.title,systemImage:"moon.fill") }.menuStyle(.borderlessButton)
-            }
+            if inverted { Menu { ForEach(EyeComfortBackground.allCases) { item in Button(item.title) { eyeComfortBackground=item } } } label: { Label(eyeComfortBackground.title,systemImage:"moon.fill") }.menuStyle(.borderlessButton) }
         }
-        Menu {
-            ForEach(BoardInterfaceTheme.allCases) { item in
-                Button { interfaceTheme = item } label: {
-                    Label(item.title, systemImage: item.systemImage)
-                }
-            }
-        } label: {
-            Label(interfaceTheme.title, systemImage: interfaceTheme.systemImage)
-        }.menuStyle(.borderlessButton)
+        Menu { ForEach(BoardInterfaceTheme.allCases) { item in Button { interfaceTheme=item } label: { Label(item.title,systemImage:item.systemImage) } } } label: { Label(interfaceTheme.title,systemImage:interfaceTheme.systemImage) }.menuStyle(.borderlessButton)
         if controller.hasSelection {
             TextField("角度",text:Binding(get:{rotationText},set:{rotationText=$0})).frame(width:58).textFieldStyle(.roundedBorder).onSubmit { if let d=Double(rotationText) { controller.setRotationDegrees(d) } }
             Text("°")
