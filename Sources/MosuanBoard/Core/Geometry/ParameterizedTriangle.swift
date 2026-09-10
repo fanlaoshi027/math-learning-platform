@@ -76,6 +76,28 @@ struct ParameterizedTriangle: Codable, Equatable, Identifiable {
         )
     }
 
+    /// Position of the direct equal-leg length control point.
+    /// It sits halfway along AB, so dragging it along the AB ray changes only
+    /// the leg length while preserving the apex angle and AB = AC constraint.
+    func legLengthControlPoint() -> CGPoint {
+        let points = vertices()
+        guard points.count >= 2 else { return anchor }
+        return CGPoint(
+            x: (points[0].x + points[1].x) * 0.5,
+            y: (points[0].y + points[1].y) * 0.5
+        )
+    }
+
+    /// Converts a dragged point on the AB ray into the corresponding leg length.
+    /// The anchor remains fixed; the current apex angle and equal-leg constraint remain intact.
+    func legLength(forControlPoint point: CGPoint) -> CGFloat? {
+        let dx = point.x - anchor.x
+        let dy = point.y - anchor.y
+        let distance = hypot(dx, dy)
+        guard distance > 0.001 else { return nil }
+        return max(1, distance * 2)
+    }
+
     mutating func setApexAngle(_ degrees: CGFloat) {
         guard !lockedApexAngle else { return }
         let newAngle = Self.clampAngle(degrees)
