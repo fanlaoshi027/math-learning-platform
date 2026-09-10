@@ -39,9 +39,9 @@ enum GeometryConstraintSolver {
             case let .rotationAround(pointID, objectID):
                 _ = pointID; _ = objectID
             case let .parallel(first, second):
-                _ = first; _ = second
+                setLineDirection(&model, referenceLineID: first, constrainedLineID: second, perpendicular: false)
             case let .perpendicular(first, second):
-                _ = first; _ = second
+                setLineDirection(&model, referenceLineID: first, constrainedLineID: second, perpendicular: true)
             }
         }
     }
@@ -130,6 +130,51 @@ enum GeometryConstraintSolver {
             model.points[endIndex].position = CGPoint(x: start.x + target * cos(angle), y: start.y + target * sin(angle))
         } else if !model.points[startIndex].isFixed {
             model.points[startIndex].position = CGPoint(x: end.x - target * cos(angle), y: end.y - target * sin(angle))
+        }
+    }
+
+    private static func setLineDirection(_ model: inout GeometryModel, referenceLineID: UUID, constrainedLineID: UUID, perpendicular: Bool) {
+        guard referenceLineID != constrainedLineID,
+              let reference = model.lines.first(where: { $0.id == referenceLineID }),
+              let constrained = model.lines.first(where: { $0.id == constrainedLineID }),
+              let referenceStart = model.points.first(where: { $0.id == reference.startPointID }),
+              let referenceEnd = model.points.first(where: { $0.id == reference.endPointID }),
+              let constrainedStartIndex = model.points.firstIndex(where: { $0.id == constrained.startPointID }),
+              let constrainedEndIndex = model.points.firstIndex(where: { $0.id == constrained.endPointID }) else { return }
+
+        let referenceDX = referenceEnd.position.x - referenceStart.position.x
+        let referenceDY = referenceEnd.position.y - referenceStart.position.y
+        let referenceLength = hypot(referenceDX, referenceDY)
+        guard referenceLength > 0.0001 else { return }
+
+        let constrainedStart = model.points[constrainedStartIndex].position
+        let constrainedEnd = model.points[constrainedEndIndex].position
+        let currentDX = constrainedEnd.x - constrainedStart.x
+        let currentDY = constrainedEnd.y - constrainedStart.y
+        let currentLength = hypot(currentDX, currentDY)
+        guard currentLength > 0.0001 else { return }
+
+        var ux = referenceDX / referenceLength
+        var uy = referenceDY / referenceLength
+        if perpendicular {
+            let rotatedX = -uy
+            let rotatedY = ux
+            ux = rotatedX
+            uy = rotatedY
+        }
+
+        // Keep the constrained segment's current length and anchor whichever
+        // endpoint is movable while respecting fixed-point constraints.
+        if !model.points[constrainedEndIndex].isFixed {
+            model.points[constrainedEndIndex].position = CGPoint(
+                x: constrainedStart.x + currentLength * ux,
+                y: constrainedStart.y + currentLength * uy
+            )
+        } else if !model.points[constrainedStartIndex].isFixed {
+            model.points[constrainedStartIndex].position = CGPoint(
+                x: constrainedEnd.x - currentLength * ux,
+                y: constrainedEnd.y - currentLength * uy
+            )
         }
     }
 
