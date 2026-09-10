@@ -113,10 +113,10 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func selectedDynamicIsoscelesTriangleLegLength() -> CGFloat? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return nil }; return objectStore.triangleLegLength(id: id) }
     @discardableResult func setSelectedDynamicIsoscelesTriangleDegrees(_ degrees: CGFloat) -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; guard objectStore.setDynamicTriangleAngle(id: id, degrees: degrees) else { return false }; rebuildGeometry(); return true }
     @discardableResult func setSelectedDynamicIsoscelesTriangleLegLength(_ length: CGFloat) -> Bool { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return false }; guard objectStore.setDynamicTriangleLegLength(id: id, length: length) else { return false }; rebuildGeometry(); return true }
-    @discardableResult func dynamicIsoscelesTriangleControlPoint(at point: SIMD2<Float>, tolerance: Float = 18) -> UUID? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, let model = object.triangleModel else { return nil }; let p = canvasPoint(from: point); let raw = transformPoint(model.angleControlPoint(), by: object.transform); let handle = viewPoint(from: SIMD2(Float(raw.x), Float(raw.y))); return simd_distance(point, handle) <= tolerance ? id : nil }
+    @discardableResult func dynamicIsoscelesTriangleControlPoint(at point: SIMD2<Float>, tolerance: Float = 18) -> UUID? { guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first, let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, let model = object.triangleModel else { return nil }; let raw = transformPoint(model.angleControlPoint(), by: object.transform); let handle = viewPoint(from: SIMD2(Float(raw.x), Float(raw.y))); return simd_distance(point, handle) <= tolerance ? id : nil }
     @discardableResult func moveDynamicIsoscelesTriangleControlPoint(id: UUID, to point: SIMD2<Float>) -> Bool { guard let object = objectStore.object(with: id), object.kind == .parameterizedTriangle, var model = object.triangleModel else { return false }; let canvas = canvasPoint(from: point); let raw = inverseTransformPoint(CGPoint(x: CGFloat(canvas.x), y: CGFloat(canvas.y)), by: object.transform); let dx = raw.x - model.anchor.x; let dy = raw.y - model.anchor.y; let c = cos(model.rotation); let s = sin(model.rotation); let localX = dx * c + dy * s; let localY = -dx * s + dy * c; guard hypot(localX, localY) > 0.001 else { return false }; let degrees = 2 * atan2(abs(localX), max(0.001, localY)) * 180 / .pi; model.setApexAngle(max(30, min(150, degrees))); guard objectStore.updateTriangleModel(id: id, { $0 = model }) else { return false }; rebuildGeometry(); return true }
     private func transformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let c = transform.rotationCenter; let t = CGPoint(x: point.x - c.x, y: point.y - c.y); let s = CGPoint(x: t.x * transform.scale.width, y: t.y * transform.scale.height); let co = cos(transform.rotation), si = sin(transform.rotation); return CGPoint(x: s.x * co - s.y * si + c.x + transform.position.x, y: s.x * si + s.y * co + c.y + transform.position.y) }
-    private func inverseTransformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let p = CGPoint(x: point.x - transform.position.x - transform.rotationCenter.x, y: point.y - transform.position.y - transform.rotationCenter.y); let co = cos(transform.rotation), si = sin(transform.rotation); let rx = p.x * co + p.y * si; let ry = -p.x * co + p.x * 0 - p.y * si; let sx = abs(transform.scale.width) > 0.0001 ? rx / transform.scale.width : rx; let sy = abs(transform.scale.height) > 0.0001 ? ry / transform.scale.height : ry; return CGPoint(x: sx + transform.rotationCenter.x, y: sy + transform.rotationCenter.y) }
+    private func inverseTransformPoint(_ point: CGPoint, by transform: GraphicObject.Transform) -> CGPoint { let p = CGPoint(x: point.x - transform.position.x - transform.rotationCenter.x, y: point.y - transform.position.y - transform.rotationCenter.y); let co = cos(transform.rotation), si = sin(transform.rotation); let rx = p.x * co + p.y * si; let ry = -p.x * si + p.y * co; let sx = abs(transform.scale.width) > 0.0001 ? rx / transform.scale.width : rx; let sy = abs(transform.scale.height) > 0.0001 ? ry / transform.scale.height : ry; return CGPoint(x: sx + transform.rotationCenter.x, y: sy + transform.rotationCenter.y) }
 
     // MARK: - Clipboard and selection
     func makeSelectionClipboardData() -> Data? { let strokes = selectedStrokeIndices.compactMap { index -> CanvasStroke? in guard committedStrokes.indices.contains(index) else { return nil }; let stroke = committedStrokes[index]; return CanvasStroke(id: stroke.id, points: stroke.points, style: stroke.style, rotation: stroke.rotation) }; let objects = selectedObjectIDs.compactMap { objectStore.object(with: $0) }; let payload = SelectionClipboardPayload(strokes: strokes, objects: objects); guard !payload.isEmpty, let data = try? JSONEncoder().encode(payload) else { return nil }; pasteCascadeIndex = 0; lastClipboardPayloadData = data; return data }
@@ -141,7 +141,36 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     func selectionBounds() -> CGRect? { var result:CGRect?; for i in selectedStrokeIndices { if committedStrokes.indices.contains(i), let b = bounds(committedStrokes[i].points) { result = result?.union(b) ?? b } }; for id in selectedObjectIDs { if let b = objectStore.bounds(of: id) { result = result?.union(b) ?? b } }; return result?.insetBy(dx: -8, dy: -8) }
     func selectionBoundsInView() -> CGRect? { guard let r = selectionBounds() else { return nil }; let a = viewPoint(from: SIMD2(Float(r.minX),Float(r.minY))); let b = viewPoint(from: SIMD2(Float(r.maxX),Float(r.maxY))); return CGRect(x: CGFloat(min(a.x,b.x)), y: CGFloat(min(a.y,b.y)), width: CGFloat(abs(b.x-a.x)), height: CGFloat(abs(b.y-a.y))) }
     func selectionCenter() -> SIMD2<Float>? { guard let r = selectionBounds() else { return nil }; return SIMD2(Float(r.midX),Float(r.midY)) }
-    func setRotationCenter(to point: SIMD2<Float>) { customRotationCenter = canvasPoint(from: point); rebuildGeometry() }
+
+    func setRotationCenter(to point: SIMD2<Float>) {
+        let requested = canvasPoint(from: point)
+        let tolerance = CGFloat(18 / max(zoomScale, 0.001))
+        var bestPoint: CGPoint?
+        var bestDistance = tolerance
+        for object in objectStore.objects {
+            let transformed = objectStore.transformedPoints(of: object)
+            guard !transformed.isEmpty else { continue }
+            for vertex in transformed {
+                let d = hypot(vertex.x - CGFloat(requested.x), vertex.y - CGFloat(requested.y))
+                if d < bestDistance { bestDistance = d; bestPoint = vertex }
+            }
+            if transformed.count >= 2 {
+                let closed = object.kind == .polygon || object.kind == .parameterizedTriangle
+                let pairs = closed ? zip(transformed, Array(transformed.dropFirst()) + [transformed[0]]) : zip(transformed, transformed.dropFirst())
+                for pair in pairs {
+                    let a = pair.0, b = pair.1
+                    let dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy
+                    if len2 <= 0.0001 { continue }
+                    let t = max(0, min(1, ((requested.x - CGFloat(a.x)) * dx + (requested.y - CGFloat(a.y)) * dy) / len2))
+                    let candidate = CGPoint(x: a.x + t * dx, y: a.y + t * dy)
+                    let d = hypot(candidate.x - CGFloat(requested.x), candidate.y - CGFloat(requested.y))
+                    if d < bestDistance { bestDistance = d; bestPoint = candidate }
+                }
+            }
+        }
+        customRotationCenter = bestPoint.map { SIMD2(Float($0.x), Float($0.y)) } ?? requested
+        rebuildGeometry()
+    }
     func rotationCenterViewPoint() -> SIMD2<Float>? { guard let c = customRotationCenter ?? selectionCenter() else { return nil }; return viewPoint(from: c) }
     func selectionHandle(at point: SIMD2<Float>, tolerance: Float = 10) -> SelectionHandle? { guard selectionCount > 1, let r = selectionBounds() else { return nil }; let p = canvasPoint(from: point); let t = tolerance / zoomScale; let h:[(SelectionHandle,SIMD2<Float>)] = [(.topRight,SIMD2(Float(r.maxX),Float(r.minY))),(.bottomRight,SIMD2(Float(r.maxX),Float(r.maxY)))]; return h.first { simd_distance(p,$0.1) <= t }?.0 }
     func rotationHandle(at point: SIMD2<Float>, tolerance: Float = 12) -> Bool { guard selectionCount > 1, let r = selectionBounds() else { return false }; let p = canvasPoint(from: point); return simd_distance(p,SIMD2(Float(r.maxX),Float(r.minY))) <= tolerance / zoomScale }
