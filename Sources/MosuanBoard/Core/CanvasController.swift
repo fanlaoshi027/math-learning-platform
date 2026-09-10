@@ -14,6 +14,7 @@ final class CanvasController: ObservableObject {
     @Published private(set) var dynamicAngleDegrees: Double?
     @Published private(set) var dynamicAnglePlaying = false
     @Published private(set) var dynamicTriangleDegrees: Double?
+    @Published private(set) var dynamicTriangleLegLength: Double?
 
     deinit { dynamicTrianglePlayback.stop() }
 
@@ -34,6 +35,7 @@ final class CanvasController: ObservableObject {
             self.dynamicAngleDegrees = canvas.selectedDynamicAngleDegrees.map(Double.init)
             self.dynamicAnglePlaying = canvas.isSelectedDynamicAnglePlaying
             self.dynamicTriangleDegrees = canvas.selectedDynamicIsoscelesTriangleDegrees.map(Double.init)
+            self.dynamicTriangleLegLength = canvas.selectedDynamicIsoscelesTriangleLegLength.map(Double.init)
         }
         refreshState()
     }
@@ -88,6 +90,12 @@ final class CanvasController: ObservableObject {
         refreshState()
     }
 
+    func setDynamicTriangleLegLength(_ length: Double) {
+        guard !dynamicTrianglePlayback.isPlaying else { return }
+        canvas?.setSelectedDynamicIsoscelesTriangleLegLength(CGFloat(length))
+        refreshState()
+    }
+
     func beginDynamicTriangleParameterEditHistory() {
         guard !dynamicTrianglePlayback.isPlaying else { return }
         canvas?.beginDynamicTriangleParameterEditHistory()
@@ -129,5 +137,6 @@ final class CanvasController: ObservableObject {
         dynamicAngleDegrees = canvas?.selectedDynamicAngleDegrees.map(Double.init)
         dynamicAnglePlaying = canvas?.isSelectedDynamicAnglePlaying ?? false
         dynamicTriangleDegrees = canvas?.selectedDynamicIsoscelesTriangleDegrees.map(Double.init)
+        dynamicTriangleLegLength = canvas?.selectedDynamicIsoscelesTriangleLegLength.map(Double.init)
     }
 }
