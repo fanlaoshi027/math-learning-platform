@@ -5,32 +5,24 @@ import Foundation
 /// This keeps object rendering/selection separate while allowing real
 /// cross-object constraints and dependency updates.
 extension GraphicObjectStore {
-    /// Merges the geometry models of line objects into one model and assigns
-    /// that model to every participating object. UUIDs are already unique, so
-    /// points, lines and constraints can be combined without remapping.
     @discardableResult
     func mergeGeometryModels(for objectIDs: [UUID]) -> UUID? {
         let selected = objectIDs.compactMap { object(with: $0) }
         guard selected.count == objectIDs.count, !selected.isEmpty,
               selected.allSatisfy({ $0.kind == .line || $0.kind == .geometryPoint }) else { return nil }
-
         let models = selected.compactMap(\.geometryModel)
         guard models.count == selected.count else { return nil }
 
-        let points = models.flatMap(\.points)
-        let lines = models.flatMap(\.lines)
-        let angles = models.flatMap(\.angles)
-        let constraints = models.flatMap(\.constraints)
-        let parameters = models.flatMap(\.parameters)
-        let translations = models.flatMap(\.translations)
-        let guides = models.flatMap(\.translationGuides)
-
         let merged = GeometryModel(
-            id: UUID(), points: points, lines: lines, angles: angles,
-            constraints: constraints, parameters: parameters,
-            translations: translations, translationGuides: guides
+            id: UUID(),
+            points: models.flatMap(\.points),
+            lines: models.flatMap(\.lines),
+            angles: models.flatMap(\.angles),
+            constraints: models.flatMap(\.constraints),
+            parameters: models.flatMap(\.parameters),
+            translations: models.flatMap(\.translations),
+            translationGuides: models.flatMap(\.translationGuides)
         )
-
         for object in selected {
             var copy = object
             copy.geometryModel = merged
@@ -59,26 +51,22 @@ extension GraphicObjectStore {
                 secondLineID: secondLineObjectID,
                 name: name,
                 segmentOnly: segmentOnly
-              ) else { return nil }
-
-        guard model.id == modelID,
+              ),
+              model.id == modelID,
               let point = model.points.first(where: { $0.id == pointID }) else { return nil }
 
-        for object in objects where object.geometryModel?.id == modelID {
-            var copy = object
-            copy.geometryModel = model
-            synchronizeGeometryProjection(&copy, model: model)
-            update(copy)
-        }
-
-        let style = GraphicObject.Style(strokeColor: first.style.strokeColor, strokeWidth: max(2, first.style.strokeWidth), opacity: first.style.opacity)
-        var marker = GraphicObject(
+        synchronizeGeometryModel(model)
+        let style = GraphicObject.Style(
+            strokeColor: first.style.strokeColor,
+            strokeWidth: max(2, first.style.strokeWidth),
+            opacity: first.style.opacity
+        )
+        let marker = GraphicObject(
             kind: .geometryPoint,
             style: style,
             geometry: GraphicObject.Geometry(points: [point.position]),
             geometryModel: model
         )
-        marker.geometry.parameters["pointID"] = 0
         insert(marker)
         return marker.id
     }
@@ -101,8 +89,6 @@ extension GraphicObjectStore {
         return true
     }
 
-    /// Re-solves a shared model and projects its points back into each
-    /// participating GraphicObject's render geometry.
     @discardableResult
     func synchronizeGeometryModel(_ model: GeometryModel) -> Bool {
         var changed = false
@@ -110,7 +96,10 @@ extension GraphicObjectStore {
             var copy = object
             copy.geometryModel = model
             synchronizeGeometryProjection(&copy, model: model)
-            if copy != object { update(copy); changed = true }
+            if copy != object {
+                update(copy)
+                changed = true
+            }
         }
         return changed
     }
@@ -123,15 +112,11 @@ extension GraphicObjectStore {
                   let b = model.points.first(where: { $0.id == line.endPointID }) else { return }
             object.geometry.points = [a.position, b.position]
         case .geometryPoint:
-            let pointID: UUID?
-            if let raw = object.geometry.points.first {
-                pointID = model.points.min { distanceSquared($0.position, raw) < distanceSquared($1.position, raw) }?.id
-            } else {
-                pointID = model.points.first?.id
-            }
-            if let pointID, let point = model.points.first(where: { $0.id == pointID }) {
-                object.geometry.points = [point.position]
-            }
+            guard let raw = object.geometry.points.first,
+                  let point = model.points.min(by: {
+                      distanceSquared($0.position, raw) < distanceSquared($1.position, raw)
+                  }) else { return }
+            object.geometry.points = [point.position]
         default:
             break
         }
