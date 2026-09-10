@@ -48,6 +48,7 @@ final class GraphicObjectStore {
     func setTriangleParameter(id:UUID,parameter:TriangleParameter,value:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};GeometryInteractionEngine.setTriangleParameter(&m,parameter:parameter,value:value);objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
     func triangleParameter(id:UUID)->CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.apexAngleDegrees }
     func triangleLegLength(id: UUID) -> CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.legLength }
+    func triangleLegLengthControlPoint(id: UUID) -> CGPoint? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return transformedPoint(m.legLengthControlPoint(), in: o) }
 
     @discardableResult
     func setDynamicTriangleAngle(id: UUID, degrees: CGFloat) -> Bool {
@@ -61,6 +62,17 @@ final class GraphicObjectStore {
     @discardableResult
     func setDynamicTriangleLegLength(id: UUID, length: CGFloat) -> Bool {
         guard let i = objects.firstIndex(where: { $0.id == id }), objects[i].kind == .parameterizedTriangle, var model = objects[i].triangleModel else { return false }
+        model.setLegLength(length)
+        objects[i].triangleModel = model
+        objects[i].geometry.points = model.vertices()
+        return true
+    }
+
+    @discardableResult
+    func dragDynamicTriangleLegLengthControl(id: UUID, to point: CGPoint) -> Bool {
+        guard let i = objects.firstIndex(where: { $0.id == id }), objects[i].kind == .parameterizedTriangle, var model = objects[i].triangleModel else { return false }
+        let rawPoint = inverseTransform(point, in: objects[i])
+        guard let length = model.legLength(forControlPoint: rawPoint), length.isFinite else { return false }
         model.setLegLength(length)
         objects[i].triangleModel = model
         objects[i].geometry.points = model.vertices()
@@ -114,6 +126,17 @@ final class GraphicObjectStore {
     func exportObjects()->[GraphicObject]{objects};func importObjects(_ value:[GraphicObject]){objects=value}
 
     private func transformedPoint(_ point:CGPoint,in object:GraphicObject)->CGPoint{let c=object.transform.rotationCenter,t=CGPoint(x:point.x-c.x,y:point.y-c.y),s=CGPoint(x:t.x*object.transform.scale.width,y:t.y*object.transform.scale.height),co=cos(object.transform.rotation),si=sin(object.transform.rotation);return CGPoint(x:s.x*co-s.y*si+c.x+object.transform.position.x,y:s.x*si+s.y*co+c.y+object.transform.position.y)}
+    private func inverseTransform(_ point: CGPoint, in object: GraphicObject) -> CGPoint {
+        let p = CGPoint(x: point.x - object.transform.position.x - object.transform.rotationCenter.x,
+                        y: point.y - object.transform.position.y - object.transform.rotationCenter.y)
+        let co = cos(object.transform.rotation)
+        let si = sin(object.transform.rotation)
+        let rx = p.x * co + p.y * si
+        let ry = -p.x * si + p.y * co
+        let sx = abs(object.transform.scale.width) > 0.0001 ? rx / object.transform.scale.width : rx
+        let sy = abs(object.transform.scale.height) > 0.0001 ? ry / object.transform.scale.height : ry
+        return CGPoint(x: sx + object.transform.rotationCenter.x, y: sy + object.transform.rotationCenter.y)
+    }
     private func segmentBounds(_ a:CGPoint,_ b:CGPoint)->CGRect{CGRect(x:min(a.x,b.x),y:min(a.y,b.y),width:abs(a.x-b.x),height:abs(a.y-b.y))}
     private func distance(_ p:CGPoint,toSegment a:CGPoint,_ b:CGPoint)->CGFloat{let dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;if l==0{return hypot(p.x-a.x,p.y-a.y)};let t=max(0,min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l)),q=CGPoint(x:a.x+t*dx,y:a.y+t*dy);return hypot(p.x-q.x,p.y-q.y)}
     private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool{guard poly.count>=3 else{return false};var inside=false;var j=poly.count-1;for i in poly.indices{let a=poly[i],b=poly[j];if(a.y>p.y) != (b.y>p.y){let d=b.y-a.y;if d != 0{let x=(b.x-a.x)*(p.y-a.y)/d+a.x;if p.x<x{inside.toggle()}}};j=i};return inside}
