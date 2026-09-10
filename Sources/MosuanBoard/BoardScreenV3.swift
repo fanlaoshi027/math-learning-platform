@@ -126,6 +126,7 @@ struct BoardScreen: View {
 
     @ViewBuilder private var toolbarContents:some View {
         ToolButton(title:"选区",systemImage:"lasso",selected:tool == .select) { tool = .select }
+        ToolButton(title:"抓手",systemImage:"hand.draw",selected:tool == .hand) { tool = .hand }
         ToolButton(title:"画笔",systemImage:"pencil.tip",selected:tool == .pen) { tool = .pen }
         ToolButton(title:"直线",systemImage:"line.diagonal",selected:tool == .line) { tool = .line }
         ToolButton(title:"智能直线",systemImage:"scribble.variable",selected:tool == .smartLine) { tool = .smartLine }
