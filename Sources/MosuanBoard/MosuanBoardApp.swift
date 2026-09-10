@@ -14,10 +14,8 @@ struct MosuanBoardApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(after: .newItem) {
-                Button("导入 PDF…") {
-                    PDFWorkspaceController.shared.openPDF()
-                }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
+                Button("导入 PDF…") { PDFWorkspaceController.shared.openPDF() }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
             }
         }
     }
