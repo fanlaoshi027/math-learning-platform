@@ -7,6 +7,8 @@ enum GeometryConstraint: Codable, Equatable, Identifiable {
     case pointOnLine(pointID: UUID, lineID: UUID)
     case pointOnSegment(pointID: UUID, lineID: UUID)
     case pointOnCircle(pointID: UUID, circleID: UUID)
+    case pointAtSegmentRatio(pointID: UUID, startPointID: UUID, endPointID: UUID, ratio: CGFloat)
+    case pointAtAngleRatio(pointID: UUID, vertexID: UUID, startPointID: UUID, endPointID: UUID, ratio: CGFloat, length: CGFloat)
     case fixedLength(segmentID: UUID, length: CGFloat)
     case equalLength(first: UUID, second: UUID)
     case lengthRatio(first: UUID, second: UUID, multiplier: CGFloat)
@@ -24,6 +26,8 @@ enum GeometryConstraint: Codable, Equatable, Identifiable {
         case let .pointOnLine(pointID, lineID): return "pointOnLine:\(pointID.uuidString):\(lineID.uuidString)"
         case let .pointOnSegment(pointID, lineID): return "pointOnSegment:\(pointID.uuidString):\(lineID.uuidString)"
         case let .pointOnCircle(pointID, circleID): return "pointOnCircle:\(pointID.uuidString):\(circleID.uuidString)"
+        case let .pointAtSegmentRatio(pointID, start, end, ratio): return "pointAtSegmentRatio:\(pointID.uuidString):\(start.uuidString):\(end.uuidString):\(ratio)"
+        case let .pointAtAngleRatio(pointID, vertex, start, end, ratio, length): return "pointAtAngleRatio:\(pointID.uuidString):\(vertex.uuidString):\(start.uuidString):\(end.uuidString):\(ratio):\(length)"
         case let .fixedLength(segmentID, _): return "fixedLength:\(segmentID.uuidString)"
         case let .equalLength(first, second): return "equalLength:\(first.uuidString):\(second.uuidString)"
         case let .lengthRatio(first, second, multiplier): return "lengthRatio:\(first.uuidString):\(second.uuidString):\(multiplier)"
@@ -67,35 +71,22 @@ struct GeometryModel: Codable, Equatable, Identifiable {
     var lines: [GeometryLine]
     var angles: [GeometryAngleAnnotation]
     var constraints: [GeometryConstraint]
-    /// Shared named parameters used by lengths, angles and future transforms.
     var parameters: [GeometryParameter]
-    /// Optional 2D transformations. These remain separate from visual guide overlays.
     var translations: [GeometryTranslation]
     var translationGuides: [GeometryTranslationGuide]
 
     init(
-        id: UUID = UUID(),
-        points: [GeometryPoint] = [],
-        lines: [GeometryLine] = [],
-        angles: [GeometryAngleAnnotation] = [],
-        constraints: [GeometryConstraint] = [],
-        parameters: [GeometryParameter] = [],
-        translations: [GeometryTranslation] = [],
+        id: UUID = UUID(), points: [GeometryPoint] = [], lines: [GeometryLine] = [],
+        angles: [GeometryAngleAnnotation] = [], constraints: [GeometryConstraint] = [],
+        parameters: [GeometryParameter] = [], translations: [GeometryTranslation] = [],
         translationGuides: [GeometryTranslationGuide] = []
     ) {
-        self.id = id
-        self.points = points
-        self.lines = lines
-        self.angles = angles
-        self.constraints = constraints
-        self.parameters = parameters
-        self.translations = translations
-        self.translationGuides = translationGuides
+        self.id = id; self.points = points; self.lines = lines; self.angles = angles
+        self.constraints = constraints; self.parameters = parameters
+        self.translations = translations; self.translationGuides = translationGuides
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case id, points, lines, angles, constraints, parameters, translations, translationGuides
-    }
+    private enum CodingKeys: String, CodingKey { case id, points, lines, angles, constraints, parameters, translations, translationGuides }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -113,52 +104,36 @@ struct GeometryModel: Codable, Equatable, Identifiable {
         guard let index = points.firstIndex(where: { $0.id == pointID }) else { return }
         points[index].isFixed = true
         if let position { points[index].position = position }
-        constraints.removeAll { constraint in
-            if case let .fixedPoint(id, _) = constraint { return id == pointID }
-            return false
-        }
+        constraints.removeAll { if case let .fixedPoint(id, _) = $0 { return id == pointID }; return false }
         constraints.append(.fixedPoint(pointID: pointID, position: points[index].position))
     }
 
     mutating func setMovable(_ pointID: UUID) {
         guard let index = points.firstIndex(where: { $0.id == pointID }) else { return }
         points[index].isFixed = false
-        constraints.removeAll { constraint in
-            if case let .fixedPoint(id, _) = constraint { return id == pointID }
-            return false
-        }
+        constraints.removeAll { if case let .fixedPoint(id, _) = $0 { return id == pointID }; return false }
     }
 
     mutating func bind(master: UUID, follower: UUID) {
         guard let masterPoint = points.first(where: { $0.id == master }), let followerPoint = points.first(where: { $0.id == follower }) else { return }
         let offset = CGPoint(x: followerPoint.position.x - masterPoint.position.x, y: followerPoint.position.y - masterPoint.position.y)
-        constraints.removeAll { constraint in
-            if case let .pointBinding(existingMaster, existingFollower, _) = constraint {
-                return existingMaster == master || existingFollower == follower
-            }
-            return false
-        }
+        constraints.removeAll { if case let .pointBinding(existingMaster, existingFollower, _) = $0 { return existingMaster == master || existingFollower == follower }; return false }
         constraints.append(.pointBinding(master: master, follower: follower, offset: offset))
     }
 
     mutating func addLine(from startPointID: UUID, to endPointID: UUID, kind: GeometryLine.Kind = .segment) -> UUID? {
         guard points.contains(where: { $0.id == startPointID }), points.contains(where: { $0.id == endPointID }), startPointID != endPointID else { return nil }
         let line = GeometryLine(startPointID: startPointID, endPointID: endPointID, kind: kind)
-        lines.append(line)
-        return line.id
+        lines.append(line); return line.id
     }
 
     mutating func addParameter(_ parameter: GeometryParameter) {
-        parameters.removeAll { $0.id == parameter.id || $0.name == parameter.name }
-        parameters.append(parameter)
+        parameters.removeAll { $0.id == parameter.id || $0.name == parameter.name }; parameters.append(parameter)
     }
 
     mutating func setParameterValue(_ parameterID: UUID, value: CGFloat) {
-        guard let index = parameters.firstIndex(where: { $0.id == parameterID }) else { return }
-        parameters[index].setValue(value)
+        guard let index = parameters.firstIndex(where: { $0.id == parameterID }) else { return }; parameters[index].setValue(value)
     }
 
-    func parameter(id: UUID) -> GeometryParameter? {
-        parameters.first(where: { $0.id == id })
-    }
+    func parameter(id: UUID) -> GeometryParameter? { parameters.first(where: { $0.id == id }) }
 }
