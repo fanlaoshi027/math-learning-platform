@@ -63,6 +63,30 @@ else
   exit 1
 fi
 
+# Build a native macOS .icns from the checked-in 1024px PNG.
+ICON_SOURCE="$ROOT/Sources/MosuanBoard/Resources/AppIcon.png"
+ICONSET="$BUILD_DIR/AppIcon.iconset"
+if [ ! -f "$ICON_SOURCE" ]; then
+  echo "ERROR: App icon source not found: $ICON_SOURCE"
+  exit 1
+fi
+mkdir -p "$ICONSET"
+while read -r size name; do
+  sips -z "$size" "$size" "$ICON_SOURCE" --out "$ICONSET/$name" >/dev/null
+done <<'ICON_SIZES'
+16 icon_16x16.png
+32 icon_16x16@2x.png
+32 icon_32x32.png
+64 icon_32x32@2x.png
+128 icon_128x128.png
+256 icon_128x128@2x.png
+256 icon_256x256.png
+512 icon_256x256@2x.png
+512 icon_512x512.png
+1024 icon_512x512@2x.png
+ICON_SIZES
+iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
+
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -82,6 +106,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
     <string>${BUILD_NUMBER}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
 </dict>
@@ -90,14 +116,30 @@ PLIST
 
 chmod +x "$APP_DIR/Contents/MacOS/$PRODUCT"
 
+# Ad-hoc sign the finished app so macOS sees one coherent application bundle.
+if command -v codesign >/dev/null 2>&1; then
+  echo "==> Ad-hoc signing app"
+  codesign --force --deep --sign - "$APP_DIR" >/dev/null
+fi
+
 DMG="$BUILD_DIR/Mosuan-Board-${VERSION}.dmg"
 rm -f "$DMG"
 
+# Standard drag-and-drop DMG: app plus an Applications alias.
+DMG_STAGING="$BUILD_DIR/dmg-staging"
+rm -rf "$DMG_STAGING"
+mkdir -p "$DMG_STAGING"
+cp -R "$APP_DIR" "$DMG_STAGING/"
+ln -s /Applications "$DMG_STAGING/Applications"
+
 echo "==> Creating DMG"
-hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$APP_DIR" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG" >/dev/null
+
+rm -rf "$DMG_STAGING" "$ICONSET"
 
 echo
 echo "Build complete:"
 echo "  App: $APP_DIR"
 echo "  DMG: $DMG"
 echo "  Architecture: $ARCH"
+echo "  App icon: AppIcon.icns"
