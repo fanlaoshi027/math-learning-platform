@@ -65,7 +65,8 @@ extension GraphicObjectStore {
             kind: .geometryPoint,
             style: style,
             geometry: GraphicObject.Geometry(points: [point.position]),
-            geometryModel: model
+            geometryModel: model,
+            geometryPointID: pointID
         )
         insert(marker)
         return marker.id
@@ -112,10 +113,8 @@ extension GraphicObjectStore {
                   let b = model.points.first(where: { $0.id == line.endPointID }) else { return }
             object.geometry.points = [a.position, b.position]
         case .geometryPoint:
-            guard let raw = object.geometry.points.first,
-                  let point = model.points.min(by: {
-                      distanceSquared($0.position, raw) < distanceSquared($1.position, raw)
-                  }) else { return }
+            guard let pointID = object.geometryPointID,
+                  let point = model.points.first(where: { $0.id == pointID }) else { return }
             object.geometry.points = [point.position]
         default:
             break
@@ -126,11 +125,5 @@ extension GraphicObjectStore {
         abs(transform.position.x) < 0.0001 && abs(transform.position.y) < 0.0001 &&
         abs(transform.scale.width - 1) < 0.0001 && abs(transform.scale.height - 1) < 0.0001 &&
         abs(transform.rotation) < 0.0001 && abs(transform.rotationCenter.x) < 0.0001 && abs(transform.rotationCenter.y) < 0.0001
-    }
-
-    private func distanceSquared(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-        let dx = a.x - b.x
-        let dy = a.y - b.y
-        return dx * dx + dy * dy
     }
 }
