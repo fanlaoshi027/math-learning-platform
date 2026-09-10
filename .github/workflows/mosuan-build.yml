@@ -45,11 +45,40 @@ jobs:
         if: steps.build.outcome == 'failure'
         run: exit 1
 
+      - name: Verify packaged resource bundle
+        run: |
+          test -d "dist/Mosuan Board.app/MosuanBoard_MosuanBoard.bundle"
+          test -d "dist/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+          echo "SwiftPM resource bundle is present in the packaged app"
+
+      - name: Launch smoke test
+        run: |
+          set -e
+          "dist/Mosuan Board.app/Contents/MacOS/MosuanBoard" >dist/mosuan-launch.log 2>&1 &
+          PID=$!
+          sleep 6
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "Mosuan Board exited during launch"
+            cat dist/mosuan-launch.log || true
+            exit 1
+          fi
+          kill "$PID" || true
+          wait "$PID" 2>/dev/null || true
+          echo "Mosuan Board launch smoke test passed"
+
+      - name: Upload launch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mosuan-Board-launch-diagnostics
+          path: dist/mosuan-launch.log
+          if-no-files-found: warn
+
       - name: Upload app bundle
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-macOS-app
+          name: Mosuan-Board-macOS-app-0.1.1
           path: dist/Mosuan Board.app
           if-no-files-found: error
 
@@ -57,6 +86,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-0.1.0.dmg
-          path: dist/Mosuan-Board-0.1.0.dmg
+          name: Mosuan-Board-0.1.1.dmg
+          path: dist/Mosuan-Board-0.1.1.dmg
           if-no-files-found: error
