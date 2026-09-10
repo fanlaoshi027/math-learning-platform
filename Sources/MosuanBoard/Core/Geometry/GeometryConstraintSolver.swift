@@ -67,6 +67,7 @@ enum GeometryConstraintSolver {
 
     private static func project(_ model: inout GeometryModel, pointID: UUID, lineID: UUID, lowerBound: CGFloat?, upperBound: CGFloat?) {
         guard let pointIndex = model.points.firstIndex(where: { $0.id == pointID }),
+              !model.points[pointIndex].isFixed,
               let line = model.lines.first(where: { $0.id == lineID }),
               let start = model.points.first(where: { $0.id == line.startPointID }),
               let end = model.points.first(where: { $0.id == line.endPointID }) else { return }
@@ -83,6 +84,7 @@ enum GeometryConstraintSolver {
 
     private static func setSegmentRatio(_ model: inout GeometryModel, pointID: UUID, startPointID: UUID, endPointID: UUID, ratio: CGFloat) {
         guard let pointIndex = model.points.firstIndex(where: { $0.id == pointID }),
+              !model.points[pointIndex].isFixed,
               let start = model.points.first(where: { $0.id == startPointID }),
               let end = model.points.first(where: { $0.id == endPointID }) else { return }
         model.points[pointIndex].position = CGPoint(
@@ -93,6 +95,7 @@ enum GeometryConstraintSolver {
 
     private static func setAngleRatio(_ model: inout GeometryModel, pointID: UUID, vertexID: UUID, startPointID: UUID, endPointID: UUID, ratio: CGFloat, length: CGFloat) {
         guard let pointIndex = model.points.firstIndex(where: { $0.id == pointID }),
+              !model.points[pointIndex].isFixed,
               let vertex = model.points.first(where: { $0.id == vertexID }),
               let start = model.points.first(where: { $0.id == startPointID }),
               let end = model.points.first(where: { $0.id == endPointID }) else { return }
@@ -163,8 +166,6 @@ enum GeometryConstraintSolver {
             uy = rotatedY
         }
 
-        // Keep the constrained segment's current length and anchor whichever
-        // endpoint is movable while respecting fixed-point constraints.
         if !model.points[constrainedEndIndex].isFixed {
             model.points[constrainedEndIndex].position = CGPoint(
                 x: constrainedStart.x + currentLength * ux,
