@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct MosuanBoardApp: App {
+    @NSApplicationDelegateAdaptor(MosuanStartupDelegate.self) private var startupDelegate
+
     var body: some Scene {
         WindowGroup("Mosuan Board") {
             ZStack {
