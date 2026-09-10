@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// Shared board UI types used by the current macOS screen.
-enum BoardTool: Equatable { case select, pen, line, smartLine, polygon, dynamicAngle, dynamicIsoscelesTriangle, eraser }
+enum BoardTool: Equatable { case select, pen, line, smartLine, polygon, dynamicAngle, dynamicIsoscelesTriangle, eraser, hand }
 
 enum BoardBackground: String, CaseIterable, Identifiable {
     case white, black, darkGray, lightGray, cream
@@ -79,6 +79,7 @@ struct MetalInkCanvas: NSViewRepresentable {
     private func configure(_ view: InkMetalView) {
         view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine || tool == .polygon || tool == .dynamicAngle || tool == .dynamicIsoscelesTriangle
         view.isSelectionTool = tool == .select
+        view.isPanTool = tool == .hand
         view.isLineTool = tool == .line
         view.isSmartLineTool = tool == .smartLine
         view.isPolygonTool = tool == .polygon
