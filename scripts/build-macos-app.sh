@@ -14,7 +14,11 @@ rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 # Normalize the dynamic-angle renderer's trig/SIMD expression before compilation.
-perl -0pi -e 's/        var previous = v \+ SIMD2\(cos\(startAngle\), sin\(startAngle\)\) \* Float\(radius\)/        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat/' Sources/MosuanBoard/Metal/InkRenderer.swift
+perl -0pi -e 's/        var previous = v \\+ SIMD2\\(cos\\(startAngle\\), sin\\(startAngle\\)\\) \\* Float\\(radius\\)/        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat/' Sources/MosuanBoard/Metal/InkRenderer.swift
+
+# PDF teaching workspace: let the Metal ink layer become transparent when its background alpha is 0.
+perl -0pi -e 's/pass\\.colorAttachments\\[0\\]\\.clearColor=MTLClearColor\\(red:Double\\(backgroundColor\\.x\\),green:Double\\(backgroundColor\\.y\\),blue:Double\\(backgroundColor\\.z\\),alpha:1\\)/pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:Double(backgroundColor.w))/' Sources/MosuanBoard/Metal/InkRenderer.swift
+perl -0pi -e 's/colorPixelFormat = \\.bgra8Unorm; clearColor/colorPixelFormat = .bgra8Unorm; isOpaque = false; layer?.isOpaque = false; clearColor/' Sources/MosuanBoard/Metal/InkMetalView.swift
 
 BUILD_LOG="$ROOT_DIR/dist/swift-build.log"
 set +e
@@ -46,9 +50,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key>
     <string>com.fanlaoshi.mosuan-board</string>
     <key>CFBundleVersion</key>
-    <string>0.1.0</string>
+    <string>0.1.1</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.1.1</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -66,8 +70,8 @@ codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
 mkdir -p "$ROOT_DIR/dist"
 diskutil_image="$(command -v hdiutil || true)"
 if [ -n "$diskutil_image" ]; then
-  "$diskutil_image" create -volname "$APP_NAME" -srcfolder "$APP_DIR" -ov -format UDZO "$ROOT_DIR/dist/Mosuan-Board-0.1.0.dmg"
+  "$diskutil_image" create -volname "$APP_NAME" -srcfolder "$APP_DIR" -ov -format UDZO "$ROOT_DIR/dist/Mosuan-Board-0.1.1.dmg"
 fi
 
 echo "Built: $APP_DIR"
-[ -f "$ROOT_DIR/dist/Mosuan-Board-0.1.0.dmg" ] && echo "Built: $ROOT_DIR/dist/Mosuan-Board-0.1.0.dmg"
+[ -f "$ROOT_DIR/dist/Mosuan-Board-0.1.1.dmg" ] && echo "Built: $ROOT_DIR/dist/Mosuan-Board-0.1.1.dmg"
