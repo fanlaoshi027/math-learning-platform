@@ -35,7 +35,11 @@ final class GraphicObjectStore {
 
     func transformedPoints(of object: GraphicObject) -> [CGPoint] {
         if object.kind == .parameterizedTriangle, let triangle=object.triangleModel { return triangle.vertices().map { transformedPoint($0,in:object) } }
-        if object.kind == .dynamicAngle, let dynamicAngle=object.dynamicAngleModel { return dynamicAngle.model.points.map { transformedPoint($0,in:object) } }
+        if object.kind == .dynamicAngle, let dynamicAngle=object.dynamicAngleModel {
+            return dynamicAngle.model.points.map { point in
+                transformedPoint(CGPoint(x: point.position.x, y: point.position.y), in: object)
+            }
+        }
         return object.geometry.points.map { transformedPoint($0,in:object) }
     }
     func transformedPoints(of id: UUID) -> [CGPoint]? { guard let object=object(with:id) else{return nil}; return transformedPoints(of:object) }
@@ -139,7 +143,8 @@ final class GraphicObjectStore {
     func objectsHitByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{guard path.count>=2 else{return[]};return objects.filter{guard let b=bounds(of:$0) else{return false};let e=b.insetBy(dx:-tolerance,dy:-tolerance);return path.contains(where:e.contains)||zip(path,path.dropFirst()).contains{e.intersects(segmentBounds($0,$1))}}.map(\.id)}
     func objectsIntersectingLasso(_ lasso:[CGPoint])->[UUID]{guard lasso.count>=3 else{return[]};return objects.compactMap{guard let b=bounds(of:$0) else{return nil};let c=[CGPoint(x:b.minX,y:b.minY),CGPoint(x:b.maxX,y:b.minY),CGPoint(x:b.maxX,y:b.maxY),CGPoint(x:b.minX,y:b.maxY),CGPoint(x:b.midX,y:b.midY)];return c.contains(where:{pointInPolygon($0,lasso)}) ? $0.id:nil}}
     @discardableResult func eraseByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{let ids=Set(objectsHitByScribble(path,tolerance:tolerance));guard !ids.isEmpty else{return[]};objects.removeAll{ids.contains($0.id)};return Array(ids)}
-    @discardableResult func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool{
+    @discardableResult
+    func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool{
         guard let i=objects.firstIndex(where:{$0.id==id}) else{return false}
         if objects[i].kind == .parameterizedTriangle && endpoint == 0 {
             return dragDynamicTriangleLegLengthControl(id: id, to: point)
