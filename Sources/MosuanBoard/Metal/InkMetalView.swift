@@ -226,6 +226,7 @@ final class InkMetalView: MTKView {
             if renderer.rotationCenterHandle(at: p) { renderer.beginHistoryTransaction(); rotationCenterDrag = true; return }
             if renderer.rotationHandle(at: p) { renderer.beginHistoryTransaction(); rotationDrag = true; lastRotationPoint = p; return }
             if let handle = renderer.selectionHandle(at: p) { renderer.beginHistoryTransaction(); resizeHandle = handle; return }
+            if renderer.selectionMoveHandle(at: p) { renderer.beginHistoryTransaction(); selectionDrag = true; lastPoint = p; return }
             let operation = SelectionOperation.fromModifiers(event.modifierFlags)
             renderer.beginHistoryTransaction()
             if renderer.selectObject(at: p, operation: operation) || renderer.selectStroke(at: p, operation: operation) { selectionDrag = true; lastPoint = p; onSelectionChanged?(); draw(); return }
