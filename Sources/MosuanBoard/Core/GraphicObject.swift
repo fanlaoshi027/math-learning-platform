@@ -54,12 +54,13 @@ struct GraphicObject: Identifiable, Codable, Equatable {
     var geometry: Geometry
     var children: [GraphicObject]
     var geometryModel: GeometryModel?
+    var geometryPointID: UUID?
     var triangleModel: ParameterizedTriangle?
     var dynamicAngleModel: DynamicAngle?
 
-    init(id: UUID = UUID(), kind: Kind, transform: Transform = Transform(), style: Style = Style(), geometry: Geometry = Geometry(), children: [GraphicObject] = [], geometryModel: GeometryModel? = nil, triangleModel: ParameterizedTriangle? = nil, dynamicAngleModel: DynamicAngle? = nil) {
+    init(id: UUID = UUID(), kind: Kind, transform: Transform = Transform(), style: Style = Style(), geometry: Geometry = Geometry(), children: [GraphicObject] = [], geometryModel: GeometryModel? = nil, geometryPointID: UUID? = nil, triangleModel: ParameterizedTriangle? = nil, dynamicAngleModel: DynamicAngle? = nil) {
         self.id=id; self.kind=kind; self.transform=transform; self.style=style; self.geometry=geometry
-        self.children=children; self.geometryModel=geometryModel; self.triangleModel=triangleModel; self.dynamicAngleModel=dynamicAngleModel
+        self.children=children; self.geometryModel=geometryModel; self.geometryPointID=geometryPointID; self.triangleModel=triangleModel; self.dynamicAngleModel=dynamicAngleModel
     }
 }
 
@@ -76,7 +77,7 @@ extension GraphicObject {
     static func geometryPoint(position: CGPoint, style: Style = Style()) -> GraphicObject {
         let pointID = UUID()
         let model = GeometryModel(points: [GeometryPoint(id: pointID, position: position)])
-        return GraphicObject(kind: .geometryPoint, style: style, geometry: Geometry(points: [position]), geometryModel: model)
+        return GraphicObject(kind: .geometryPoint, style: style, geometry: Geometry(points: [position]), geometryModel: model, geometryPointID: pointID)
     }
 
     static func polygon(points: [CGPoint], style: Style = Style()) -> GraphicObject { GraphicObject(kind: .polygon, style: style, geometry: Geometry(points: points)) }
