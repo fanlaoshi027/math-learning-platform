@@ -13,12 +13,30 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-# Normalize the dynamic-angle renderer's trig/SIMD expression before compilation.
-perl -0pi -e 's/        var previous = v \\+ SIMD2\\(cos\\(startAngle\\), sin\\(startAngle\\)\\) \\* Float\\(radius\\)/        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat/' Sources/MosuanBoard/Metal/InkRenderer.swift
+# Normalize the dynamic-angle renderer and prepare a transparent ink layer for PDF teaching.
+python3 - <<'PY'
+from pathlib import Path
 
-# PDF teaching workspace: let the Metal ink layer become transparent when its background alpha is 0.
-perl -0pi -e 's/pass\\.colorAttachments\\[0\\]\\.clearColor=MTLClearColor\\(red:Double\\(backgroundColor\\.x\\),green:Double\\(backgroundColor\\.y\\),blue:Double\\(backgroundColor\\.z\\),alpha:1\\)/pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:Double(backgroundColor.w))/' Sources/MosuanBoard/Metal/InkRenderer.swift
-perl -0pi -e 's/colorPixelFormat = \\.bgra8Unorm; clearColor/colorPixelFormat = .bgra8Unorm; isOpaque = false; layer?.isOpaque = false; clearColor/' Sources/MosuanBoard/Metal/InkMetalView.swift
+renderer = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
+s = renderer.read_text()
+old = "        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)"
+new = "        let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat"
+if old in s:
+    s = s.replace(old, new, 1)
+old = "pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:1)"
+new = "pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:Double(backgroundColor.w))"
+if old in s:
+    s = s.replace(old, new, 1)
+renderer.write_text(s)
+
+metal_view = Path("Sources/MosuanBoard/Metal/InkMetalView.swift")
+s = metal_view.read_text()
+old = "colorPixelFormat = .bgra8Unorm; clearColor"
+new = "colorPixelFormat = .bgra8Unorm; isOpaque = false; layer?.isOpaque = false; clearColor"
+if old in s:
+    s = s.replace(old, new, 1)
+metal_view.write_text(s)
+PY
 
 BUILD_LOG="$ROOT_DIR/dist/swift-build.log"
 set +e
