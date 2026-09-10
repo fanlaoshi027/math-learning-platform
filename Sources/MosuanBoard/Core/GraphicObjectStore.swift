@@ -35,7 +35,7 @@ final class GraphicObjectStore {
 
     func transformedPoints(of object: GraphicObject) -> [CGPoint] {
         if object.kind == .parameterizedTriangle, let triangle=object.triangleModel { return triangle.vertices().map { transformedPoint($0,in:object) } }
-        if object.kind == .dynamicAngle, let dynamicAngle=object.dynamicAngleModel { return dynamicAngle.model.points.map { transformedPoint($0.position,in:object) } }
+        if object.kind == .dynamicAngle, let dynamicAngle=object.dynamicAngleModel { return dynamicAngle.model.points.map { transformedPoint($0,in:object) } }
         return object.geometry.points.map { transformedPoint($0,in:object) }
     }
     func transformedPoints(of id: UUID) -> [CGPoint]? { guard let object=object(with:id) else{return nil}; return transformedPoints(of:object) }
@@ -108,7 +108,28 @@ final class GraphicObjectStore {
         objects[i].dynamicAngleModel=m;objects[i].geometryModel=m.model;return true
     }
 
-    func nearestLineEndpoint(to point:CGPoint,tolerance:CGFloat=12)->(id:UUID,endpoint:Int,distance:CGFloat)? { var best:(id:UUID,endpoint:Int,distance:CGFloat)?;for o in objects where o.kind == .line {guard o.geometry.points.count>=2 else{continue};for e in 0...1{let p=transformedPoint(o.geometry.points[e],in:o),d=hypot(p.x-point.x,p.y-point.y);if d<=tolerance && (best == nil || d<best!.distance){best=(o.id,e,d)}}};return best }
+    func nearestLineEndpoint(to point:CGPoint,tolerance:CGFloat=12)->(id:UUID,endpoint:Int,distance:CGFloat)? {
+        var best:(id:UUID,endpoint:Int,distance:CGFloat)?
+        for o in objects where o.kind == .line {
+            guard o.geometry.points.count>=2 else{continue}
+            for e in 0...1 {
+                let p=transformedPoint(o.geometry.points[e],in:o),d=hypot(p.x-point.x,p.y-point.y)
+                if d<=tolerance && (best == nil || d<best!.distance){best=(o.id,e,d)}
+            }
+        }
+        // Reuse the existing line-endpoint interaction path for the triangle's
+        // dedicated leg handle. The handle is the midpoint of AB; moving it
+        // changes AB = AC while the apex angle stays fixed.
+        for o in objects where o.kind == .parameterizedTriangle {
+            guard let model = o.triangleModel else { continue }
+            let p = transformedPoint(model.legLengthControlPoint(), in: o)
+            let d = hypot(p.x-point.x, p.y-point.y)
+            if d <= tolerance && (best == nil || d < best!.distance) {
+                best = (o.id, 0, d)
+            }
+        }
+        return best
+    }
     func nearestPolygonVertex(to point:CGPoint,tolerance:CGFloat=12)->(id:UUID,index:Int,distance:CGFloat)? { var best:(id:UUID,index:Int,distance:CGFloat)?;for o in objects where o.kind == .polygon {for (i,raw) in o.geometry.points.enumerated(){let p=transformedPoint(raw,in:o),d=hypot(p.x-point.x,p.y-point.y);if d<=tolerance && (best == nil || d<best!.distance){best=(o.id,i,d)}}};return best }
     @discardableResult
     func movePolygonVertex(id:UUID,index:Int,to point:CGPoint)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .polygon,objects[i].geometry.points.indices.contains(index) else{return false};objects[i].geometry.points[index]=point;return true }
@@ -120,8 +141,16 @@ final class GraphicObjectStore {
     func objectsIntersecting(_ rect:CGRect,fullyContained:Bool=false)->[UUID]{objects.compactMap{guard let b=bounds(of:$0) else{return nil};return(fullyContained ? rect.contains(b):rect.intersects(b)) ? $0.id:nil}}
     func objectsHitByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{guard path.count>=2 else{return[]};return objects.filter{guard let b=bounds(of:$0) else{return false};let e=b.insetBy(dx:-tolerance,dy:-tolerance);return path.contains(where:e.contains)||zip(path,path.dropFirst()).contains{e.intersects(segmentBounds($0,$1))}}.map(\.id)}
     func objectsIntersectingLasso(_ lasso:[CGPoint])->[UUID]{guard lasso.count>=3 else{return[]};return objects.compactMap{guard let b=bounds(of:$0) else{return nil};let c=[CGPoint(x:b.minX,y:b.minY),CGPoint(x:b.maxX,y:b.minY),CGPoint(x:b.maxX,y:b.maxY),CGPoint(x:b.minX,y:b.maxY),CGPoint(x:b.midX,y:b.midY)];return c.contains(where:{pointInPolygon($0,lasso)}) ? $0.id:nil}}
-    @discardableResult func eraseByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{let ids=Set(objectsHitByScribble(path,tolerance:tolerance));guard !ids.isEmpty else{return[]};objects.removeAll{ids.contains($0.id)};return Array(ids)}
-    @discardableResult func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool{guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .line,objects[i].geometry.points.count>=2,(endpoint==0 || endpoint==1) else{return false};objects[i].geometry.points[endpoint]=point;return true}
+    @discardableResult func eraseByScribble(_ path:[SIMD2<Float>],tolerance:CGFloat=12)->[UUID]{let ids=Set(objectsHitByScribble(path,tolerance:tolerance));guard !ids.isEmpty else{return[]};objects.removeAll{ids.contains($0.id)};return Array(ids)}
+    @discardableResult func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool{
+        guard let i=objects.firstIndex(where:{$0.id==id}) else{return false}
+        if objects[i].kind == .parameterizedTriangle && endpoint == 0 {
+            return dragDynamicTriangleLegLengthControl(id: id, to: point)
+        }
+        guard objects[i].kind == .line,objects[i].geometry.points.count>=2,(endpoint==0 || endpoint==1) else{return false}
+        objects[i].geometry.points[endpoint]=point
+        return true
+    }
     @discardableResult func transform(id:UUID,position:CGPoint?=nil,scale:CGSize?=nil,rotation:CGFloat?=nil)->Bool{guard let i=objects.firstIndex(where:{$0.id==id}) else{return false};if let position{objects[i].transform.position=position};if let scale{objects[i].transform.scale=scale};if let rotation{objects[i].transform.rotation=rotation};return true}
     func exportObjects()->[GraphicObject]{objects};func importObjects(_ value:[GraphicObject]){objects=value}
 
