@@ -35,6 +35,7 @@ final class InkMetalView: MTKView {
 
     var isUserInteractionEnabledForTool = true
     var isSelectionTool = false
+    var isPanTool = false
     var isLineTool = false
     var isSmartLineTool = false
     var isPolygonTool = false
@@ -208,7 +209,23 @@ final class InkMetalView: MTKView {
         window?.makeFirstResponder(self)
         let p = makePoint(from: event)
         if event.buttonNumber == 2 { middleButtonHeld = true; panDrag = true; lastPoint = p; return }
-        if spaceHeld { panDrag = true; lastPoint = p; return }
+        if spaceHeld || isPanTool { panDrag = true; lastPoint = p; return }
+
+        // A current selection owns the canvas until the click lands outside its frame.
+        // This prevents a pen/line/other tool from accidentally placing a mark while a selection is active.
+        if renderer.hasSelection && !temporarySelectHeld {
+            if let frame = renderer.selectionBoundsInView(), frame.contains(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) {
+                selectionDrag = true
+                lastPoint = p
+                renderer.beginHistoryTransaction()
+                return
+            }
+            renderer.clearSelection()
+            onSelectionChanged?()
+            draw()
+            return
+        }
+
         if isEraserTool && !temporarySelectHeld { renderer.beginHistoryTransaction(); eraserPoints = [p]; return }
         if isDynamicAngleTool && !selectionModeActive {
             renderer.beginHistoryTransaction(); dynamicAngleDragID = renderer.commitDynamicAngle(at: p); active = true; lastPoint = p; onSelectionChanged?(); draw(); return
