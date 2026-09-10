@@ -25,6 +25,9 @@ jobs:
       - name: Select Swift toolchain
         run: swift --version
 
+      - name: Normalize Swift 6 parser edge case
+        run: perl -0pi -e 's/ry=-p\.x\*si\+p\.y\*co/ry = (-p.x * si) + (p.y * co)/g' Sources/MosuanBoard/Core/GraphicObjectStore.swift
+
       - name: Build app bundle and DMG
         id: build
         continue-on-error: true
