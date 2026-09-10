@@ -45,6 +45,7 @@ jobs:
           file "dist/Mosuan Board.app/Contents/MacOS/MosuanBoard" | grep -q arm64
           echo "==> Metal resource bundle"
           test -d "dist/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+          echo "==> App icon"
           test -f "dist/Mosuan Board.app/Contents/Resources/AppIcon.icns"
           echo "==> Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "dist/Mosuan Board.app/Contents/Info.plist"
@@ -53,6 +54,8 @@ jobs:
           test -f "dist/Mosuan-Board-0.1.2.dmg"
           ls -lh "dist/Mosuan Board.app" "dist/Mosuan-Board-0.1.2.dmg"
 
+      # GUI/Metal launch is intentionally tested on the user's Mac rather than
+      # the hosted runner; the package/resource/architecture checks above are deterministic.
       - name: Upload app bundle
         if: success()
         uses: actions/upload-artifact@v4
