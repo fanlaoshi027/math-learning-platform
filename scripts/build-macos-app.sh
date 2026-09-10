@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 APP_NAME="Mosuan Board"
+VERSION="0.1.2"
+BUILD_NUMBER="2"
 APP_DIR="$ROOT_DIR/dist/$APP_NAME.app"
 CONTENTS="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS/MacOS"
@@ -13,10 +15,9 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-# Normalize the dynamic-angle renderer and prepare a transparent ink layer for PDF teaching.
+# Normalize a Metal expression that is rejected by some Swift 6 toolchains.
 python3 - <<'PY'
 from pathlib import Path
-
 renderer = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
 s = renderer.read_text()
 old = "        var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)"
@@ -54,12 +55,18 @@ if [ ! -x "$BINARY" ]; then
   exit 1
 fi
 
+ARCH="$(uname -m)"
+echo "Built binary architecture:"
+file "$BINARY"
+if [ "$ARCH" = "arm64" ] && ! file "$BINARY" | grep -q "arm64"; then
+  echo "ERROR: Apple Silicon runner produced a non-arm64 binary." >&2
+  exit 1
+fi
+
 cp "$BINARY" "$MACOS_DIR/MosuanBoard"
 
-# SwiftPM generates the Metal resource bundle next to the executable.  A hand-built
-# .app does not copy it automatically, so Bundle.module would otherwise fatalError
-# during InkRenderer initialization on the user's Mac.  Ship it in both locations
-# used by SwiftPM's generated Bundle.module lookup across toolchain versions.
+# SwiftPM generates the Metal resource bundle next to the executable. Ship it
+# in both locations used by SwiftPM's Bundle.module lookup across toolchains.
 RESOURCE_BUNDLE="$(find "$ROOT_DIR/.build" -type d -name 'MosuanBoard_MosuanBoard.bundle' -print -quit)"
 if [ -z "$RESOURCE_BUNDLE" ]; then
   echo "SwiftPM resource bundle not found: MosuanBoard_MosuanBoard.bundle" >&2
@@ -68,10 +75,33 @@ if [ -z "$RESOURCE_BUNDLE" ]; then
 fi
 cp -R "$RESOURCE_BUNDLE" "$APP_DIR/"
 cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
-
 echo "Packaged SwiftPM resource bundle: $(basename "$RESOURCE_BUNDLE")"
 
-cat > "$CONTENTS/Info.plist" <<'PLIST'
+# Build the macOS icon from the checked-in 1024px source.
+ICON_SOURCE="$ROOT_DIR/Sources/MosuanBoard/Resources/AppIcon.png"
+ICONSET="$ROOT_DIR/dist/AppIcon.iconset"
+if [ ! -f "$ICON_SOURCE" ]; then
+  echo "App icon source not found: $ICON_SOURCE" >&2
+  exit 1
+fi
+mkdir -p "$ICONSET"
+while read -r size name; do
+  sips -z "$size" "$size" "$ICON_SOURCE" --out "$ICONSET/$name" >/dev/null
+done <<'ICON_SIZES'
+16 icon_16x16.png
+32 icon_16x16@2x.png
+32 icon_32x32.png
+64 icon_32x32@2x.png
+128 icon_128x128.png
+256 icon_128x128@2x.png
+256 icon_256x256.png
+512 icon_256x256@2x.png
+512 icon_512x512.png
+1024 icon_512x512@2x.png
+ICON_SIZES
+iconutil -c icns "$ICONSET" -o "$RESOURCES_DIR/AppIcon.icns"
+
+cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -83,13 +113,15 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key>
     <string>com.fanlaoshi.mosuan-board</string>
     <key>CFBundleVersion</key>
-    <string>0.1.1</string>
+    <string>${BUILD_NUMBER}</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.1</string>
+    <string>${VERSION}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>MosuanBoard</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
@@ -98,13 +130,27 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+chmod +x "$MACOS_DIR/MosuanBoard"
 codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
-mkdir -p "$ROOT_DIR/dist"
-diskutil_image="$(command -v hdiutil || true)"
-if [ -n "$diskutil_image" ]; then
-  "$diskutil_image" create -volname "$APP_NAME" -srcfolder "$APP_DIR" -ov -format UDZO "$ROOT_DIR/dist/Mosuan-Board-0.1.1.dmg"
-fi
+# Standard drag-and-drop installer layout.
+DMG="$ROOT_DIR/dist/Mosuan-Board-${VERSION}.dmg"
+DMG_STAGING="$ROOT_DIR/dist/dmg-staging"
+rm -rf "$DMG_STAGING"
+mkdir -p "$DMG_STAGING"
+cp -R "$APP_DIR" "$DMG_STAGING/"
+ln -s /Applications "$DMG_STAGING/Applications"
+hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG" >/dev/null
+rm -rf "$DMG_STAGING" "$ICONSET"
 
+# Basic package assertions catch the exact failure that caused the old 0.1.1
+# package to launch and immediately crash: missing Metal resources or wrong arch.
+test -d "$APP_DIR/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+test -f "$APP_DIR/Contents/Resources/AppIcon.icns"
+test -L "$DMG_STAGING/Applications" 2>/dev/null || true
+
+# The app itself is not launched here because hosted CI has no guaranteed GUI/Metal device.
 echo "Built: $APP_DIR"
-[ -f "$ROOT_DIR/dist/Mosuan-Board-0.1.1.dmg" ] && echo "Built: $ROOT_DIR/dist/Mosuan-Board-0.1.1.dmg"
+echo "Built: $DMG"
+echo "Architecture: $ARCH"
+echo "Version: $VERSION"
