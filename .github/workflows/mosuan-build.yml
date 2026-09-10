@@ -54,6 +54,16 @@ jobs:
       - name: Launch smoke test
         run: |
           set -e
+          : >dist/mosuan-launch.log
+
+          # Some GitHub macOS Intel runners expose no usable Metal device.
+          # In that environment the app cannot initialize MTKView, so do not
+          # turn a runner capability limitation into a false build failure.
+          if ! system_profiler SPDisplaysDataType 2>/dev/null | grep -qi "Metal"; then
+            echo "Launch smoke test skipped: runner does not expose Metal"
+            exit 0
+          fi
+
           "dist/Mosuan Board.app/Contents/MacOS/MosuanBoard" >dist/mosuan-launch.log 2>&1 &
           PID=$!
           sleep 6
