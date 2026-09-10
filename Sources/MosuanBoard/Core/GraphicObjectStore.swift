@@ -117,9 +117,6 @@ final class GraphicObjectStore {
                 if d<=tolerance && (best == nil || d<best!.distance){best=(o.id,e,d)}
             }
         }
-        // Reuse the existing line-endpoint interaction path for the triangle's
-        // dedicated leg handle. The handle is the midpoint of AB; moving it
-        // changes AB = AC while the apex angle stays fixed.
         for o in objects where o.kind == .parameterizedTriangle {
             guard let model = o.triangleModel else { continue }
             let p = transformedPoint(model.legLengthControlPoint(), in: o)
@@ -141,7 +138,7 @@ final class GraphicObjectStore {
     func objectsIntersecting(_ rect:CGRect,fullyContained:Bool=false)->[UUID]{objects.compactMap{guard let b=bounds(of:$0) else{return nil};return(fullyContained ? rect.contains(b):rect.intersects(b)) ? $0.id:nil}}
     func objectsHitByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{guard path.count>=2 else{return[]};return objects.filter{guard let b=bounds(of:$0) else{return false};let e=b.insetBy(dx:-tolerance,dy:-tolerance);return path.contains(where:e.contains)||zip(path,path.dropFirst()).contains{e.intersects(segmentBounds($0,$1))}}.map(\.id)}
     func objectsIntersectingLasso(_ lasso:[CGPoint])->[UUID]{guard lasso.count>=3 else{return[]};return objects.compactMap{guard let b=bounds(of:$0) else{return nil};let c=[CGPoint(x:b.minX,y:b.minY),CGPoint(x:b.maxX,y:b.minY),CGPoint(x:b.maxX,y:b.maxY),CGPoint(x:b.minX,y:b.maxY),CGPoint(x:b.midX,y:b.midY)];return c.contains(where:{pointInPolygon($0,lasso)}) ? $0.id:nil}}
-    @discardableResult func eraseByScribble(_ path:[SIMD2<Float>],tolerance:CGFloat=12)->[UUID]{let ids=Set(objectsHitByScribble(path,tolerance:tolerance));guard !ids.isEmpty else{return[]};objects.removeAll{ids.contains($0.id)};return Array(ids)}
+    @discardableResult func eraseByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{let ids=Set(objectsHitByScribble(path,tolerance:tolerance));guard !ids.isEmpty else{return[]};objects.removeAll{ids.contains($0.id)};return Array(ids)}
     @discardableResult func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool{
         guard let i=objects.firstIndex(where:{$0.id==id}) else{return false}
         if objects[i].kind == .parameterizedTriangle && endpoint == 0 {
@@ -166,7 +163,7 @@ final class GraphicObjectStore {
         let sy = abs(object.transform.scale.height) > 0.0001 ? ry / object.transform.scale.height : ry
         return CGPoint(x: sx + object.transform.rotationCenter.x, y: sy + object.transform.rotationCenter.y)
     }
-    private func segmentBounds(_ a:CGPoint,_ b:CGPoint)->CGRect{CGRect(x:min(a.x,b.x),y:min(a.y,b.y),width:abs(a.x-b.x),height:abs(a.y-b.y))}
+    private func segmentBounds(_ a:CGPoint,_ b:CGPoint)->CGRect{CGRect(x:min(a.x,b.x),y:min(a.y,b.y),width:abs(b.x-a.x),height:abs(b.y-a.y))}
     private func distance(_ p:CGPoint,toSegment a:CGPoint,_ b:CGPoint)->CGFloat{let dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;if l==0{return hypot(p.x-a.x,p.y-a.y)};let t=max(0,min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l)),q=CGPoint(x:a.x+t*dx,y:a.y+t*dy);return hypot(p.x-q.x,p.y-q.y)}
     private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool{guard poly.count>=3 else{return false};var inside=false;var j=poly.count-1;for i in poly.indices{let a=poly[i],b=poly[j];if(a.y>p.y) != (b.y>p.y){let d=b.y-a.y;if d != 0{let x=(b.x-a.x)*(p.y-a.y)/d+a.x;if p.x<x{inside.toggle()}}};j=i};return inside}
 }
