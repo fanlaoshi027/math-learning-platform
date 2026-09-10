@@ -19,73 +19,46 @@ enum GeometryInteractionEngine {
     }
 
     /// Returns the closest line whose rendered segment is within `tolerance`.
-    /// The returned line can subsequently be used by `attachPointToLine`.
-    static func hitTestLine(
-        in model: GeometryModel,
-        at position: CGPoint,
-        tolerance: CGFloat = 14
-    ) -> UUID? {
+    static func hitTestLine(in model: GeometryModel, at position: CGPoint, tolerance: CGFloat = 14) -> UUID? {
         var bestID: UUID?
         var bestDistance = tolerance
-
         for line in model.lines {
             guard let start = model.points.first(where: { $0.id == line.startPointID }),
                   let end = model.points.first(where: { $0.id == line.endPointID }) else { continue }
             let distance = distanceToLine(position, start: start.position, end: end.position, kind: line.kind)
-            if distance <= bestDistance {
-                bestDistance = distance
-                bestID = line.id
-            }
+            if distance <= bestDistance { bestDistance = distance; bestID = line.id }
         }
         return bestID
     }
 
-    /// Constrains an existing point to a line. For segments, the point is clamped
-    /// to the two endpoints; for infinite lines it may move beyond either endpoint.
+    /// Attaches an existing point to a line/segment and immediately resolves it.
     @discardableResult
-    static func attachPointToLine(
-        _ model: inout GeometryModel,
-        pointID: UUID,
-        lineID: UUID,
-        segmentOnly: Bool = false
-    ) -> Bool {
+    static func attachPointToLine(_ model: inout GeometryModel, pointID: UUID, lineID: UUID, segmentOnly: Bool = false) -> Bool {
         guard model.points.contains(where: { $0.id == pointID }),
               let line = model.lines.first(where: { $0.id == lineID }),
-              line.startPointID != pointID,
-              line.endPointID != pointID else { return false }
-
-        // A point should have at most one direct line constraint. Remove only
-        // the previous point-on-line/segment relation; unrelated constraints stay intact.
+              line.startPointID != pointID, line.endPointID != pointID else { return false }
         model.constraints.removeAll { constraint in
             switch constraint {
-            case let .pointOnLine(id, _), let .pointOnSegment(id, _):
-                return id == pointID
-            default:
-                return false
+            case let .pointOnLine(id, _), let .pointOnSegment(id, _): return id == pointID
+            default: return false
             }
         }
-
         if segmentOnly || line.kind == .segment {
             model.constraints.append(.pointOnSegment(pointID: pointID, lineID: lineID))
         } else {
             model.constraints.append(.pointOnLine(pointID: pointID, lineID: lineID))
         }
-
         GeometryConstraintSolver.apply(&model)
         return true
     }
 
-    /// Removes a point's direct point-on-line/segment relation without touching
-    /// bindings, fixed points, lengths, angles, or other geometry constraints.
     @discardableResult
     static func detachPointFromLine(_ model: inout GeometryModel, pointID: UUID) -> Bool {
         let oldCount = model.constraints.count
         model.constraints.removeAll { constraint in
             switch constraint {
-            case let .pointOnLine(id, _), let .pointOnSegment(id, _):
-                return id == pointID
-            default:
-                return false
+            case let .pointOnLine(id, _), let .pointOnSegment(id, _): return id == pointID
+            default: return false
             }
         }
         guard model.constraints.count != oldCount else { return false }
@@ -93,6 +66,8 @@ enum GeometryInteractionEngine {
         return true
     }
 
+    /// Moves a point and then resolves all dependent constraints. A point constrained
+    /// to a line is projected back onto that line by the solver.
     @discardableResult
     static func dragPoint(_ model: inout GeometryModel, pointID: UUID, to position: CGPoint) -> Bool {
         guard let index = model.points.firstIndex(where: { $0.id == pointID }), !model.points[index].isFixed else { return false }
@@ -135,37 +110,18 @@ enum GeometryInteractionEngine {
         }
     }
 
-    static func applyConstraints(_ model: inout GeometryModel) {
-        GeometryConstraintSolver.apply(&model)
-    }
+    static func applyConstraints(_ model: inout GeometryModel) { GeometryConstraintSolver.apply(&model) }
 
     private static func distanceSquared(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-        let dx = a.x - b.x
-        let dy = a.y - b.y
-        return dx * dx + dy * dy
+        let dx = a.x - b.x; let dy = a.y - b.y; return dx * dx + dy * dy
     }
 
-    private static func distanceToLine(
-        _ point: CGPoint,
-        start: CGPoint,
-        end: CGPoint,
-        kind: GeometryLine.Kind
-    ) -> CGFloat {
-        let dx = end.x - start.x
-        let dy = end.y - start.y
+    private static func distanceToLine(_ point: CGPoint, start: CGPoint, end: CGPoint, kind: GeometryLine.Kind) -> CGFloat {
+        let dx = end.x - start.x; let dy = end.y - start.y
         let lengthSquared = dx * dx + dy * dy
         guard lengthSquared > 0.000001 else { return hypot(point.x - start.x, point.y - start.y) }
-
         var t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
-        switch kind {
-        case .segment:
-            t = max(0, min(1, t))
-        case .ray:
-            t = max(0, t)
-        case .line:
-            break
-        }
-
+        switch kind { case .segment: t = max(0, min(1, t)); case .ray: t = max(0, t); case .line: break }
         let closest = CGPoint(x: start.x + t * dx, y: start.y + t * dy)
         return hypot(point.x - closest.x, point.y - closest.y)
     }
