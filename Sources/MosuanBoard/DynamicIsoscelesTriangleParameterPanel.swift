@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DynamicIsoscelesTriangleParameterPanel: View {
     @Binding var degrees: Double
+    @Binding var legLength: Double
     var onValueChanged: (() -> Void)?
     var onParameterEditingChanged: ((Bool) -> Void)?
     var onPlaybackChanged: ((Bool) -> Void)?
@@ -12,12 +13,10 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
 
     private var apexAngle: Int { Int(degrees.rounded()) }
     private var baseAngle: Int { Int(((180 - degrees) / 2).rounded()) }
+    private var roundedLegLength: Int { Int(legLength.rounded()) }
 
     private func setAngle(_ value: Double) {
-        if isPlaying {
-            isPlaying = false
-            onPlaybackChanged?(false)
-        }
+        if isPlaying { isPlaying = false; onPlaybackChanged?(false) }
         degrees = value
         onValueChanged?()
     }
@@ -57,9 +56,31 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("边长")
+                        .font(.system(size: 14, weight: .medium))
+                    Spacer()
+                    Text("AB = AC = \(roundedLegLength)")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .monospacedDigit()
+                }
+                Slider(value: $legLength, in: 50...300, step: 1) {
+                    Text("等腰边长")
+                } onEditingChanged: { editing in
+                    isEditingParameter = editing
+                    onParameterEditingChanged?(editing)
+                    if !editing { onValueChanged?() }
+                }
+                .disabled(isPlaying)
+                HStack {
+                    Text("50").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("300").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
             HStack(spacing: 10) {
-                Text("AB = AC")
-                    .font(.system(size: 14, weight: .medium))
                 Text("∠B = ∠C = \(baseAngle)°")
                     .font(.system(size: 14, weight: .regular, design: .rounded))
                     .foregroundStyle(.secondary)
@@ -81,7 +102,7 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
             }
         }
         .padding(14)
-        .frame(minWidth: 280)
+        .frame(minWidth: 300)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
