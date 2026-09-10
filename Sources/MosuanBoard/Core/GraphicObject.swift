@@ -79,9 +79,9 @@ extension GraphicObject {
         return GraphicObject(kind: .geometryPoint, style: style, geometry: Geometry(points: [position]), geometryModel: model)
     }
 
-    static func polygon(points: [CGPoint], style: Style = Style()) { GraphicObject(kind: .polygon, style: style, geometry: Geometry(points: points)) }
-    static func rectangle(_ rect: CGRect, style: Style = Style()) { GraphicObject(kind: .rectangle, style: style, geometry: Geometry(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)) }
-    static func ellipse(_ rect: CGRect, style: Style = Style()) { GraphicObject(kind: .ellipse, style: style, geometry: Geometry(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)) }
+    static func polygon(points: [CGPoint], style: Style = Style()) -> GraphicObject { GraphicObject(kind: .polygon, style: style, geometry: Geometry(points: points)) }
+    static func rectangle(_ rect: CGRect, style: Style = Style()) -> GraphicObject { GraphicObject(kind: .rectangle, style: style, geometry: Geometry(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)) }
+    static func ellipse(_ rect: CGRect, style: Style = Style()) -> GraphicObject { GraphicObject(kind: .ellipse, style: style, geometry: Geometry(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)) }
 
     static func isoscelesTriangle(anchor: CGPoint, legLength: CGFloat = 120, apexAngleDegrees: CGFloat = 60, style: Style = Style()) -> GraphicObject {
         let model = ParameterizedTriangle(kind: .isosceles, anchor: anchor, legLength: legLength, apexAngleDegrees: apexAngleDegrees)
