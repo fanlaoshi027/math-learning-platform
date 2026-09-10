@@ -56,6 +56,21 @@ fi
 
 cp "$BINARY" "$MACOS_DIR/MosuanBoard"
 
+# SwiftPM generates the Metal resource bundle next to the executable.  A hand-built
+# .app does not copy it automatically, so Bundle.module would otherwise fatalError
+# during InkRenderer initialization on the user's Mac.  Ship it in both locations
+# used by SwiftPM's generated Bundle.module lookup across toolchain versions.
+RESOURCE_BUNDLE="$(find "$ROOT_DIR/.build" -type d -name 'MosuanBoard_MosuanBoard.bundle' -print -quit)"
+if [ -z "$RESOURCE_BUNDLE" ]; then
+  echo "SwiftPM resource bundle not found: MosuanBoard_MosuanBoard.bundle" >&2
+  find "$ROOT_DIR/.build" -maxdepth 6 -type d -name '*.bundle' -print >&2 || true
+  exit 1
+fi
+cp -R "$RESOURCE_BUNDLE" "$APP_DIR/"
+cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
+
+echo "Packaged SwiftPM resource bundle: $(basename "$RESOURCE_BUNDLE")"
+
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
