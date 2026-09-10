@@ -14,6 +14,9 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
     private var apexAngle: Int { Int(degrees.rounded()) }
     private var baseAngle: Int { Int(((180 - degrees) / 2).rounded()) }
     private var roundedLegLength: Int { Int(legLength.rounded()) }
+    private var baseLength: Int {
+        Int((2 * legLength * sin(degrees * .pi / 360)).rounded())
+    }
 
     private func setAngle(_ value: Double) {
         if isPlaying { isPlaying = false; onPlaybackChanged?(false) }
@@ -82,6 +85,11 @@ struct DynamicIsoscelesTriangleParameterPanel: View {
 
             HStack(spacing: 10) {
                 Text("∠B = ∠C = \(baseAngle)°")
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Spacer()
+                Text("BC = \(baseLength)")
                     .font(.system(size: 14, weight: .regular, design: .rounded))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
