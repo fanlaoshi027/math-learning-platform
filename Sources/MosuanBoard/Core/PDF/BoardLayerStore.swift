@@ -34,7 +34,7 @@ final class BoardLayerStore: ObservableObject {
     func setPDF(_ pdf: PDFDocument) {
         note.pdf = pdf
         if let baseIndex = note.layers.firstIndex(where: { $0.isBase }) { note.layers[baseIndex].name = "PDF · \(pdf.fileName)" }
-        else { note.layers.insert(BoardLayer(name: "PDF · \(pdf.fileName)", isBase: true, isLocked: true), at: 0) }
+        else { note.layers.insert(BoardLayer(name: "PDF · \(pdf.fileName)", isLocked: true, isBase: true), at: 0) }
         note.currentPage = 1
     }
     func setRawCanvasBase() { note.pdf = nil; note.layers.removeAll(where: { $0.isBase }); note.currentPage = 1 }
