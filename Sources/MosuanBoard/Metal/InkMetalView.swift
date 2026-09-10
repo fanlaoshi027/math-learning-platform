@@ -211,9 +211,10 @@ final class InkMetalView: MTKView {
         if event.buttonNumber == 2 { middleButtonHeld = true; panDrag = true; lastPoint = p; return }
         if spaceHeld || isPanTool { panDrag = true; lastPoint = p; return }
 
-        // A current selection owns the canvas until the click lands outside its frame.
-        // This prevents a pen/line/other tool from accidentally placing a mark while a selection is active.
-        if renderer.hasSelection && !temporarySelectHeld {
+        // Selection-tool hit targets must win over the generic "inside selection" drag.
+        // When another tool is active, an existing selection owns the canvas so a stray click
+        // cannot accidentally draw over the selected objects.
+        if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool {
             if let frame = renderer.selectionBoundsInView(), frame.contains(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) {
                 selectionDrag = true
                 lastPoint = p
@@ -244,6 +245,19 @@ final class InkMetalView: MTKView {
             if renderer.rotationHandle(at: p) { renderer.beginHistoryTransaction(); rotationDrag = true; lastRotationPoint = p; return }
             if let handle = renderer.selectionHandle(at: p) { renderer.beginHistoryTransaction(); resizeHandle = handle; return }
             if renderer.selectionMoveHandle(at: p) { renderer.beginHistoryTransaction(); selectionDrag = true; lastPoint = p; return }
+
+            // With a selection active, the interior of the multi-selection frame is also a move target.
+            // This is intentionally checked before object/lasso hit testing so an interior click never
+            // becomes a new stroke/selection operation.
+            if renderer.hasSelection,
+               let frame = renderer.selectionBoundsInView(),
+               frame.contains(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) {
+                renderer.beginHistoryTransaction()
+                selectionDrag = true
+                lastPoint = p
+                return
+            }
+
             let operation = SelectionOperation.fromModifiers(event.modifierFlags)
             renderer.beginHistoryTransaction()
             if renderer.selectObject(at: p, operation: operation) || renderer.selectStroke(at: p, operation: operation) { selectionDrag = true; lastPoint = p; onSelectionChanged?(); draw(); return }
