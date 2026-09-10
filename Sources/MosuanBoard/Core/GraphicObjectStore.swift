@@ -59,6 +59,15 @@ final class GraphicObjectStore {
     }
 
     @discardableResult
+    func setDynamicTriangleLegLength(id: UUID, length: CGFloat) -> Bool {
+        guard let i = objects.firstIndex(where: { $0.id == id }), objects[i].kind == .parameterizedTriangle, var model = objects[i].triangleModel else { return false }
+        model.setLegLength(length)
+        objects[i].triangleModel = model
+        objects[i].geometry.points = model.vertices()
+        return true
+    }
+
+    @discardableResult
     func dragDynamicTriangleVertex(id: UUID, vertexIndex: Int, to point: CGPoint) -> Bool {
         guard let i = objects.firstIndex(where: { $0.id == id }), objects[i].kind == .parameterizedTriangle, var model = objects[i].triangleModel else { return false }
         guard GeometryInteractionEngine.dragTriangle(&model, vertexIndex: vertexIndex, to: point) else { return false }
