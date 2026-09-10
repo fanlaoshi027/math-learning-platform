@@ -29,8 +29,7 @@ enum GeometryConstruction {
         return pointID
     }
 
-    /// Creates a point constrained to a line and returns its ID. The initial
-    /// position is projected immediately, so the object is valid from creation.
+    /// Constrains an existing point to a line/segment and resolves it immediately.
     static func attachPointToLine(model: inout GeometryModel, pointID: UUID, lineID: UUID, segmentOnly: Bool = false) -> Bool {
         GeometryInteractionEngine.attachPointToLine(&model, pointID: pointID, lineID: lineID, segmentOnly: segmentOnly)
     }
@@ -45,6 +44,44 @@ enum GeometryConstruction {
         model.points.append(GeometryPoint(id: pointID, name: name, position: projected))
         guard GeometryInteractionEngine.attachPointToLine(&model, pointID: pointID, lineID: lineID, segmentOnly: segmentOnly) else { return nil }
         return pointID
+    }
+
+    /// Creates a point at the intersection of two non-parallel lines.
+    /// The point is added to the same geometry model, so future constraint solving can
+    /// keep it attached to both source lines.
+    static func createIntersectionPoint(model: inout GeometryModel, firstLineID: UUID, secondLineID: UUID, name: String? = nil, segmentOnly: Bool = false) -> UUID? {
+        guard firstLineID != secondLineID,
+              let first = model.lines.first(where: { $0.id == firstLineID }),
+              let second = model.lines.first(where: { $0.id == secondLineID }),
+              let a = point(in: model, id: first.startPointID),
+              let b = point(in: model, id: first.endPointID),
+              let c = point(in: model, id: second.startPointID),
+              let d = point(in: model, id: second.endPointID),
+              let intersection = intersection(of: a, b, c, d, firstKind: first.kind, secondKind: second.kind, segmentOnly: segmentOnly) else { return nil }
+        let pointID = UUID()
+        model.points.append(GeometryPoint(id: pointID, name: name, position: intersection))
+        model.constraints.append(.pointOnLine(pointID: pointID, lineID: firstLineID))
+        model.constraints.append(.pointOnLine(pointID: pointID, lineID: secondLineID))
+        GeometryConstraintSolver.apply(&model)
+        return pointID
+    }
+
+    private static func point(in model: GeometryModel, id: UUID) -> CGPoint? {
+        model.points.first(where: { $0.id == id })?.position
+    }
+
+    private static func intersection(of a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ d: CGPoint, firstKind: GeometryLine.Kind, secondKind: GeometryLine.Kind, segmentOnly: Bool) -> CGPoint? {
+        let r = CGPoint(x: b.x - a.x, y: b.y - a.y)
+        let s = CGPoint(x: d.x - c.x, y: d.y - c.y)
+        let denominator = r.x * s.y - r.y * s.x
+        guard abs(denominator) > 0.000001 else { return nil }
+        let ca = CGPoint(x: c.x - a.x, y: c.y - a.y)
+        let t = (ca.x * s.y - ca.y * s.x) / denominator
+        let u = (ca.x * r.y - ca.y * r.x) / denominator
+        let firstAllows: Bool = segmentOnly || firstKind == .segment ? t >= -0.000001 && t <= 1.000001 : firstKind != .ray || t >= -0.000001
+        let secondAllows: Bool = segmentOnly || secondKind == .segment ? u >= -0.000001 && u <= 1.000001 : secondKind != .ray || u >= -0.000001
+        guard firstAllows && secondAllows else { return nil }
+        return CGPoint(x: a.x + t * r.x, y: a.y + t * r.y)
     }
 
     private static func interpolate(_ a: CGPoint, _ b: CGPoint, ratio: CGFloat) -> CGPoint {
