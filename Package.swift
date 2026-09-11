@@ -13,6 +13,7 @@ let package = Package(
                 "BoardScreen.swift",
                 "BoardScreenFixed.swift",
                 "BoardScreenV2.swift",
+                "PDFTeachingWorkspace.swift",
                 "Metal/InkRendererFixed.swift",
                 "Core/GraphicObjectStoreFixed.swift",
                 "Core/GraphicObjectStoreV2.swift",
