@@ -6,13 +6,14 @@ view = ROOT / "Sources/MosuanBoard/Metal/InkMetalView.swift"
 
 r = renderer.read_text()
 
-# Repair the legacy one-line appendBackground declaration: it was missing
-# the function-closing brace, which makes every following private method local.
-r = r.replace(
-    'y+=step}}\n    private func appendStroke',
-    'y+=step}}\n    }\n    private func appendStroke',
-    1
-)
+# The legacy appendBackground implementation is a compact one-line function.
+# Some revisions ended without the function-closing brace. Repair it by checking
+# the brace balance specifically between appendBackground and appendStroke.
+bg_start = r.index("    private func appendBackground(")
+stroke_start = r.index("    private func appendStroke(", bg_start)
+bg_block = r[bg_start:stroke_start]
+if bg_block.count("{") > bg_block.count("}"):
+    r = r[:stroke_start] + "    }\n" + r[stroke_start:]
 
 start = r.index("    private func appendStroke(")
 end = r.index("    private func appendSelection(", start)
@@ -67,13 +68,18 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
 '''
 r = r[:start] + new_stroke + r[end:]
 
-# Make color SIMD literals explicitly Float and normalize Swift lexer-sensitive math.
-r = r.replace('let color=SIMD4(0.82,0.84,0.88,0.55)', 'let color=SIMD4<Float>(0.82,0.84,0.88,0.55)', 1)
-r = r.replace('let c=SIMD4(0.1,0.45,1,0.75)', 'let c=SIMD4<Float>(0.1,0.45,1,0.75)', 1)
-r = r.replace('let c=SIMD4(0.1,0.45,1,0.85)', 'let c=SIMD4<Float>(0.1,0.45,1,0.85)', 1)
+# Make all renderer color literals explicitly Float and normalize Swift lexer-sensitive math.
+r = r.replace('SIMD4(0.82,0.84,0.88,0.55)', 'SIMD4<Float>(0.82,0.84,0.88,0.55)')
+r = r.replace('SIMD4(0.1,0.45,1,0.75)', 'SIMD4<Float>(0.1,0.45,1,0.75)')
+r = r.replace('SIMD4(0.1,0.45,1,0.85)', 'SIMD4<Float>(0.1,0.45,1,0.85)')
+r = r.replace('SIMD4(0.1,0.45,1,0.9)', 'SIMD4<Float>(0.1,0.45,1,0.9)')
 r = r.replace('SIMD4(0.95,0.55,0.05,1)', 'SIMD4<Float>(0.95,0.55,0.05,1)')
 r = r.replace('180.0/.pi', '180.0 / .pi')
 r = r.replace('2*.pi', '2 * .pi')
+r = r.replace('sourceRadius*CGFloat(0.32)', 'sourceRadius * CGFloat(0.32)')
+r = r.replace('delta*CGFloat(180.0 / .pi)', 'delta * CGFloat(180.0 / .pi)')
+r = r.replace('nx=-dy/l', 'nx = -dy / l')
+r = r.replace('ny=dx/l', 'ny = dx / l')
 
 r = r.replace(
     'descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm\n',
@@ -91,4 +97,4 @@ v = v.replace(
 )
 v = v.replace('tolerance: 8, minimumLength: 30', 'tolerance: 18, minimumLength: 20', 1)
 view.write_text(v)
-print("Applied compile-safe ink smoothing, 4x MSAA, and forgiving smart-line pause/commit detection.")
+print("Applied robust ink renderer repair, compile-safe smoothing, 4x MSAA, and forgiving smart-line detection.")
