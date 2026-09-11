@@ -1,14 +1,14 @@
 import Foundation
 
-/// Lightweight stroke preprocessing inspired by the smoothing approach used by
-/// mature Metal drawing engines. It deliberately stays platform-independent so
-/// the renderer can keep ownership of Metal and canvas state.
+/// Lightweight stroke preprocessing for natural-looking classroom handwriting.
+/// It stays platform-independent so the renderer keeps ownership of Metal/canvas state.
 enum StrokeSmoother {
     struct Configuration {
         var enabled: Bool = true
-        var strength: Float = 0.65
+        var strength: Float = 0.55
         var cornerAngleDegrees: Float = 55
         var minimumPointDistance: Float = 0.8
+        var pressureStrength: Float = 0.35
     }
 
     static func smooth(_ input: [InkPoint], configuration: Configuration = Configuration()) -> [InkPoint] {
@@ -17,12 +17,13 @@ enum StrokeSmoother {
         let points = deduplicated(input, minimumDistance: configuration.minimumPointDistance)
         guard points.count >= 3 else { return points }
 
-        var output: [InkPoint] = []
-        output.reserveCapacity(points.count * 2)
-        output.append(points[0])
-
         let strength = max(0, min(1, configuration.strength))
+        let pressureStrength = max(0, min(1, configuration.pressureStrength))
         let cornerCosine = cos(configuration.cornerAngleDegrees * .pi / 180)
+
+        var output: [InkPoint] = []
+        output.reserveCapacity(points.count)
+        output.append(points[0])
 
         for i in 1..<(points.count - 1) {
             let previous = points[i - 1]
@@ -41,21 +42,21 @@ enum StrokeSmoother {
 
             let cosine = simdDot(inVector / inLength, outVector / outLength)
             if cosine < cornerCosine {
-                // Preserve mathematical handwriting corners instead of rounding
-                // them away (e.g. a "7", angle, triangle vertex, etc.).
+                // Keep mathematical corners crisp: 7, angle vertices, triangle vertices, etc.
                 output.append(current)
                 continue
             }
 
-            let midpoint = SIMD2(
-                (previous.x + next.x) * 0.5,
-                (previous.y + next.y) * 0.5
-            )
-            let target = SIMD2(current.x, current.y) * Float(1 - strength) + midpoint * strength
-            let pressure = current.pressure
+            let averageX = (previous.x + 2 * current.x + next.x) * 0.25
+            let averageY = (previous.y + 2 * current.y + next.y) * 0.25
+            let targetX = current.x + (averageX - current.x) * strength
+            let targetY = current.y + (averageY - current.y) * strength
 
-            output.append(InkPoint(x: target.x, y: target.y, pressure: pressure))
-            output.append(current)
+            // Smooth pressure gently as well, while retaining the current sample as the anchor.
+            let averagePressure = (previous.pressure + 2 * current.pressure + next.pressure) * 0.25
+            let pressure = current.pressure + (averagePressure - current.pressure) * pressureStrength
+
+            output.append(InkPoint(x: targetX, y: targetY, pressure: pressure))
         }
 
         output.append(points[points.count - 1])
@@ -75,8 +76,7 @@ enum StrokeSmoother {
             if dx * dx + dy * dy >= thresholdSquared {
                 output.append(point)
             } else {
-                // Keep the latest pressure sample while avoiding a zero-length
-                // geometry segment.
+                // Keep the latest pressure sample while avoiding zero-length geometry segments.
                 output[output.count - 1] = InkPoint(x: last.x, y: last.y, pressure: point.pressure)
             }
         }
