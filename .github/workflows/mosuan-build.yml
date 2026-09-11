@@ -22,6 +22,42 @@ jobs:
           grep -q 'private var loadedPageState: CanvasPageState?' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'if loadedPageState == state { return }' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'Page state pushed by SwiftUI is input only' Sources/MosuanBoard/Metal/InkMetalView.swift
+      - name: Fix eraser tool priority
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('Sources/MosuanBoard/Metal/InkMetalView.swift')
+          s = p.read_text()
+          eraser = '''        if isEraserTool && !temporarySelectHeld {
+              renderer.beginHistoryTransaction()
+              eraserPoints = [p]
+              lastEraserPoint = p
+              eraseAlongPath([p])
+              return
+          }
+          '''
+          selection = '''        if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool {
+              if let frame = renderer.selectionBoundsInView(), frame.contains(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) {
+                  selectionDrag = true
+                  lastPoint = p
+                  renderer.beginHistoryTransaction()
+                  return
+              }
+              renderer.clearSelection()
+              onSelectionChanged?()
+              draw()
+              return
+          }
+          '''
+          if eraser not in s:
+              raise SystemExit('expected eraser block not found')
+          if selection not in s:
+              raise SystemExit('expected selection block not found')
+          s = s.replace(selection, eraser + selection, 1)
+          s = s.replace(eraser, '', 1)
+          p.write_text(s)
+          PY
+          grep -n -A7 -B3 'if isEraserTool && !temporarySelectHeld' Sources/MosuanBoard/Metal/InkMetalView.swift | head -n 20
       - name: Improve ink rendering quality
         run: |
           python3 scripts/fix-mosuan-ink-quality.py
