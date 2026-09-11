@@ -11,6 +11,7 @@ struct BoardScreen: View {
     @State private var eyeComfortBackground: EyeComfortBackground = .black90
     @State private var customHex = "1A1A1A"
     @State private var zoomPercent = 100
+    @State private var showMoreTools = false
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var rotationBinding: Binding<String> { Binding(get: { rotationText }, set: { rotationText = $0 }) }
@@ -76,15 +77,16 @@ struct BoardScreen: View {
 
     private var compactToolbar: some View {
         HStack(spacing: 4) {
-            compactButton("star.fill", active: false, help: "常用笔") { tool = .pen }
+            compactButton("star.fill", active: false, help: "常用笔") {
+                presetID = PenPreset.defaults[0].id
+                tool = .pen
+            }
             toolbarDivider
-
             compactButton("cursorarrow", active: tool == .select, help: "选择") { tool = .select }
             compactButton("pencil.tip", active: tool == .pen, help: "画笔") { tool = .pen }
             compactButton("line.diagonal", active: tool == .line, help: "直线") { tool = .line }
             compactButton("scribble.variable", active: tool == .smartLine, help: "智能直线") { tool = .smartLine }
             compactButton("eraser", active: tool == .eraser, help: "橡皮") { tool = .eraser }
-
             toolbarDivider
             ForEach(PenPreset.defaults) { item in
                 Button {
@@ -100,14 +102,12 @@ struct BoardScreen: View {
                 .buttonStyle(.plain)
                 .help(item.name)
             }
-
             toolbarDivider
             compactButton("arrow.uturn.backward", active: false, help: "撤销") { controller.undo() }
                 .disabled(!controller.canUndo)
             compactButton("arrow.uturn.forward", active: false, help: "重做") { controller.redo() }
                 .disabled(!controller.canRedo)
-            compactButton("plus", active: false, help: "更多工具") { }
-                .popover(isPresented: moreToolsBinding, arrowEdge: .top) { moreToolsMenu }
+            compactButton("plus", active: showMoreTools, help: "更多工具") { showMoreTools.toggle() }
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 5)
@@ -116,10 +116,8 @@ struct BoardScreen: View {
         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(.quaternary, lineWidth: 1))
         .shadow(color: .black.opacity(0.18), radius: 9, y: 3)
         .padding(.top, 8)
+        .popover(isPresented: $showMoreTools, arrowEdge: .top) { moreToolsMenu }
     }
-
-    @State private var showMoreTools = false
-    private var moreToolsBinding: Binding<Bool> { Binding(get: { showMoreTools }, set: { showMoreTools = $0 }) }
 
     private var toolbarDivider: some View {
         Divider().frame(height: 22).padding(.horizontal, 3)
