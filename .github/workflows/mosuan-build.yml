@@ -23,12 +23,30 @@ jobs:
           grep -q 'if loadedPageState == state { return }' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'Page state pushed by SwiftUI is input only' Sources/MosuanBoard/Metal/InkMetalView.swift
       - name: Improve ink rendering quality
-        run: python3 scripts/fix-mosuan-ink-quality.py
+        run: |
+          python3 scripts/fix-mosuan-ink-quality.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('Sources/MosuanBoard/Metal/InkRenderer.swift')
+          s = p.read_text()
+          marker = '    private func appendStroke('
+          if marker in s:
+              before, after = s.split(marker, 1)
+              if 'private func appendBackground' in before:
+                  last = before.rstrip()
+                  if not last.endswith('}'):
+                      s = before + '\n    }\n' + marker + after
+                  elif not last.endswith('}}') and not last.endswith('}\n    }'):
+                      # The legacy one-line appendBackground ends with its loop brace;
+                      # add the function-level closing brace when needed.
+                      s = before + '\n    }\n' + marker + after
+                  p.write_text(s)
+          PY
       - name: Fix packaged Metal resource lookup
         run: python3 scripts/fix-mosuan-runtime-resources.py
       - name: Set release version
         run: |
-          perl -0pi -e 's/VERSION="0\.1\.3"/VERSION="0.1.4"/; s/BUILD_NUMBER="5"/BUILD_NUMBER="11"/' scripts/build-macos-app.sh
+          perl -0pi -e 's/VERSION="0\.1\.3"/VERSION="0.1.4"/; s/BUILD_NUMBER="5"/BUILD_NUMBER="12"/' scripts/build-macos-app.sh
       - name: Build app bundle and DMG
         id: build
         run: bash scripts/build-macos-app.sh
@@ -46,7 +64,7 @@ jobs:
           test -f "dist/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle/default.metallib"
           test -f "dist/Mosuan Board.app/Contents/Resources/AppIcon.icns"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 0.1.4
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 11
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 12
           test -f "dist/Mosuan-Board-0.1.4.dmg"
           codesign --verify --deep --strict --verbose=2 "dist/Mosuan Board.app"
           hdiutil verify "dist/Mosuan-Board-0.1.4.dmg"
@@ -54,13 +72,13 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-macOS-app-0.1.4-build11-arm64
+          name: Mosuan-Board-macOS-app-0.1.4-build12-arm64
           path: dist/Mosuan Board.app
           if-no-files-found: error
       - name: Upload DMG
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-0.1.4-build11-arm64.dmg
+          name: Mosuan-Board-0.1.4-build12-arm64.dmg
           path: dist/Mosuan-Board-0.1.4.dmg
           if-no-files-found: error
