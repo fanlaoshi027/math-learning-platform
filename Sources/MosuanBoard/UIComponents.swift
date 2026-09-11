@@ -47,7 +47,9 @@ struct PageSidebar: View {
 }
 
 struct MetalInkCanvas: NSViewRepresentable {
-    var pageState: CanvasPageState = CanvasPageState()
+    /// nil means the normal standalone board owns its canvas state. A non-nil value is
+    /// used by document/page workspaces where SwiftUI is the source of truth.
+    var pageState: CanvasPageState?
     @Binding var tool: BoardTool
     let penStyle: PenStyle
     @ObservedObject var controller: CanvasController
@@ -57,13 +59,33 @@ struct MetalInkCanvas: NSViewRepresentable {
     @Binding var zoomPercent: Int
     var onPageStateChanged: ((CanvasPageState) -> Void)?
 
+    init(pageState: CanvasPageState? = nil,
+         tool: Binding<BoardTool>,
+         penStyle: PenStyle,
+         controller: CanvasController,
+         background: SIMD4<Float> = SIMD4(1,1,1,1),
+         inverted: Bool = false,
+         pattern: BoardPattern = .blank,
+         zoomPercent: Binding<Int>,
+         onPageStateChanged: ((CanvasPageState) -> Void)? = nil) {
+        self.pageState = pageState
+        self._tool = tool
+        self.penStyle = penStyle
+        self.controller = controller
+        self.background = background
+        self.inverted = inverted
+        self.pattern = pattern
+        self._zoomPercent = zoomPercent
+        self.onPageStateChanged = onPageStateChanged
+    }
+
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> InkMetalView {
         let view = InkMetalView()
         configure(view)
         view.onPageStateChanged = onPageStateChanged
         view.onZoomChanged = { value in zoomPercent = value }
-        view.loadPageState(pageState)
+        if let pageState { view.loadPageState(pageState) }
         controller.attach(view)
         return view
     }
@@ -71,9 +93,9 @@ struct MetalInkCanvas: NSViewRepresentable {
         configure(view)
         view.onPageStateChanged = onPageStateChanged
         view.onZoomChanged = { value in zoomPercent = value }
-        // Page content is the source of truth. InkMetalView.loadPageState is idempotent,
-        // so this is safe even when SwiftUI refreshes the representable for other state.
-        view.loadPageState(pageState)
+        // A standalone board has no external pageState. Do not reload an empty/default
+        // state on every SwiftUI refresh, otherwise lifting the pen can erase the stroke.
+        if let pageState { view.loadPageState(pageState) }
         controller.attach(view)
     }
     private func configure(_ view: InkMetalView) {
