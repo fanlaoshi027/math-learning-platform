@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 APP_NAME="Mosuan Board"
 VERSION="0.1.2"
-BUILD_NUMBER="2"
+BUILD_NUMBER="3"
 APP_DIR="$ROOT_DIR/dist/$APP_NAME.app"
 CONTENTS="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS/MacOS"
@@ -99,16 +99,60 @@ cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
 echo "Packaged Metal library: $METALLIB"
 echo "Packaged SwiftPM resource bundle: $(basename "$RESOURCE_BUNDLE")"
 
-# Build the macOS icon from the checked-in 1024px source.
-ICON_SOURCE="$ROOT_DIR/Sources/MosuanBoard/Resources/AppIcon.png"
+# Generate a deterministic macOS app icon during the build instead of relying on
+# a checked-in PNG that may be stale/transparent/blank in Finder. The icon is a
+# simple teaching/ink mark: blue rounded square, white pen stroke and orange tip.
+GENERATED_ICON="$ROOT_DIR/dist/generated-AppIcon.png"
+cat > "$ROOT_DIR/dist/make-app-icon.swift" <<'SWIFT'
+import AppKit
+import CoreGraphics
+
+let size = 1024
+let image = NSImage(size: NSSize(width: size, height: size))
+image.lockFocus()
+
+NSColor(calibratedRed: 0.08, green: 0.30, blue: 0.70, alpha: 1).setFill()
+NSBezierPath(roundedRect: NSRect(x: 32, y: 32, width: 960, height: 960), xRadius: 210, yRadius: 210).fill()
+
+NSColor.white.setFill()
+let pen = NSBezierPath()
+pen.move(to: NSPoint(x: 270, y: 690))
+pen.line(to: NSPoint(x: 650, y: 310))
+pen.line(to: NSPoint(x: 760, y: 420))
+pen.line(to: NSPoint(x: 380, y: 800))
+pen.close()
+pen.fill()
+
+NSColor(calibratedRed: 0.98, green: 0.55, blue: 0.10, alpha: 1).setFill()
+let tip = NSBezierPath()
+tip.move(to: NSPoint(x: 650, y: 310))
+tip.line(to: NSPoint(x: 820, y: 260))
+tip.line(to: NSPoint(x: 760, y: 420))
+tip.close()
+tip.fill()
+
+NSColor(calibratedWhite: 1, alpha: 0.28).setStroke()
+let line = NSBezierPath()
+line.lineWidth = 22
+line.move(to: NSPoint(x: 220, y: 260))
+line.line(to: NSPoint(x: 560, y: 260))
+line.stroke()
+
+image.unlockFocus()
+
+guard let tiff = image.tiffRepresentation,
+      let rep = NSBitmapImageRep(data: tiff),
+      let png = rep.representation(using: .png, properties: [:]) else {
+    exit(1)
+}
+try png.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))
+SWIFT
+swift "$ROOT_DIR/dist/make-app-icon.swift" "$GENERATED_ICON"
+
 ICONSET="$ROOT_DIR/dist/AppIcon.iconset"
-if [ ! -f "$ICON_SOURCE" ]; then
-  echo "App icon source not found: $ICON_SOURCE" >&2
-  exit 1
-fi
 mkdir -p "$ICONSET"
 while read -r size name; do
-  sips -z "$size" "$size" "$ICON_SOURCE" --out "$ICONSET/$name" >/dev/null
+  sips -z "$size" "$size" "$GENERATED_ICON" --out "$ICONSET/$name" >/dev/null
 done <<'ICON_SIZES'
 16 icon_16x16.png
 32 icon_16x16@2x.png
@@ -144,6 +188,8 @@ cat > "$CONTENTS/Info.plist" <<PLIST
     <string>MosuanBoard</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon.icns</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
@@ -155,7 +201,6 @@ PLIST
 chmod +x "$MACOS_DIR/MosuanBoard"
 codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
-# Standard drag-and-drop installer layout.
 DMG="$ROOT_DIR/dist/Mosuan-Board-${VERSION}.dmg"
 DMG_STAGING="$ROOT_DIR/dist/dmg-staging"
 rm -rf "$DMG_STAGING"
@@ -164,15 +209,15 @@ cp -R "$APP_DIR" "$DMG_STAGING/"
 ln -s /Applications "$DMG_STAGING/Applications"
 hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG" >/dev/null
 
-# Basic package assertions catch the exact failures that caused 0.1.1 to crash.
 test -d "$APP_DIR/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
 test -f "$APP_DIR/Contents/Resources/MosuanBoard_MosuanBoard.bundle/default.metallib"
 test -f "$APP_DIR/Contents/Resources/AppIcon.icns"
 test -L "$DMG_STAGING/Applications"
 
-rm -rf "$DMG_STAGING" "$ICONSET" "$METAL_BUILD_DIR"
+rm -rf "$DMG_STAGING" "$ICONSET" "$METAL_BUILD_DIR" "$ROOT_DIR/dist/make-app-icon.swift" "$GENERATED_ICON"
 
 echo "Built: $APP_DIR"
 echo "Built: $DMG"
 echo "Architecture: $ARCH"
 echo "Version: $VERSION"
+echo "Build: $BUILD_NUMBER"
