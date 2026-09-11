@@ -87,17 +87,17 @@ v = view.read_text()
 v = v.replace('colorPixelFormat = .bgra8Unorm\n', 'colorPixelFormat = .bgra8Unorm\n        sampleCount = 4\n', 1)
 
 # Smart-line recognition should work both while the pen pauses and when the user
-# releases immediately after drawing. The old implementation depended on an
-# asynchronous detector having fired before mouseUp, which could lose the line.
+# releases immediately after drawing. Use a deliberately forgiving tolerance so
+# a hand-drawn "almost straight" stroke is still converted into a line.
 v = v.replace(
     'if isLineTool || (isSmartLineTool && smartLineDetected) { let line = linePreview(from: points);',
-    'let smartLine = isSmartLineTool && (smartLineDetected || (points.count >= 3 && LineGeometry.isLikelyStraight(points: points, tolerance: 14, minimumLength: 24)))\n        if isLineTool || smartLine { let line = linePreview(from: points);',
+    'let smartLine = isSmartLineTool && (smartLineDetected || (points.count >= 3 && LineGeometry.isLikelyStraight(points: points, tolerance: 18, minimumLength: 20)))\n        if isLineTool || smartLine { let line = linePreview(from: points);',
     1
 )
 v = v.replace(
     'tolerance: 8, minimumLength: 30',
-    'tolerance: 14, minimumLength: 24',
+    'tolerance: 18, minimumLength: 20',
     1
 )
 view.write_text(v)
-print("Applied smoothed pressure-sensitive ink, 4x MSAA, and reliable smart-line pause/commit detection.")
+print("Applied smoothed pressure-sensitive ink, 4x MSAA, and forgiving smart-line pause/commit detection.")
