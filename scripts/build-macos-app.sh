@@ -17,14 +17,36 @@ set -x
 
 python3 - <<'PY'
 from pathlib import Path
+
 renderer=Path('Sources/MosuanBoard/Metal/InkRenderer.swift')
 s=renderer.read_text()
 s=s.replace('var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * Float(radius)','let startCos = Float(cos(startAngle))\n        let startSin = Float(sin(startAngle))\n        let startVector = SIMD2<Float>(startCos, startSin)\n        let radiusFloat = Float(radius)\n        var previous = v + startVector * radiusFloat',1)
 s=s.replace('pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:1)','pass.colorAttachments[0].clearColor=MTLClearColor(red:Double(backgroundColor.x),green:Double(backgroundColor.y),blue:Double(backgroundColor.z),alpha:Double(backgroundColor.w))',1)
 renderer.write_text(s)
+
 metal_view=Path('Sources/MosuanBoard/Metal/InkMetalView.swift')
 s=metal_view.read_text()
 s=s.replace('colorPixelFormat = .bgra8Unorm; clearColor','colorPixelFormat = .bgra8Unorm; isOpaque = false; layer?.isOpaque = false; clearColor',1)
+
+# Feed freehand input through the platform-independent stroke smoother.
+# Line and smart-line previews intentionally remain raw/2-point previews.
+old='points = [InkPoint(x: c.x, y: c.y, pressure: event.pressure > 0 ? Float(event.pressure) : 1)]\n        renderer.setStroke(points); draw()'
+new='points = [InkPoint(x: c.x, y: c.y, pressure: event.pressure > 0 ? Float(event.pressure) : 1)]\n        renderer.setStroke(StrokeSmoother.smooth(points)); draw()'
+if old not in s:
+    raise SystemExit('freehand mouseDown smoothing patch target not found')
+s=s.replace(old,new,1)
+
+old='renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from: points) : points)'
+new='renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from: points) : StrokeSmoother.smooth(points))'
+if old not in s:
+    raise SystemExit('freehand drag smoothing patch target not found')
+s=s.replace(old,new,1)
+
+old='} else { renderer.commitStroke(points) }'
+new='} else { renderer.commitStroke(StrokeSmoother.smooth(points)) }'
+if old not in s:
+    raise SystemExit('freehand commit smoothing patch target not found')
+s=s.replace(old,new,1)
 metal_view.write_text(s)
 PY
 
