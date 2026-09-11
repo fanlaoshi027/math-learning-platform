@@ -17,7 +17,7 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
         }
 
         // Handwriting is rendered from a smoothed centerline rather than directly
-        // connecting every sampled mouse/tablet point. This removes the visible
+        // connecting every sampled mouse/tablet point. This removes visible
         // polygonal/jagged edges while preserving pressure changes.
         var smooth: [InkPoint] = []
         smooth.reserveCapacity(s.count * 3)
@@ -85,5 +85,19 @@ renderer.write_text(r)
 
 v = view.read_text()
 v = v.replace('colorPixelFormat = .bgra8Unorm\n', 'colorPixelFormat = .bgra8Unorm\n        sampleCount = 4\n', 1)
+
+# Smart-line recognition should work both while the pen pauses and when the user
+# releases immediately after drawing. The old implementation depended on an
+# asynchronous detector having fired before mouseUp, which could lose the line.
+v = v.replace(
+    'if isLineTool || (isSmartLineTool && smartLineDetected) { let line = linePreview(from: points);',
+    'let smartLine = isSmartLineTool && (smartLineDetected || (points.count >= 3 && LineGeometry.isLikelyStraight(points: points, tolerance: 14, minimumLength: 24)))\n        if isLineTool || smartLine { let line = linePreview(from: points);',
+    1
+)
+v = v.replace(
+    'tolerance: 8, minimumLength: 30',
+    'tolerance: 14, minimumLength: 24',
+    1
+)
 view.write_text(v)
-print("Applied smoothed pressure-sensitive ink geometry and 4x MSAA.")
+print("Applied smoothed pressure-sensitive ink, 4x MSAA, and reliable smart-line pause/commit detection.")
