@@ -18,6 +18,11 @@ jobs:
         run: perl -0pi -e 's/ry=-p\.x\*si\+p\.y\*co/ry = (-p.x * si) + (p.y * co)/g' Sources/MosuanBoard/Core/GraphicObjectStore.swift
       - name: Guard Metal page-state update loop
         run: python3 scripts/fix-mosuan-ui-loop.py
+      - name: Fix packaged Metal resource lookup
+        run: python3 scripts/fix-mosuan-runtime-resources.py
+      - name: Set release version
+        run: |
+          perl -0pi -e 's/VERSION="0\.1\.3"/VERSION="0.1.4"/; s/BUILD_NUMBER="5"/BUILD_NUMBER="6"/' scripts/build-macos-app.sh
       - name: Build app bundle and DMG
         id: build
         run: bash scripts/build-macos-app.sh
@@ -34,22 +39,22 @@ jobs:
           file "dist/Mosuan Board.app/Contents/MacOS/MosuanBoard" | grep -q arm64
           test -f "dist/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle/default.metallib"
           test -f "dist/Mosuan Board.app/Contents/Resources/AppIcon.icns"
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 0.1.3
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 5
-          test -f "dist/Mosuan-Board-0.1.3.dmg"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 0.1.4
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "dist/Mosuan Board.app/Contents/Info.plist" | grep -q 6
+          test -f "dist/Mosuan-Board-0.1.4.dmg"
           codesign --verify --deep --strict --verbose=2 "dist/Mosuan Board.app"
-          hdiutil verify "dist/Mosuan-Board-0.1.3.dmg"
+          hdiutil verify "dist/Mosuan-Board-0.1.4.dmg"
       - name: Upload app bundle
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-macOS-app-0.1.3-build5-arm64
+          name: Mosuan-Board-macOS-app-0.1.4-build6-arm64
           path: dist/Mosuan Board.app
           if-no-files-found: error
       - name: Upload DMG
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Mosuan-Board-0.1.3-build5-arm64.dmg
-          path: dist/Mosuan-Board-0.1.3.dmg
+          name: Mosuan-Board-0.1.4-build6-arm64.dmg
+          path: dist/Mosuan-Board-0.1.4.dmg
           if-no-files-found: error
