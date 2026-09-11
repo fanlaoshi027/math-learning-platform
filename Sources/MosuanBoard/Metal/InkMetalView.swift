@@ -9,6 +9,7 @@ final class InkMetalView: MTKView {
     private let lassoOverlay = LassoOverlayView()
     private var points: [InkPoint] = []
     private var eraserPoints: [SIMD2<Float>] = []
+    private var lastEraserPoint: SIMD2<Float>?
     private var active = false
     private var selectionDrag = false
     private var lassoActive = false
@@ -227,7 +228,13 @@ final class InkMetalView: MTKView {
             return
         }
 
-        if isEraserTool && !temporarySelectHeld { renderer.beginHistoryTransaction(); eraserPoints = [p]; return }
+        if isEraserTool && !temporarySelectHeld {
+            renderer.beginHistoryTransaction()
+            eraserPoints = [p]
+            lastEraserPoint = p
+            eraseAlongPath([p])
+            return
+        }
         if isDynamicAngleTool && !selectionModeActive {
             renderer.beginHistoryTransaction(); dynamicAngleDragID = renderer.commitDynamicAngle(at: p); active = true; lastPoint = p; onSelectionChanged?(); draw(); return
         }
@@ -275,7 +282,16 @@ final class InkMetalView: MTKView {
     override func mouseDragged(with event: NSEvent) {
         let p = makePoint(from: event)
         if panDrag { renderer.pan(by: p - lastPoint); lastPoint = p; draw(); return }
-        if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); return }
+        if isEraserTool && !temporarySelectHeld {
+            eraserPoints.append(p)
+            if let last = lastEraserPoint {
+                eraseAlongPath([last, p])
+            } else {
+                eraseAlongPath([p])
+            }
+            lastEraserPoint = p
+            return
+        }
         if isDynamicAngleTool || dynamicAngleDragID != nil { if let id = dynamicAngleDragID { _ = renderer.moveDynamicAngleEndpoint(id: id, to: p); onSelectionChanged?(); draw(); return } }
         if isDynamicIsoscelesTriangleTool || dynamicIsoscelesTriangleDragID != nil { if let id = dynamicIsoscelesTriangleDragID { _ = renderer.moveDynamicIsoscelesTriangleControlPoint(id: id, to: p); onSelectionChanged?(); draw(); return } }
         if isPolygonTool { return }
@@ -307,7 +323,18 @@ final class InkMetalView: MTKView {
         if isDynamicAngleTool || dynamicAngleDragID != nil { dynamicAngleDragID = nil; active = false; renderer.endHistoryTransaction(); notifyState(); draw(); return }
         if isDynamicIsoscelesTriangleTool || dynamicIsoscelesTriangleDragID != nil { dynamicIsoscelesTriangleDragID = nil; active = false; renderer.endHistoryTransaction(); notifyState(); draw(); return }
         if isPolygonTool { return }
-        if isEraserTool && !temporarySelectHeld { eraserPoints.append(p); eraseAlongPath(eraserPoints); eraserPoints.removeAll(keepingCapacity: true); renderer.endHistoryTransaction(); notifyState(); return }
+        if isEraserTool && !temporarySelectHeld {
+            eraserPoints.append(p)
+            if let last = lastEraserPoint, simd_distance(last, p) > 0.001 {
+                eraseAlongPath([last, p])
+            }
+            lastEraserPoint = nil
+            eraserPoints.removeAll(keepingCapacity: true)
+            renderer.endHistoryTransaction()
+            notifyState()
+            draw()
+            return
+        }
         if selectionModeActive {
             if lassoActive {
                 appendLassoPoint(p)
@@ -359,6 +386,7 @@ final class InkMetalView: MTKView {
         case .ended: mouseUp(with: event)
         case .cancelled:
             smartLineWorkItem?.cancel(); active = false; points.removeAll(keepingCapacity: true); renderer.setStroke([])
+            eraserPoints.removeAll(keepingCapacity: true); lastEraserPoint = nil
             if dynamicTrianglePlaybackHistoryActive { dynamicTrianglePlaybackHistoryActive = false; renderer.endHistoryTransaction() } else { renderer.endHistoryTransaction() }
             dynamicTriangleParameterHistoryActive = false; polygonModel.cancel(); polygonVertexDrag = nil; lineEndpointDrag = nil; dynamicAngleDragID = nil; dynamicIsoscelesTriangleDragID = nil; lassoActive = false; lassoPoints.removeAll(keepingCapacity: true); lassoOverlay.update(points: [], visible: false); draw()
         default: break
@@ -381,7 +409,17 @@ final class InkMetalView: MTKView {
         smartLineWorkItem = work; DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
     private func linePreview(from p: [InkPoint]) -> [InkPoint] { guard let first = p.first, let last = p.last else { return p }; return [first, last] }
-    private func eraseAlongPath(_ path: [SIMD2<Float>]) { guard !path.isEmpty else { return }; var deleted = renderer.eraseObjectsByScribble(path, tolerance: 14); for p in path { if renderer.selectStroke(at: p, tolerance: 16) { renderer.deleteSelected(); deleted = true } }; if deleted { draw() } }
+    private func eraseAlongPath(_ path: [SIMD2<Float>]) {
+        guard !path.isEmpty else { return }
+        var deleted = renderer.eraseObjectsByScribble(path, tolerance: 14)
+        for p in path {
+            if renderer.selectStroke(at: p, tolerance: 16) {
+                renderer.deleteSelected()
+                deleted = true
+            }
+        }
+        if deleted { draw() }
+    }
     private func makePoint(from event: NSEvent) -> SIMD2<Float> { let p = convert(event.locationInWindow, from: nil); return SIMD2(Float(p.x), Float(p.y)) }
 }
 
