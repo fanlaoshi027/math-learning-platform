@@ -47,7 +47,6 @@ struct PageSidebar: View {
 }
 
 struct MetalInkCanvas: NSViewRepresentable {
-    var pageID: UUID = UUID()
     var pageState: CanvasPageState = CanvasPageState()
     @Binding var tool: BoardTool
     let penStyle: PenStyle
@@ -64,7 +63,6 @@ struct MetalInkCanvas: NSViewRepresentable {
         configure(view)
         view.onPageStateChanged = onPageStateChanged
         view.onZoomChanged = { value in zoomPercent = value }
-        context.coordinator.loadedPageID = pageID
         view.loadPageState(pageState)
         controller.attach(view)
         return view
@@ -73,7 +71,9 @@ struct MetalInkCanvas: NSViewRepresentable {
         configure(view)
         view.onPageStateChanged = onPageStateChanged
         view.onZoomChanged = { value in zoomPercent = value }
-        if context.coordinator.loadedPageID != pageID { context.coordinator.loadedPageID = pageID; view.loadPageState(pageState) }
+        // Page content is the source of truth. InkMetalView.loadPageState is idempotent,
+        // so this is safe even when SwiftUI refreshes the representable for other state.
+        view.loadPageState(pageState)
         controller.attach(view)
     }
     private func configure(_ view: InkMetalView) {
@@ -91,5 +91,5 @@ struct MetalInkCanvas: NSViewRepresentable {
         view.displayInverted = inverted
         view.backgroundPattern = pattern.rawValue
     }
-    final class Coordinator { var loadedPageID: UUID? }
+    final class Coordinator { }
 }
