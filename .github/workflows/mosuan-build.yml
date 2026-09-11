@@ -49,15 +49,19 @@ jobs:
               return
           }
           '''
-          if eraser not in s:
-              raise SystemExit('expected eraser block not found')
-          if selection not in s:
-              raise SystemExit('expected selection block not found')
-          s = s.replace(selection, eraser + selection, 1)
+          if eraser not in s or selection not in s:
+              raise SystemExit('expected mouseDown blocks not found')
           s = s.replace(eraser, '', 1)
+          s = s.replace(selection, eraser + selection, 1)
           p.write_text(s)
           PY
-          grep -n -A7 -B3 'if isEraserTool && !temporarySelectHeld' Sources/MosuanBoard/Metal/InkMetalView.swift | head -n 20
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('Sources/MosuanBoard/Metal/InkMetalView.swift').read_text()
+          mouse_down = s.split('override func mouseDown', 1)[1].split('override func mouseDragged', 1)[0]
+          if mouse_down.find('if isEraserTool && !temporarySelectHeld') > mouse_down.find('if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool'):
+              raise SystemExit('eraser priority check failed')
+          PY
       - name: Improve ink rendering quality
         run: |
           python3 scripts/fix-mosuan-ink-quality.py
