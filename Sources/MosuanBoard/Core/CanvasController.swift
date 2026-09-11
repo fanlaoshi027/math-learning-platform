@@ -19,6 +19,11 @@ final class CanvasController: ObservableObject {
     deinit { dynamicTrianglePlayback.stop() }
 
     func attach(_ canvas: InkMetalView) {
+        // SwiftUI's updateNSView can run repeatedly for ordinary state changes.
+        // Re-attaching the same canvas used to call refreshState(), which publishes
+        // @Published values during updateNSView and created a feedback loop.
+        if self.canvas === canvas { return }
+
         dynamicTrianglePlayback.stop()
         self.canvas = canvas
         canvas.onHistoryChanged = { [weak self, weak canvas] in
