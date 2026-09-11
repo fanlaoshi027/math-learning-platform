@@ -5,6 +5,15 @@ renderer = ROOT / "Sources/MosuanBoard/Metal/InkRenderer.swift"
 view = ROOT / "Sources/MosuanBoard/Metal/InkMetalView.swift"
 
 r = renderer.read_text()
+
+# Repair the legacy one-line appendBackground declaration: it was missing
+# the function-closing brace, which makes every following private method local.
+r = r.replace(
+    'y+=step}}\n    private func appendStroke',
+    'y+=step}}\n    }\n    private func appendStroke',
+    1
+)
+
 start = r.index("    private func appendStroke(")
 end = r.index("    private func appendSelection(", start)
 new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle, to out: inout [InkVertex]) {
@@ -16,9 +25,8 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             return
         }
 
-        // Light-weight handwriting smoothing. Keep the original samples as the
-        // centerline, but replace each interior point with a short weighted average.
-        // This removes jitter without making mathematical writing look like a vector curve.
+        // Light smoothing: preserve the original centerline shape while removing
+        // small sampling jitter. This is intentionally not vector-like smoothing.
         var smooth = s
         if s.count >= 3 {
             for i in 1..<(s.count - 1) {
@@ -51,31 +59,36 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             triangle(c, b, d, color: color, to: &out)
         }
 
-        // Round joins and caps retain a natural pen feel.
+        // Round joins/caps retain a natural pen feel.
         for p in smooth {
             disk(viewPoint(from: SIMD2(p.x, p.y)), strokeWidth(p.pressure, style), color, to: &out)
         }
     }
 '''
 r = r[:start] + new_stroke + r[end:]
-r = r.replace('descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm\n', 'descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm\n        descriptor.rasterSampleCount = 4\n', 1)
+
+# Make color SIMD literals explicitly Float and normalize Swift lexer-sensitive math.
+r = r.replace('let color=SIMD4(0.82,0.84,0.88,0.55)', 'let color=SIMD4<Float>(0.82,0.84,0.88,0.55)', 1)
+r = r.replace('let c=SIMD4(0.1,0.45,1,0.75)', 'let c=SIMD4<Float>(0.1,0.45,1,0.75)', 1)
+r = r.replace('let c=SIMD4(0.1,0.45,1,0.85)', 'let c=SIMD4<Float>(0.1,0.45,1,0.85)', 1)
+r = r.replace('SIMD4(0.95,0.55,0.05,1)', 'SIMD4<Float>(0.95,0.55,0.05,1)')
+r = r.replace('180.0/.pi', '180.0 / .pi')
+r = r.replace('2*.pi', '2 * .pi')
+
+r = r.replace(
+    'descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm\n',
+    'descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm\n        descriptor.rasterSampleCount = 4\n',
+    1
+)
 renderer.write_text(r)
 
 v = view.read_text()
 v = v.replace('colorPixelFormat = .bgra8Unorm\n', 'colorPixelFormat = .bgra8Unorm\n        sampleCount = 4\n', 1)
-
-# Smart-line recognition should work both while the pen pauses and when the user
-# releases immediately after drawing. Use a deliberately forgiving tolerance so
-# an "almost straight" hand-drawn stroke is still converted into a line.
 v = v.replace(
     'if isLineTool || (isSmartLineTool && smartLineDetected) { let line = linePreview(from: points);',
     'let smartLine = isSmartLineTool && (smartLineDetected || (points.count >= 3 && LineGeometry.isLikelyStraight(points: points, tolerance: 18, minimumLength: 20)))\n        if isLineTool || smartLine { let line = linePreview(from: points);',
     1
 )
-v = v.replace(
-    'tolerance: 8, minimumLength: 30',
-    'tolerance: 18, minimumLength: 20',
-    1
-)
+v = v.replace('tolerance: 8, minimumLength: 30', 'tolerance: 18, minimumLength: 20', 1)
 view.write_text(v)
 print("Applied compile-safe ink smoothing, 4x MSAA, and forgiving smart-line pause/commit detection.")
