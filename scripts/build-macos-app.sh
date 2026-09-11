@@ -15,7 +15,7 @@ RESOURCES_DIR="$CONTENTS/Resources"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-# Normalize a Metal expression that is rejected by some Swift 6 toolchains.
+# Normalize expressions rejected by some Swift 6 toolchains.
 python3 - <<'PY'
 from pathlib import Path
 renderer = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
@@ -65,16 +65,38 @@ fi
 
 cp "$BINARY" "$MACOS_DIR/MosuanBoard"
 
-# SwiftPM generates the Metal resource bundle next to the executable. Ship it
-# in both locations used by SwiftPM's Bundle.module lookup across toolchains.
+# SwiftPM generates the resource bundle, but a .metal file stored only as a
+# resource is NOT a compiled Metal library. The old package therefore contained
+# InkShaders.metal but makeDefaultLibrary(bundle:) could not find default.metallib.
+# Compile the shader explicitly and put default.metallib inside the same bundle.
 RESOURCE_BUNDLE="$(find "$ROOT_DIR/.build" -type d -name 'MosuanBoard_MosuanBoard.bundle' -print -quit)"
 if [ -z "$RESOURCE_BUNDLE" ]; then
   echo "SwiftPM resource bundle not found: MosuanBoard_MosuanBoard.bundle" >&2
   find "$ROOT_DIR/.build" -maxdepth 6 -type d -name '*.bundle' -print >&2 || true
   exit 1
 fi
+
+METAL_SOURCE="$ROOT_DIR/Sources/MosuanBoard/Metal/InkShaders.metal"
+METAL_BUILD_DIR="$ROOT_DIR/dist/metal-build"
+AIR="$METAL_BUILD_DIR/InkShaders.air"
+METALLIB="$METAL_BUILD_DIR/default.metallib"
+mkdir -p "$METAL_BUILD_DIR"
+
+if ! xcrun -sdk macosx metal -mmacosx-version-min=14.0 -c "$METAL_SOURCE" -o "$AIR"; then
+  echo "Metal shader compilation failed." >&2
+  exit 1
+fi
+if ! xcrun -sdk macosx metallib "$AIR" -o "$METALLIB"; then
+  echo "Metal library linking failed." >&2
+  exit 1
+fi
+cp "$METALLIB" "$RESOURCE_BUNDLE/default.metallib"
+
+# Ship the complete resource bundle in both locations used by SwiftPM's
+# Bundle.module lookup across toolchain versions.
 cp -R "$RESOURCE_BUNDLE" "$APP_DIR/"
 cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
+echo "Packaged Metal library: $METALLIB"
 echo "Packaged SwiftPM resource bundle: $(basename "$RESOURCE_BUNDLE")"
 
 # Build the macOS icon from the checked-in 1024px source.
@@ -141,15 +163,15 @@ mkdir -p "$DMG_STAGING"
 cp -R "$APP_DIR" "$DMG_STAGING/"
 ln -s /Applications "$DMG_STAGING/Applications"
 hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG" >/dev/null
-rm -rf "$DMG_STAGING" "$ICONSET"
 
-# Basic package assertions catch the exact failure that caused the old 0.1.1
-# package to launch and immediately crash: missing Metal resources or wrong arch.
+# Basic package assertions catch the exact failures that caused 0.1.1 to crash.
 test -d "$APP_DIR/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+test -f "$APP_DIR/Contents/Resources/MosuanBoard_MosuanBoard.bundle/default.metallib"
 test -f "$APP_DIR/Contents/Resources/AppIcon.icns"
-test -L "$DMG_STAGING/Applications" 2>/dev/null || true
+test -L "$DMG_STAGING/Applications"
 
-# The app itself is not launched here because hosted CI has no guaranteed GUI/Metal device.
+rm -rf "$DMG_STAGING" "$ICONSET" "$METAL_BUILD_DIR"
+
 echo "Built: $APP_DIR"
 echo "Built: $DMG"
 echo "Architecture: $ARCH"
