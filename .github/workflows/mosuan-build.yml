@@ -22,45 +22,21 @@ jobs:
           grep -q 'private var loadedPageState: CanvasPageState?' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'if loadedPageState == state { return }' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'Page state pushed by SwiftUI is input only' Sources/MosuanBoard/Metal/InkMetalView.swift
-      - name: Fix eraser tool priority
+      - name: Verify eraser tool priority
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('Sources/MosuanBoard/Metal/InkMetalView.swift')
-          s = p.read_text()
-          eraser = '''        if isEraserTool && !temporarySelectHeld {
-              renderer.beginHistoryTransaction()
-              eraserPoints = [p]
-              lastEraserPoint = p
-              eraseAlongPath([p])
-              return
-          }
-          '''
-          selection = '''        if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool {
-              if let frame = renderer.selectionBoundsInView(), frame.contains(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) {
-                  selectionDrag = true
-                  lastPoint = p
-                  renderer.beginHistoryTransaction()
-                  return
-              }
-              renderer.clearSelection()
-              onSelectionChanged?()
-              draw()
-              return
-          }
-          '''
-          if eraser not in s or selection not in s:
-              raise SystemExit('expected mouseDown blocks not found')
-          s = s.replace(eraser, '', 1)
-          s = s.replace(selection, eraser + selection, 1)
-          p.write_text(s)
-          PY
-          python3 - <<'PY'
-          from pathlib import Path
           s = Path('Sources/MosuanBoard/Metal/InkMetalView.swift').read_text()
-          mouse_down = s.split('override func mouseDown', 1)[1].split('override func mouseDragged', 1)[0]
-          if mouse_down.find('if isEraserTool && !temporarySelectHeld') > mouse_down.find('if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool'):
-              raise SystemExit('eraser priority check failed')
+          start = s.index('    override func mouseDown(with event: NSEvent) {')
+          end = s.index('    override func mouseDragged(with event: NSEvent) {', start)
+          block = s[start:end]
+          eraser_pos = block.find('if isEraserTool && !temporarySelectHeld')
+          selection_pos = block.find('if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool')
+          if eraser_pos < 0 or selection_pos < 0:
+              raise SystemExit('expected mouseDown eraser/selection blocks not found')
+          if eraser_pos > selection_pos:
+              raise SystemExit('eraser priority is still below active selection')
+          print('Verified eraser priority before active selection')
           PY
       - name: Improve ink rendering quality
         run: |
@@ -77,8 +53,6 @@ jobs:
                   if not last.endswith('}'):
                       s = before + '\n    }\n' + marker + after
                   elif not last.endswith('}}') and not last.endswith('}\n    }'):
-                      # The legacy one-line appendBackground ends with its loop brace;
-                      # add the function-level closing brace when needed.
                       s = before + '\n    }\n' + marker + after
                   p.write_text(s)
           PY
