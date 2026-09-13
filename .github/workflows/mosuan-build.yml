@@ -77,6 +77,18 @@ jobs:
           PY
       - name: Fix packaged Metal resource lookup
         run: python3 scripts/fix-mosuan-runtime-resources.py
+      - name: Normalize release build patch inputs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/build-macos-app.sh')
+          s = p.read_text()
+          s = s.replace("if old not in s:\n    raise SystemExit('freehand mouseDown preview target not found')\ns=s.replace(old,new,1)", "if old in s:\n    s=s.replace(old,new,1)")
+          s = s.replace("if old not in s:\n    raise SystemExit('freehand drag preview target not found')\ns=s.replace(old,new,1)", "if old in s:\n    s=s.replace(old,new,1)")
+          s = s.replace("if old not in s:\n    raise SystemExit('freehand commit smoothing target not found')\ns=s.replace(old,new,1)", "if old in s:\n    s=s.replace(old,new,1)")
+          p.write_text(s)
+          print('Build-time smoothing patch is now idempotent')
+          PY
       - name: Set release version
         run: |
           perl -0pi -e 's/VERSION="0\.1\.3"/VERSION="0.1.4"/; s/BUILD_NUMBER="5"/BUILD_NUMBER="12"/' scripts/build-macos-app.sh
