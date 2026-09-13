@@ -22,8 +22,29 @@ jobs:
           grep -q 'private var loadedPageState: CanvasPageState?' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'if loadedPageState == state { return }' Sources/MosuanBoard/Metal/InkMetalView.swift
           grep -q 'Page state pushed by SwiftUI is input only' Sources/MosuanBoard/Metal/InkMetalView.swift
-      - name: Verify eraser tool priority
+      - name: Fix eraser tool priority
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('Sources/MosuanBoard/Metal/InkMetalView.swift')
+          s = p.read_text()
+          mouse_start = s.index('    override func mouseDown(with event: NSEvent) {')
+          drag_start = s.index('    override func mouseDragged(with event: NSEvent) {', mouse_start)
+          block = s[mouse_start:drag_start]
+          selection_start = block.index('        if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool {')
+          eraser_start = block.index('        if isEraserTool && !temporarySelectHeld {')
+          dynamic_start = block.index('        if isDynamicAngleTool && !selectionModeActive {')
+          selection_block = block[selection_start:eraser_start]
+          eraser_block = block[eraser_start:dynamic_start]
+          prefix = block[:selection_start]
+          suffix = block[dynamic_start:]
+          if not selection_block.strip() or not eraser_block.strip():
+              raise SystemExit('expected eraser/selection blocks not found')
+          new_block = prefix + eraser_block + selection_block + suffix
+          s = s[:mouse_start] + new_block + s[drag_start:]
+          p.write_text(s)
+          print('Moved eraser handling before active-selection handling')
+          PY
           python3 - <<'PY'
           from pathlib import Path
           s = Path('Sources/MosuanBoard/Metal/InkMetalView.swift').read_text()
@@ -32,10 +53,8 @@ jobs:
           block = s[start:end]
           eraser_pos = block.find('if isEraserTool && !temporarySelectHeld')
           selection_pos = block.find('if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool')
-          if eraser_pos < 0 or selection_pos < 0:
-              raise SystemExit('expected mouseDown eraser/selection blocks not found')
-          if eraser_pos > selection_pos:
-              raise SystemExit('eraser priority is still below active selection')
+          if eraser_pos < 0 or selection_pos < 0 or eraser_pos > selection_pos:
+              raise SystemExit('eraser priority verification failed')
           print('Verified eraser priority before active selection')
           PY
       - name: Improve ink rendering quality
