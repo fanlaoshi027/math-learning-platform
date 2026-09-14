@@ -60,9 +60,14 @@ struct BoardScreen: View {
                     .background(effectiveBackgroundColor)
                     .padding(24)
 
-                    compactToolbar
+                    topToolbar
                 }
             }
+
+            // 收藏笔槽独立于主工具栏：点击主工具栏最右侧的爱心后出现，
+            // 拖动时显示五个绿色磁吸区域。
+            FavoriteDockHost(presetID: $presetID, tool: $tool)
+                .zIndex(20)
         }
         .onAppear {
             if let raw = UserDefaults.standard.string(forKey: "mosuan.eyeComfortBackground"), let saved = EyeComfortBackground(rawValue: raw) { eyeComfortBackground = saved }
@@ -75,26 +80,27 @@ struct BoardScreen: View {
         .frame(minWidth: 1100, minHeight: 700)
     }
 
-    private var compactToolbar: some View {
-        HStack(spacing: 4) {
-            compactButton("star.fill", active: false, help: "常用笔") {
-                presetID = PenPreset.defaults[0].id
-                tool = .pen
-            }
+    private var topToolbar: some View {
+        HStack(spacing: 3) {
+            toolbarIcon("cursorarrow", active: tool == .select, help: "选择") { tool = .select }
+            toolbarIcon("hand.draw", active: tool == .hand, help: "抓手") { tool = .hand }
+            toolbarIcon("pencil.tip", active: tool == .pen, help: "画笔") { tool = .pen }
+            toolbarIcon("line.diagonal", active: tool == .line, help: "直线") { tool = .line }
+            toolbarIcon("scribble.variable", active: tool == .smartLine, help: "智能直线") { tool = .smartLine }
+            toolbarIcon("triangle", active: tool == .polygon, help: "多边形") { tool = .polygon }
+            toolbarIcon("eraser", active: tool == .eraser, help: "橡皮") { tool = .eraser }
+
             toolbarDivider
-            compactButton("cursorarrow", active: tool == .select, help: "选择") { tool = .select }
-            compactButton("pencil.tip", active: tool == .pen, help: "画笔") { tool = .pen }
-            compactButton("line.diagonal", active: tool == .line, help: "直线") { tool = .line }
-            compactButton("scribble.variable", active: tool == .smartLine, help: "智能直线") { tool = .smartLine }
-            compactButton("eraser", active: tool == .eraser, help: "橡皮") { tool = .eraser }
-            toolbarDivider
+
             ForEach(PenPreset.defaults) { item in
                 Button {
                     presetID = item.id
                     tool = .pen
                 } label: {
                     Circle()
-                        .fill(Color(red: item.style.color.red, green: item.style.color.green, blue: item.style.color.blue))
+                        .fill(Color(red: item.style.color.red,
+                                    green: item.style.color.green,
+                                    blue: item.style.color.blue))
                         .frame(width: 16, height: 16)
                         .overlay(Circle().stroke(presetID == item.id ? Color.accentColor : .clear, lineWidth: 2))
                         .frame(width: 30, height: 34)
@@ -102,14 +108,29 @@ struct BoardScreen: View {
                 .buttonStyle(.plain)
                 .help(item.name)
             }
+
             toolbarDivider
-            compactButton("arrow.uturn.backward", active: false, help: "撤销") { controller.undo() }
+
+            toolbarIcon("arrow.uturn.backward", active: false, help: "撤销") { controller.undo() }
                 .disabled(!controller.canUndo)
-            compactButton("arrow.uturn.forward", active: false, help: "重做") { controller.redo() }
+            toolbarIcon("arrow.uturn.forward", active: false, help: "重做") { controller.redo() }
                 .disabled(!controller.canRedo)
-            compactButton("plus", active: showMoreTools, help: "更多工具") { showMoreTools.toggle() }
+
+            toolbarIcon("plus", active: showMoreTools, help: "更多工具") { showMoreTools.toggle() }
+
+            // 爱心就是“加入收藏笔槽”。不直接改变当前工具，只把当前笔加入收藏。
+            Button {
+                NotificationCenter.default.post(name: .mosuanAddFavoritePen, object: presetID)
+            } label: {
+                Image(systemName: "heart")
+                    .font(.system(size: 15, weight: .medium))
+                    .frame(width: 30, height: 34)
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+            .help("加入收藏笔槽")
         }
-        .padding(.horizontal, 7)
+        .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
@@ -123,7 +144,7 @@ struct BoardScreen: View {
         Divider().frame(height: 22).padding(.horizontal, 3)
     }
 
-    private func compactButton(_ image: String, active: Bool, help: String, action: @escaping () -> Void) -> some View {
+    private func toolbarIcon(_ image: String, active: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: image)
                 .font(.system(size: 15, weight: .medium))
