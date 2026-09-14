@@ -9,19 +9,27 @@ enum OneStrokeRecognizer {
     }
 
     static func recognize(_ input: [InkPoint]) -> Result? {
-        let points = deduplicated(input.map { CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)) })
+        let points = normalizedPoints(input)
         guard points.count >= 4, let box = bounds(points) else { return nil }
         let diagonal = max(hypot(box.width, box.height), 1)
         let length = pathLength(points)
         guard length >= 30 else { return nil }
-        if isLine(points, diagonal: diagonal, pathLength: length) { return .line(points[0], points[points.count - 1]) }
 
-        let closure = hypot(points[0].x - points[points.count - 1].x, points[0].y - points[points.count - 1].y)
+        // Keep line recognition deliberately conservative. A short curved hook at the end of
+        // a teacher's stroke should not turn a freehand mark into a geometric line.
+        if isLine(points, diagonal: diagonal, pathLength: length) {
+            return .line(points[0], points[points.count - 1])
+        }
+
+        let closure = hypot(points[0].x - points[points.count - 1].x,
+                            points[0].y - points[points.count - 1].y)
         guard closure <= max(18, diagonal * 0.20), length / diagonal >= 1.35 else { return nil }
 
         // Round closed gestures are emitted as a dense polygon approximation. This keeps the
         // current renderer/model API unchanged while producing a visually smooth circle/ellipse.
-        if let rounded = roundedShape(points, box: box, pathLength: length) { return .polygon(rounded) }
+        if let rounded = roundedShape(points, box: box, pathLength: length) {
+            return .polygon(rounded)
+        }
 
         let simplified = rdp(points + [points[0]], epsilon: max(4, diagonal * 0.035))
         let vertices = Array(simplified.dropLast())
@@ -38,6 +46,22 @@ enum OneStrokeRecognizer {
         return .polygon(vertices)
     }
 
+    private static func normalizedPoints(_ input: [InkPoint]) -> [CGPoint] {
+        var points = deduplicated(input.map { CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)) })
+        guard points.count >= 8 else { return points }
+
+        // The final tablet/mouse sample often contains a tiny release wobble. Stabilize only
+        // the endpoint used by recognition; the original stroke is still preserved elsewhere.
+        let count = min(3, points.count - 1)
+        let tail = points.suffix(count)
+        let average = CGPoint(
+            x: tail.reduce(0) { $0 + $1.x } / CGFloat(count),
+            y: tail.reduce(0) { $0 + $1.y } / CGFloat(count)
+        )
+        points[points.count - 1] = average
+        return deduplicated(points)
+    }
+
     private static func roundedShape(_ points: [CGPoint], box: CGRect, pathLength: CGFloat) -> [CGPoint]? {
         guard box.width >= 20, box.height >= 20 else { return nil }
         let cx = box.midX, cy = box.midY, rx = box.width / 2, ry = box.height / 2
@@ -47,7 +71,8 @@ enum OneStrokeRecognizer {
         for p in points {
             let normalized = hypot((p.x - cx) / rx, (p.y - cy) / ry)
             let error = abs(normalized - 1) * minRadius
-            totalError += error; maxError = max(maxError, error)
+            totalError += error
+            maxError = max(maxError, error)
         }
         let meanError = totalError / CGFloat(points.count)
         guard meanError <= max(10, minRadius * 0.16),
@@ -75,7 +100,7 @@ enum OneStrokeRecognizer {
     private static func isLine(_ points: [CGPoint], diagonal: CGFloat, pathLength: CGFloat) -> Bool {
         guard let first = points.first, let last = points.last else { return false }
         let baseline = hypot(last.x - first.x, last.y - first.y)
-        guard baseline >= 30, baseline / max(pathLength, 1) > 0.88 else { return false }
+        guard baseline >= 30, baseline / max(pathLength, 1) > 0.90 else { return false }
         let tolerance = max(5, diagonal * 0.035)
         let maxDeviation = points.map { distanceToSegment($0, first, last) }.max() ?? .greatestFiniteMagnitude
         return maxDeviation <= tolerance
@@ -86,7 +111,9 @@ enum OneStrokeRecognizer {
         var maxError: CGFloat = 0
         for point in points {
             var best = CGFloat.greatestFiniteMagnitude
-            for i in vertices.indices { best = min(best, distanceToSegment(point, vertices[i], vertices[(i + 1) % vertices.count])) }
+            for i in vertices.indices {
+                best = min(best, distanceToSegment(point, vertices[i], vertices[(i + 1) % vertices.count]))
+            }
             maxError = max(maxError, best)
         }
         return maxError
@@ -104,7 +131,9 @@ enum OneStrokeRecognizer {
         guard let first = points.first else { return [] }
         var result = [first]
         for point in points.dropFirst() {
-            if hypot(point.x - result[result.count - 1].x, point.y - result[result.count - 1].y) >= 1 { result.append(point) }
+            if hypot(point.x - result[result.count - 1].x, point.y - result[result.count - 1].y) >= 1 {
+                result.append(point)
+            }
         }
         return result
     }
@@ -116,7 +145,10 @@ enum OneStrokeRecognizer {
     private static func bounds(_ points: [CGPoint]) -> CGRect? {
         guard let first = points.first else { return nil }
         var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
-        for p in points.dropFirst() { minX = min(minX, p.x); maxX = max(maxX, p.x); minY = min(minY, p.y); maxY = max(maxY, p.y) }
+        for p in points.dropFirst() {
+            minX = min(minX, p.x); maxX = max(maxX, p.x)
+            minY = min(minY, p.y); maxY = max(maxY, p.y)
+        }
         return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
