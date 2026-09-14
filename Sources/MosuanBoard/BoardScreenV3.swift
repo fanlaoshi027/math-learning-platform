@@ -11,11 +11,11 @@ struct BoardScreen: View {
     @State private var zoomPercent = 100
     @State private var toolbarDock: ToolbarDock = .top
     @State private var toolbarDragOffset = CGSize.zero
-    @State private var background: BoardBackground = .white
+    @State private var background: BoardBackground = .black
     @State private var inverted = false
     @State private var eyeComfortBackground: EyeComfortBackground = .black90
     @State private var customHex = "1A1A1A"
-    @State private var interfaceTheme: BoardInterfaceTheme = .light
+    @State private var interfaceTheme: BoardInterfaceTheme = .darkPurple
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
     private var toolbarIsVertical: Bool { toolbarDock == .left || toolbarDock == .right }
@@ -78,6 +78,10 @@ struct BoardScreen: View {
                             .offset(toolbarDragOffset)
                             .padding(8)
                             .frame(maxWidth:.infinity, maxHeight:.infinity, alignment:toolbarAlignment)
+
+                        // 收藏笔槽独立于主工具栏，可吸附到画布内/外的五个位置。
+                        FavoriteDockHost(presetID: $presetID, tool: $tool)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             }
@@ -94,6 +98,7 @@ struct BoardScreen: View {
         }
         .frame(minWidth:1100,minHeight:700)
         .preferredColorScheme(interfaceTheme.colorScheme)
+        .tint(interfaceTheme.accent)
     }
 
     private var toolbarAlignment:Alignment { switch toolbarDock { case .top:.top; case .bottom:.bottom; case .left:.leading; case .right:.trailing } }
@@ -137,6 +142,19 @@ struct BoardScreen: View {
         ForEach(PenPreset.defaults) { item in
             Button { presetID=item.id; tool = .pen } label: { Circle().fill(Color(red:item.style.color.red, green:item.style.color.green, blue:item.style.color.blue)).frame(width:18,height:18) }.buttonStyle(.plain).help(item.name)
         }
+
+        // 收藏当前笔：收藏后出现在独立的可拖动收藏笔槽。
+        Button {
+            NotificationCenter.default.post(name: .mosuanAddFavoritePen, object: presetID)
+        } label: {
+            Image(systemName: "heart.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(interfaceTheme.accent)
+        .help("收藏当前笔")
+
         Menu { ForEach(BoardBackground.allCases) { item in Button(item.title) { background=item; if item != .white { inverted=false } } } } label: { Label("背景",systemImage:"rectangle.fill") }.menuStyle(.borderlessButton)
         if background == .white {
             Toggle("反色",isOn:$inverted).toggleStyle(.checkbox)
