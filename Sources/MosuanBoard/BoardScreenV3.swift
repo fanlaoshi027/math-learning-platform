@@ -54,10 +54,31 @@ struct BoardScreen: View {
                 }
             }
             .onAppear {
+                ShortcutEventMonitor.shared.start()
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.toolbarDock"), let saved=ToolbarDock(rawValue:raw) { toolbarDock=saved }
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.eyeComfortBackground"), let saved=EyeComfortBackground(rawValue:raw) { eyeComfortBackground=saved }
                 if let saved=UserDefaults.standard.string(forKey:"mosuan.customHex") { customHex=saved }
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.interfaceTheme"), let saved=BoardInterfaceTheme(rawValue:raw) { interfaceTheme=saved }
+            }
+            .onDisappear { ShortcutEventMonitor.shared.stop() }
+            .onReceive(NotificationCenter.default.publisher(for: .mosuanShortcutAction)) { note in
+                guard let action = note.object as? String else { return }
+                switch action {
+                case "select": tool = .select
+                case "pen": tool = .pen
+                case "line": tool = .line
+                case "smartLine": tool = .smartLine
+                case "eraser": tool = .eraser
+                case "hand": tool = .hand
+                case "undo": controller.undo()
+                case "redo": controller.redo()
+                case "nextColor":
+                    let presets = PenPreset.defaults
+                    guard let index = presets.firstIndex(where: { $0.id == presetID }) else { return }
+                    presetID = presets[(index + 1) % presets.count].id
+                    tool = .pen
+                default: break
+                }
             }
             .onChange(of:toolbarDock) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.toolbarDock") }
             .onChange(of:eyeComfortBackground) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.eyeComfortBackground") }
