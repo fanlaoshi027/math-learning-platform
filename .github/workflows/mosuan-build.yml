@@ -31,19 +31,24 @@ jobs:
           mouse_start = s.index('    override func mouseDown(with event: NSEvent) {')
           drag_start = s.index('    override func mouseDragged(with event: NSEvent) {', mouse_start)
           block = s[mouse_start:drag_start]
-          selection_start = block.index('        if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool {')
-          eraser_start = block.index('        if isEraserTool && !temporarySelectHeld {')
-          dynamic_start = block.index('        if isDynamicAngleTool && !selectionModeActive {')
-          selection_block = block[selection_start:eraser_start]
-          eraser_block = block[eraser_start:dynamic_start]
-          prefix = block[:selection_start]
-          suffix = block[dynamic_start:]
-          if not selection_block.strip() or not eraser_block.strip():
-              raise SystemExit('expected eraser/selection blocks not found')
-          new_block = prefix + eraser_block + selection_block + suffix
-          s = s[:mouse_start] + new_block + s[drag_start:]
-          p.write_text(s)
-          print('Moved eraser handling before active-selection handling')
+          eraser_pos = block.find('if isEraserTool && !temporarySelectHeld')
+          selection_pos = block.find('if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool')
+          if eraser_pos < 0 or selection_pos < 0:
+              raise SystemExit('eraser/selection blocks not found')
+          if eraser_pos < selection_pos:
+              print('Eraser priority already correct; no source rewrite needed')
+          else:
+              selection_start = block.index('        if renderer.hasSelection && !temporarySelectHeld && !isSelectionTool {')
+              eraser_start = block.index('        if isEraserTool && !temporarySelectHeld {')
+              dynamic_start = block.index('        if isDynamicAngleTool && !selectionModeActive {')
+              selection_block = block[selection_start:eraser_start]
+              eraser_block = block[eraser_start:dynamic_start]
+              prefix = block[:selection_start]
+              suffix = block[dynamic_start:]
+              new_block = prefix + eraser_block + selection_block + suffix
+              s = s[:mouse_start] + new_block + s[drag_start:]
+              p.write_text(s)
+              print('Moved eraser handling before active-selection handling')
           PY
           python3 - <<'PY'
           from pathlib import Path
