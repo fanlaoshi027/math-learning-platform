@@ -16,9 +16,9 @@ enum FavoriteDockPlacement: String, CaseIterable {
 
 struct FavoriteToolDock: View {
     let placement: FavoriteDockPlacement
-    let presetIDs: [String]
+    let presetIDs: [UUID]
     let onSelect: (PenPreset) -> Void
-    let onRemove: (String) -> Void
+    let onRemove: (UUID) -> Void
     let onDragChanged: (CGSize) -> Void
     let onDragEnded: (CGSize) -> Void
 
@@ -95,19 +95,20 @@ struct FavoriteToolDock: View {
 }
 
 struct FavoriteDockHost: View {
-    @Binding var presetID: String
+    @Binding var presetID: UUID
     @Binding var tool: BoardTool
 
-    @State private var favorites: [String]
+    @State private var favorites: [UUID]
     @State private var placement: FavoriteDockPlacement
     @State private var dragging = false
     @State private var dragOffset: CGSize = .zero
     @State private var highlighted: FavoriteDockPlacement?
 
-    init(presetID: Binding<String>, tool: Binding<BoardTool>) {
+    init(presetID: Binding<UUID>, tool: Binding<BoardTool>) {
         _presetID = presetID
         _tool = tool
-        _favorites = State(initialValue: UserDefaults.standard.stringArray(forKey: "mosuan.favoritePenIDs") ?? [])
+        let stored = UserDefaults.standard.stringArray(forKey: "mosuan.favoritePenIDs") ?? []
+        _favorites = State(initialValue: stored.compactMap(UUID.init(uuidString:)))
         let raw = UserDefaults.standard.string(forKey: "mosuan.favoriteDockPlacement") ?? FavoriteDockPlacement.top.rawValue
         _placement = State(initialValue: FavoriteDockPlacement(rawValue: raw) ?? .top)
     }
@@ -121,7 +122,7 @@ struct FavoriteDockHost: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onReceive(NotificationCenter.default.publisher(for: .mosuanAddFavoritePen)) { note in
-            guard let id = note.object as? String else { return }
+            guard let id = note.object as? UUID else { return }
             addFavorite(id)
         }
     }
@@ -212,14 +213,14 @@ struct FavoriteDockHost: View {
         hypot(a.x - b.x, a.y - b.y)
     }
 
-    private func addFavorite(_ id: String) {
+    private func addFavorite(_ id: UUID) {
         guard !favorites.contains(id), PenPreset.defaults.contains(where: { $0.id == id }) else { return }
         favorites.append(id)
-        UserDefaults.standard.set(favorites, forKey: "mosuan.favoritePenIDs")
+        UserDefaults.standard.set(favorites.map(\.uuidString), forKey: "mosuan.favoritePenIDs")
     }
 
-    private func removeFavorite(_ id: String) {
+    private func removeFavorite(_ id: UUID) {
         favorites.removeAll { $0 == id }
-        UserDefaults.standard.set(favorites, forKey: "mosuan.favoritePenIDs")
+        UserDefaults.standard.set(favorites.map(\.uuidString), forKey: "mosuan.favoritePenIDs")
     }
 }
