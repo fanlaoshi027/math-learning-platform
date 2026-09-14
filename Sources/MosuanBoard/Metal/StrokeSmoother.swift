@@ -1,14 +1,23 @@
 import Foundation
 
 /// Lightweight stroke preprocessing for natural-looking classroom handwriting.
-/// It stays platform-independent so the renderer keeps ownership of Metal/canvas state.
+///
+/// The goal is closer to a good paper pen than to vector "beautification":
+/// slow writing gets a little more stabilization, while fast writing stays close
+/// to the original trajectory so the pen never feels like it is being dragged.
 enum StrokeSmoother {
     struct Configuration {
         var enabled: Bool = true
-        var strength: Float = 0.55
+        /// Maximum smoothing applied to a slow, straight section.
+        var strength: Float = 0.42
+        /// Turns sharper than this are kept crisp.
         var cornerAngleDegrees: Float = 55
         var minimumPointDistance: Float = 0.8
-        var pressureStrength: Float = 0.35
+        var pressureStrength: Float = 0.28
+        /// Approximate per-sample travel at which motion is considered fast.
+        var fastDistance: Float = 14
+        /// Approximate per-sample travel below which motion is considered slow.
+        var slowDistance: Float = 2.5
     }
 
     static func smooth(_ input: [InkPoint], configuration: Configuration = Configuration()) -> [InkPoint] {
@@ -17,9 +26,11 @@ enum StrokeSmoother {
         let points = deduplicated(input, minimumDistance: configuration.minimumPointDistance)
         guard points.count >= 3 else { return points }
 
-        let strength = max(0, min(1, configuration.strength))
+        let maxStrength = max(0, min(1, configuration.strength))
         let pressureStrength = max(0, min(1, configuration.pressureStrength))
         let cornerCosine = cos(configuration.cornerAngleDegrees * .pi / 180)
+        let slowDistance = max(0.001, configuration.slowDistance)
+        let fastDistance = max(slowDistance + 0.001, configuration.fastDistance)
 
         var output: [InkPoint] = []
         output.reserveCapacity(points.count)
@@ -42,17 +53,23 @@ enum StrokeSmoother {
 
             let cosine = simdDot(inVector / inLength, outVector / outLength)
             if cosine < cornerCosine {
-                // Keep mathematical corners crisp: 7, angle vertices, triangle vertices, etc.
+                // Mathematical corners and handwriting turns should remain crisp.
                 output.append(current)
                 continue
             }
 
+            // Distance-per-sample is a useful low-cost motion proxy. Slow movement
+            // gets more stabilization; fast movement gets almost no correction.
+            let travel = (inLength + outLength) * 0.5
+            let fast01 = max(0, min(1, (travel - slowDistance) / (fastDistance - slowDistance)))
+            let motionFactor = 1 - fast01
+            let adaptiveStrength = maxStrength * motionFactor
+
             let averageX = (previous.x + 2 * current.x + next.x) * 0.25
             let averageY = (previous.y + 2 * current.y + next.y) * 0.25
-            let targetX = current.x + (averageX - current.x) * strength
-            let targetY = current.y + (averageY - current.y) * strength
+            let targetX = current.x + (averageX - current.x) * adaptiveStrength
+            let targetY = current.y + (averageY - current.y) * adaptiveStrength
 
-            // Smooth pressure gently as well, while retaining the current sample as the anchor.
             let averagePressure = (previous.pressure + 2 * current.pressure + next.pressure) * 0.25
             let pressure = current.pressure + (averagePressure - current.pressure) * pressureStrength
 
@@ -76,7 +93,6 @@ enum StrokeSmoother {
             if dx * dx + dy * dy >= thresholdSquared {
                 output.append(point)
             } else {
-                // Keep the latest pressure sample while avoiding zero-length geometry segments.
                 output[output.count - 1] = InkPoint(x: last.x, y: last.y, pressure: point.pressure)
             }
         }
