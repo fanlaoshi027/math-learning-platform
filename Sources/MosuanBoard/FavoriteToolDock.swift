@@ -1,6 +1,9 @@
 import SwiftUI
 
-/// 收藏笔槽可吸附的位置：上方、左右画面内、左右画面外。
+extension Notification.Name {
+    static let mosuanAddFavoritePen = Notification.Name("mosuan.addFavoritePen")
+}
+
 enum FavoriteDockPlacement: String, CaseIterable {
     case top
     case leftInside
@@ -8,9 +11,7 @@ enum FavoriteDockPlacement: String, CaseIterable {
     case leftOutside
     case rightOutside
 
-    var isVertical: Bool {
-        self != .top
-    }
+    var isVertical: Bool { self != .top }
 }
 
 struct FavoriteToolDock: View {
@@ -93,7 +94,7 @@ struct FavoriteToolDock: View {
     }
 }
 
-/// 独立的收藏笔槽容器。拖动时才显示五个绿色吸附槽。
+/// 收藏笔槽：只有开始拖动时才出现五个绿色磁吸区域。
 struct FavoriteDockHost: View {
     @Binding var presetID: String
     @Binding var tool: BoardTool
@@ -107,8 +108,7 @@ struct FavoriteDockHost: View {
     init(presetID: Binding<String>, tool: Binding<BoardTool>) {
         _presetID = presetID
         _tool = tool
-        let saved = UserDefaults.standard.stringArray(forKey: "mosuan.favoritePenIDs") ?? []
-        _favorites = State(initialValue: saved)
+        _favorites = State(initialValue: UserDefaults.standard.stringArray(forKey: "mosuan.favoritePenIDs") ?? [])
         let raw = UserDefaults.standard.string(forKey: "mosuan.favoriteDockPlacement") ?? FavoriteDockPlacement.top.rawValue
         _placement = State(initialValue: FavoriteDockPlacement(rawValue: raw) ?? .top)
     }
@@ -116,15 +116,15 @@ struct FavoriteDockHost: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                if dragging {
-                    dropTargets(in: proxy.size)
-                }
-
+                if dragging { dropTargets(in: proxy.size) }
                 dock(in: proxy.size)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .allowsHitTesting(true)
+        .onReceive(NotificationCenter.default.publisher(for: .mosuanAddFavoritePen)) { note in
+            guard let id = note.object as? String else { return }
+            addFavorite(id)
+        }
     }
 
     private func dock(in size: CGSize) -> some View {
@@ -137,7 +137,7 @@ struct FavoriteDockHost: View {
             },
             onRemove: removeFavorite,
             onDragChanged: { translation in
-                if !dragging { dragging = true }
+                dragging = true
                 dragOffset = translation
                 highlighted = nearestPlacement(in: size, translation: translation)
             },
@@ -151,20 +151,17 @@ struct FavoriteDockHost: View {
             }
         )
         .offset(baseOffset(in: size) + dragOffset)
+        .opacity(favorites.isEmpty ? 0 : 1)
+        .allowsHitTesting(!favorites.isEmpty)
     }
 
     private func baseOffset(in size: CGSize) -> CGSize {
         switch placement {
-        case .top:
-            return CGSize(width: 0, height: 74)
-        case .leftInside:
-            return CGSize(width: 74, height: 0)
-        case .rightInside:
-            return CGSize(width: -74, height: 0)
-        case .leftOutside:
-            return CGSize(width: 22, height: 0)
-        case .rightOutside:
-            return CGSize(width: -22, height: 0)
+        case .top: return CGSize(width: 0, height: 72)
+        case .leftInside: return CGSize(width: 68, height: 0)
+        case .rightInside: return CGSize(width: -68, height: 0)
+        case .leftOutside: return CGSize(width: 20, height: 0)
+        case .rightOutside: return CGSize(width: -20, height: 0)
         }
     }
 
@@ -181,28 +178,20 @@ struct FavoriteDockHost: View {
                 .frame(width: target.isVertical ? 52 : 270,
                        height: target.isVertical ? 270 : 42)
                 .position(targetPoint(target, in: size))
-                .animation(.easeOut(duration: 0.1), value: highlighted)
         }
     }
 
     private func targetPoint(_ target: FavoriteDockPlacement, in size: CGSize) -> CGPoint {
         switch target {
-        case .top:
-            return CGPoint(x: size.width / 2, y: 78)
-        case .leftInside:
-            return CGPoint(x: 76, y: size.height / 2)
-        case .rightInside:
-            return CGPoint(x: size.width - 76, y: size.height / 2)
-        case .leftOutside:
-            return CGPoint(x: 25, y: size.height / 2)
-        case .rightOutside:
-            return CGPoint(x: size.width - 25, y: size.height / 2)
+        case .top: return CGPoint(x: size.width / 2, y: 74)
+        case .leftInside: return CGPoint(x: 74, y: size.height / 2)
+        case .rightInside: return CGPoint(x: size.width - 74, y: size.height / 2)
+        case .leftOutside: return CGPoint(x: 25, y: size.height / 2)
+        case .rightOutside: return CGPoint(x: size.width - 25, y: size.height / 2)
         }
     }
 
     private func nearestPlacement(in size: CGSize, translation: CGSize) -> FavoriteDockPlacement {
-        // The dock is a floating object. Its drag end is interpreted against five fixed
-        // magnetic zones, matching the reference UI: top, inside-left/right, outside-left/right.
         let start = targetPoint(placement, in: size)
         let point = CGPoint(x: start.x + translation.width, y: start.y + translation.height)
         return FavoriteDockPlacement.allCases.min {
@@ -214,14 +203,14 @@ struct FavoriteDockHost: View {
         hypot(a.x - b.x, a.y - b.y)
     }
 
-    private func removeFavorite(_ id: String) {
-        favorites.removeAll { $0 == id }
+    private func addFavorite(_ id: String) {
+        guard !favorites.contains(id), PenPreset.defaults.contains(where: { $0.id == id }) else { return }
+        favorites.append(id)
         UserDefaults.standard.set(favorites, forKey: "mosuan.favoritePenIDs")
     }
 
-    func addFavorite(_ id: String) {
-        guard !favorites.contains(id) else { return }
-        favorites.append(id)
+    private func removeFavorite(_ id: String) {
+        favorites.removeAll { $0 == id }
         UserDefaults.standard.set(favorites, forKey: "mosuan.favoritePenIDs")
     }
 }
