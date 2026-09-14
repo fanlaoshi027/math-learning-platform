@@ -40,6 +40,7 @@ final class InkMetalView: MTKView {
     var isLineTool = false
     var isSmartLineTool = false
     var isPolygonTool = false
+    var isOneStrokeTool = false
     var isDynamicAngleTool = false
     var isDynamicIsoscelesTriangleTool = false
     var isEraserTool = false
@@ -253,9 +254,6 @@ final class InkMetalView: MTKView {
             if let handle = renderer.selectionHandle(at: p) { renderer.beginHistoryTransaction(); resizeHandle = handle; return }
             if renderer.selectionMoveHandle(at: p) { renderer.beginHistoryTransaction(); selectionDrag = true; lastPoint = p; return }
 
-            // With a selection active, the interior of the multi-selection frame is also a move target.
-            // This is intentionally checked before object/lasso hit testing so an interior click never
-            // becomes a new stroke/selection operation.
             if renderer.hasSelection,
                let frame = renderer.selectionBoundsInView(),
                frame.contains(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))) {
@@ -284,11 +282,7 @@ final class InkMetalView: MTKView {
         if panDrag { renderer.pan(by: p - lastPoint); lastPoint = p; draw(); return }
         if isEraserTool && !temporarySelectHeld {
             eraserPoints.append(p)
-            if let last = lastEraserPoint {
-                eraseAlongPath([last, p])
-            } else {
-                eraseAlongPath([p])
-            }
+            if let last = lastEraserPoint { eraseAlongPath([last, p]) } else { eraseAlongPath([p]) }
             lastEraserPoint = p
             return
         }
@@ -325,9 +319,7 @@ final class InkMetalView: MTKView {
         if isPolygonTool { return }
         if isEraserTool && !temporarySelectHeld {
             eraserPoints.append(p)
-            if let last = lastEraserPoint, simd_distance(last, p) > 0.001 {
-                eraseAlongPath([last, p])
-            }
+            if let last = lastEraserPoint, simd_distance(last, p) > 0.001 { eraseAlongPath([last, p]) }
             lastEraserPoint = nil
             eraserPoints.removeAll(keepingCapacity: true)
             renderer.endHistoryTransaction()
@@ -349,7 +341,22 @@ final class InkMetalView: MTKView {
         let c = renderer.canvasPoint(from: p)
         let pressure = event.pressure > 0 ? Float(event.pressure) : (points.last?.pressure ?? 1)
         points.append(InkPoint(x: c.x, y: c.y, pressure: pressure))
-        if isLineTool || (isSmartLineTool && smartLineDetected) { let line = linePreview(from: points); if line.count >= 2 { renderer.commitLine(from: SIMD2(line[0].x, line[0].y), to: SIMD2(line[1].x, line[1].y)) } } else { renderer.commitStroke(points) }
+
+        if isOneStrokeTool {
+            switch OneStrokeRecognizer.recognize(points) {
+            case .line(let start, let end):
+                renderer.commitLine(from: SIMD2(Float(start.x), Float(start.y)), to: SIMD2(Float(end.x), Float(end.y)))
+            case .polygon(let vertices):
+                renderer.commitPolygon(points: vertices)
+            case nil:
+                renderer.commitStroke(points)
+            }
+        } else if isLineTool || (isSmartLineTool && smartLineDetected) {
+            let line = linePreview(from: points)
+            if line.count >= 2 { renderer.commitLine(from: SIMD2(line[0].x, line[0].y), to: SIMD2(line[1].x, line[1].y)) }
+        } else {
+            renderer.commitStroke(points)
+        }
         renderer.endHistoryTransaction(); points.removeAll(keepingCapacity: true); active = false; smartLineDetected = false; renderer.setStroke([]); notifyState(); draw()
     }
 
