@@ -26,18 +26,44 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             return
         }
 
-        // Light smoothing: preserve the original centerline shape while removing
-        // small sampling jitter. This is intentionally not vector-like smoothing.
+        // Noteful-like motion smoothing: stabilize slow movement, but keep fast
+        // handwriting close to the original trajectory. This avoids the "rubber
+        // band" feeling caused by a fixed smoothing amount.
         var smooth = s
         if s.count >= 3 {
+            let maxStrength: Float = 0.42
+            let slowDistance: Float = 2.5
+            let fastDistance: Float = 14.0
+            let cornerCosine = cos(Float(55.0) * .pi / 180.0)
+
             for i in 1..<(s.count - 1) {
                 let p0 = s[i - 1]
                 let p1 = s[i]
                 let p2 = s[i + 1]
+                let inVector = SIMD2(p1.x - p0.x, p1.y - p0.y)
+                let outVector = SIMD2(p2.x - p1.x, p2.y - p1.y)
+                let inLength = sqrt(inVector.x * inVector.x + inVector.y * inVector.y)
+                let outLength = sqrt(outVector.x * outVector.x + outVector.y * outVector.y)
+                guard inLength > 0.001, outLength > 0.001 else { continue }
+
+                let cosine = (inVector.x * outVector.x + inVector.y * outVector.y) / (inLength * outLength)
+                if cosine < cornerCosine {
+                    // Preserve handwriting turns and mathematical corners.
+                    continue
+                }
+
+                let travel = (inLength + outLength) * 0.5
+                let fast01 = max(0, min(1, (travel - slowDistance) / (fastDistance - slowDistance)))
+                let strength = maxStrength * (1 - fast01)
+
+                let averageX = (p0.x + 2.0 * p1.x + p2.x) * 0.25
+                let averageY = (p0.y + 2.0 * p1.y + p2.y) * 0.25
+                let averagePressure = (p0.pressure + 2.0 * p1.pressure + p2.pressure) * 0.25
+                let pressure = p1.pressure + (averagePressure - p1.pressure) * 0.28
                 smooth[i] = InkPoint(
-                    x: (p0.x + 2.0 * p1.x + p2.x) * 0.25,
-                    y: (p0.y + 2.0 * p1.y + p2.y) * 0.25,
-                    pressure: (p0.pressure + 2.0 * p1.pressure + p2.pressure) * 0.25
+                    x: p1.x + (averageX - p1.x) * strength,
+                    y: p1.y + (averageY - p1.y) * strength,
+                    pressure: pressure
                 )
             }
         }
@@ -97,4 +123,4 @@ v = v.replace(
 )
 v = v.replace('tolerance: 8, minimumLength: 30', 'tolerance: 18, minimumLength: 20', 1)
 view.write_text(v)
-print("Applied robust ink renderer repair, compile-safe smoothing, 4x MSAA, and forgiving smart-line detection.")
+print("Applied natural speed-aware ink smoothing, compile-safe renderer repair, 4x MSAA, and forgiving smart-line detection.")
