@@ -14,20 +14,14 @@ enum OneStrokeRecognizer {
         let diagonal = max(hypot(box.width, box.height), 1)
         let length = pathLength(points)
         guard length >= 30 else { return nil }
+        if isLine(points, diagonal: diagonal, pathLength: length) { return .line(points[0], points[points.count - 1]) }
 
-        if isLine(points, diagonal: diagonal, pathLength: length) {
-            return .line(points[0], points[points.count - 1])
-        }
-
-        let closure = hypot(points[0].x - points[points.count - 1].x,
-                            points[0].y - points[points.count - 1].y)
+        let closure = hypot(points[0].x - points[points.count - 1].x, points[0].y - points[points.count - 1].y)
         guard closure <= max(18, diagonal * 0.20), length / diagonal >= 1.35 else { return nil }
 
-        // Round closed gestures are emitted as a dense polygon approximation. This keeps
-        // the current renderer/model API unchanged while giving a smooth classroom shape.
-        if let rounded = roundedShape(points, box: box, pathLength: length) {
-            return .polygon(rounded)
-        }
+        // Round closed gestures are emitted as a dense polygon approximation. This keeps the
+        // current renderer/model API unchanged while producing a visually smooth circle/ellipse.
+        if let rounded = roundedShape(points, box: box, pathLength: length) { return .polygon(rounded) }
 
         let simplified = rdp(points + [points[0]], epsilon: max(4, diagonal * 0.035))
         let vertices = Array(simplified.dropLast())
@@ -46,43 +40,36 @@ enum OneStrokeRecognizer {
 
     private static func roundedShape(_ points: [CGPoint], box: CGRect, pathLength: CGFloat) -> [CGPoint]? {
         guard box.width >= 20, box.height >= 20 else { return nil }
-        let cx = box.midX, cy = box.midY
-        let rx = box.width / 2, ry = box.height / 2
+        let cx = box.midX, cy = box.midY, rx = box.width / 2, ry = box.height / 2
         let minRadius = min(rx, ry)
         guard minRadius > 0.001 else { return nil }
-
         var totalError: CGFloat = 0, maxError: CGFloat = 0
         for p in points {
             let normalized = hypot((p.x - cx) / rx, (p.y - cy) / ry)
             let error = abs(normalized - 1) * minRadius
-            totalError += error
-            maxError = max(maxError, error)
+            totalError += error; maxError = max(maxError, error)
         }
         let meanError = totalError / CGFloat(points.count)
         guard meanError <= max(10, minRadius * 0.16),
               maxError <= max(18, minRadius * 0.32),
               pathLength / (CGFloat.pi * (rx + ry)) >= 0.72 else { return nil }
 
-        // Sharp corners belong to polygons, not rounded shapes.
         let simplified = rdp(points + [points[0]], epsilon: max(4, hypot(box.width, box.height) * 0.035))
-        let corners = max(0, simplified.count - 1) >= 3 ? Array(simplified.dropLast()).indices.filter { i in
-            let prev = simplified[(i - 1 + simplified.count - 1) % (simplified.count - 1)]
+        let vertexCount = max(0, simplified.count - 1)
+        let corners = vertexCount >= 3 ? (0..<vertexCount).filter { i in
+            let prev = simplified[(i - 1 + vertexCount) % vertexCount]
             let current = simplified[i]
-            let next = simplified[(i + 1) % (simplified.count - 1)]
+            let next = simplified[(i + 1) % vertexCount]
             return cornerAngle(prev, current, next) < 135
         }.count : 0
         guard corners <= 2 else { return nil }
 
-        let aspect = max(rx, ry) / min(rx, ry)
         let segments = 48
         let start = atan2((points[0].y - cy) / ry, (points[0].x - cx) / rx)
         return (0..<segments).map { i in
             let a = start + CGFloat(i) * 2 * .pi / CGFloat(segments)
             return CGPoint(x: cx + rx * cos(a), y: cy + ry * sin(a))
         }
-        // Keep the local `aspect` calculation explicit: it documents that both circles and
-        // ellipses are intentionally supported by this same rounded-shape path.
-        _ = aspect
     }
 
     private static func isLine(_ points: [CGPoint], diagonal: CGFloat, pathLength: CGFloat) -> Bool {
