@@ -21,21 +21,20 @@ final class ShortcutEventMonitor {
             let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
             let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
 
+            // Command-Z must undo; Shift-Command-Z must redo.
+            if flags == [.command, .shift] && key == "z" {
+                NotificationCenter.default.post(name: .mosuanShortcutAction, object: "redo")
+                return nil
+            }
             if flags == .command && key == "z" {
-                NotificationCenter.default.post(name: .mosuanShortcutAction, object: "redo")
+                NotificationCenter.default.post(name: .mosuanShortcutAction, object: "undo")
                 return nil
             }
-            if flags == .command && key == "z" && event.modifierFlags.contains(.shift) {
-                NotificationCenter.default.post(name: .mosuanShortcutAction, object: "redo")
-                return nil
-            }
+
             if flags.isEmpty {
-                switch event.keyCode {
-                case 48:
+                if event.keyCode == 48 { // Tab
                     NotificationCenter.default.post(name: .mosuanShortcutAction, object: "nextColor")
                     return nil
-                default:
-                    break
                 }
 
                 switch key {
@@ -47,15 +46,6 @@ final class ShortcutEventMonitor {
                 case "h": NotificationCenter.default.post(name: .mosuanShortcutAction, object: "hand"); return nil
                 default: break
                 }
-            }
-
-            if flags == .command && key == "z" && event.modifierFlags.contains(.shift) {
-                NotificationCenter.default.post(name: .mosuanShortcutAction, object: "redo")
-                return nil
-            }
-            if flags == .command && key == "z" {
-                NotificationCenter.default.post(name: .mosuanShortcutAction, object: "undo")
-                return nil
             }
 
             return event
