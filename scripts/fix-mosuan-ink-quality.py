@@ -101,5 +101,13 @@ v = v.replace(
     1
 )
 v = v.replace('tolerance: 8, minimumLength: 30', 'tolerance: 18, minimumLength: 20', 1)
+
+# Live-only short-horizon prediction. Never feed predicted samples into the
+# recognizer or document model; they exist solely to hide render/input latency.
+v = v.replace(
+    'renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from: points) : points)',
+    'renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from: points) : InkPrediction.preview(points))',
+    1
+)
 view.write_text(v)
-print("Applied shared speed-aware ink smoothing, light width smoothing, natural start/end width ramp, 4x MSAA, and forgiving smart-line detection.")
+print("Applied shared speed-aware ink smoothing, light width smoothing, natural start/end width ramp, 4x MSAA, forgiving smart-line detection, and live-only short-horizon tip prediction.")
