@@ -94,7 +94,6 @@ struct FavoriteToolDock: View {
     }
 }
 
-/// 收藏笔槽：只有开始拖动时才出现五个绿色磁吸区域。
 struct FavoriteDockHost: View {
     @Binding var presetID: String
     @Binding var tool: BoardTool
@@ -150,18 +149,28 @@ struct FavoriteDockHost: View {
                 dragging = false
             }
         )
-        .offset(baseOffset(in: size) + dragOffset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment(for: placement))
+        .padding(edgePadding(for: placement))
+        .offset(dragOffset)
         .opacity(favorites.isEmpty ? 0 : 1)
         .allowsHitTesting(!favorites.isEmpty)
     }
 
-    private func baseOffset(in size: CGSize) -> CGSize {
+    private func alignment(for placement: FavoriteDockPlacement) -> Alignment {
         switch placement {
-        case .top: return CGSize(width: 0, height: 72)
-        case .leftInside: return CGSize(width: 68, height: 0)
-        case .rightInside: return CGSize(width: -68, height: 0)
-        case .leftOutside: return CGSize(width: 20, height: 0)
-        case .rightOutside: return CGSize(width: -20, height: 0)
+        case .top: return .top
+        case .leftInside, .leftOutside: return .leading
+        case .rightInside, .rightOutside: return .trailing
+        }
+    }
+
+    private func edgePadding(for placement: FavoriteDockPlacement) -> EdgeInsets {
+        switch placement {
+        case .top: return EdgeInsets(top: 72, leading: 0, bottom: 0, trailing: 0)
+        case .leftInside: return EdgeInsets(top: 0, leading: 66, bottom: 0, trailing: 0)
+        case .rightInside: return EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 66)
+        case .leftOutside: return EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 0)
+        case .rightOutside: return EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 8)
         }
     }
 
