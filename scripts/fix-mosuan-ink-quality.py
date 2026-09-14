@@ -6,68 +6,32 @@ view = ROOT / "Sources/MosuanBoard/Metal/InkMetalView.swift"
 
 r = renderer.read_text()
 
-# The legacy appendBackground implementation is a compact one-line function.
-# Some revisions ended without the function-closing brace. Repair it by checking
-# the brace balance specifically between appendBackground and appendStroke.
+# Repair the legacy background function when an older revision is missing its
+# closing brace.
 bg_start = r.index("    private func appendBackground(")
 stroke_start = r.index("    private func appendStroke(", bg_start)
 bg_block = r[bg_start:stroke_start]
 if bg_block.count("{") > bg_block.count("}"):
     r = r[:stroke_start] + "    }\n" + r[stroke_start:]
 
+# Keep the Release build on the same smoothing path as the source build.
+# StrokeSmoother performs speed-aware position smoothing and light pressure
+# smoothing; pressure smoothing therefore also becomes width smoothing without
+# introducing a second, conflicting renderer algorithm.
 start = r.index("    private func appendStroke(")
 end = r.index("    private func appendSelection(", start)
 new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle, to out: inout [InkVertex]) {
         guard !s.isEmpty else { return }
         let color = metalColor(style)
-        guard s.count > 1 else {
-            let p = s[0]
+        let smooth = StrokeSmoother.smooth(s)
+        guard smooth.count > 1 else {
+            let p = smooth[0]
             disk(viewPoint(from: SIMD2(p.x, p.y)), strokeWidth(p.pressure, style), color, to: &out)
             return
         }
 
-        // Noteful-like motion smoothing: stabilize slow movement, but keep fast
-        // handwriting close to the original trajectory. This avoids the "rubber
-        // band" feeling caused by a fixed smoothing amount.
-        var smooth = s
-        if s.count >= 3 {
-            let maxStrength: Float = 0.42
-            let slowDistance: Float = 2.5
-            let fastDistance: Float = 14.0
-            let cornerCosine = cos(Float(55.0) * .pi / 180.0)
-
-            for i in 1..<(s.count - 1) {
-                let p0 = s[i - 1]
-                let p1 = s[i]
-                let p2 = s[i + 1]
-                let inVector = SIMD2(p1.x - p0.x, p1.y - p0.y)
-                let outVector = SIMD2(p2.x - p1.x, p2.y - p1.y)
-                let inLength = sqrt(inVector.x * inVector.x + inVector.y * inVector.y)
-                let outLength = sqrt(outVector.x * outVector.x + outVector.y * outVector.y)
-                guard inLength > 0.001, outLength > 0.001 else { continue }
-
-                let cosine = (inVector.x * outVector.x + inVector.y * outVector.y) / (inLength * outLength)
-                if cosine < cornerCosine {
-                    // Preserve handwriting turns and mathematical corners.
-                    continue
-                }
-
-                let travel = (inLength + outLength) * 0.5
-                let fast01 = max(0, min(1, (travel - slowDistance) / (fastDistance - slowDistance)))
-                let strength = maxStrength * (1 - fast01)
-
-                let averageX = (p0.x + 2.0 * p1.x + p2.x) * 0.25
-                let averageY = (p0.y + 2.0 * p1.y + p2.y) * 0.25
-                let averagePressure = (p0.pressure + 2.0 * p1.pressure + p2.pressure) * 0.25
-                let pressure = p1.pressure + (averagePressure - p1.pressure) * 0.28
-                smooth[i] = InkPoint(
-                    x: p1.x + (averageX - p1.x) * strength,
-                    y: p1.y + (averageY - p1.y) * strength,
-                    pressure: pressure
-                )
-            }
-        }
-
+        // The final geometry uses the shared smoother used by the normal source
+        // path. This keeps Release and Debug handwriting behavior identical.
         for i in 0..<(smooth.count - 1) {
             let p = smooth[i]
             let q = smooth[i + 1]
@@ -86,7 +50,8 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             triangle(c, b, d, color: color, to: &out)
         }
 
-        // Round joins/caps retain a natural pen feel.
+        // Round caps/joins keep the stroke natural without adding a heavy brush
+        // simulation layer.
         for p in smooth {
             disk(viewPoint(from: SIMD2(p.x, p.y)), strokeWidth(p.pressure, style), color, to: &out)
         }
@@ -94,7 +59,7 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
 '''
 r = r[:start] + new_stroke + r[end:]
 
-# Make all renderer color literals explicitly Float and normalize Swift lexer-sensitive math.
+# Keep renderer literals explicit and normalize Swift lexer-sensitive math.
 r = r.replace('SIMD4(0.82,0.84,0.88,0.55)', 'SIMD4<Float>(0.82,0.84,0.88,0.55)')
 r = r.replace('SIMD4(0.1,0.45,1,0.75)', 'SIMD4<Float>(0.1,0.45,1,0.75)')
 r = r.replace('SIMD4(0.1,0.45,1,0.85)', 'SIMD4<Float>(0.1,0.45,1,0.85)')
@@ -123,4 +88,4 @@ v = v.replace(
 )
 v = v.replace('tolerance: 8, minimumLength: 30', 'tolerance: 18, minimumLength: 20', 1)
 view.write_text(v)
-print("Applied natural speed-aware ink smoothing, compile-safe renderer repair, 4x MSAA, and forgiving smart-line detection.")
+print("Applied shared speed-aware ink smoothing, pressure/width smoothing, 4x MSAA, and forgiving smart-line detection.")
