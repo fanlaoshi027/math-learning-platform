@@ -39,37 +39,6 @@ struct BoardScreen: View {
                         MetalInkCanvas(tool:$tool, penStyle:preset.style, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
                             .padding(24)
 
-                        if let degrees = controller.dynamicAngleDegrees, tool == .select {
-                            DynamicAngleParameterPanel(
-                                degrees: Binding(get: { degrees }, set: { controller.setDynamicAngleDegrees($0) }),
-                                onPlayPause: { controller.toggleDynamicAnglePlayback() },
-                                isPlaying: controller.dynamicAnglePlaying
-                            )
-                            .frame(width: 300)
-                            .padding(16)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        }
-
-                        if let degrees = controller.dynamicTriangleDegrees,
-                           let legLength = controller.dynamicTriangleLegLength,
-                           tool == .select {
-                            DynamicIsoscelesTriangleParameterPanel(
-                                degrees: Binding(get: { degrees }, set: { controller.setDynamicTriangleDegrees($0) }),
-                                legLength: Binding(get: { legLength }, set: { controller.setDynamicTriangleLegLength($0) }),
-                                onParameterEditingChanged: { editing in
-                                    if editing { controller.beginDynamicTriangleParameterEditHistory() }
-                                    else { controller.endDynamicTriangleParameterEditHistory() }
-                                },
-                                onPlaybackChanged: { playing in
-                                    if playing { controller.beginDynamicTrianglePlaybackHistory() }
-                                    else { controller.endDynamicTrianglePlaybackHistory() }
-                                }
-                            )
-                            .frame(width: 300)
-                            .padding(16)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        }
-
                         toolbar(in: proxy.size)
                             .frame(maxWidth:toolbarIsVertical ? 96 : .infinity, maxHeight:toolbarIsVertical ? .infinity : 76)
                             .background(.regularMaterial)
@@ -79,7 +48,6 @@ struct BoardScreen: View {
                             .padding(8)
                             .frame(maxWidth:.infinity, maxHeight:.infinity, alignment:toolbarAlignment)
 
-                        // 收藏笔槽独立于主工具栏，可吸附到画布内/外的五个位置。
                         FavoriteDockHost(presetID: $presetID, tool: $tool)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -136,14 +104,11 @@ struct BoardScreen: View {
         ToolButton(title:"直线",systemImage:"line.diagonal",selected:tool == .line) { tool = .line }
         ToolButton(title:"智能直线",systemImage:"scribble.variable",selected:tool == .smartLine) { tool = .smartLine }
         ToolButton(title:"多边形",systemImage:"triangle",selected:tool == .polygon) { tool = .polygon }
-        ToolButton(title:"动态角",systemImage:"angle",selected:tool == .dynamicAngle) { tool = .dynamicAngle }
-        ToolButton(title:"等腰三角",systemImage:"triangle",selected:tool == .dynamicIsoscelesTriangle) { tool = .dynamicIsoscelesTriangle }
         ToolButton(title:"橡皮",systemImage:"eraser",selected:tool == .eraser) { tool = .eraser }
         ForEach(PenPreset.defaults) { item in
             Button { presetID=item.id; tool = .pen } label: { Circle().fill(Color(red:item.style.color.red, green:item.style.color.green, blue:item.style.color.blue)).frame(width:18,height:18) }.buttonStyle(.plain).help(item.name)
         }
 
-        // 收藏当前笔：收藏后出现在独立的可拖动收藏笔槽。
         Button {
             NotificationCenter.default.post(name: .mosuanAddFavoritePen, object: presetID)
         } label: {
