@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// Shared board UI types used by the current macOS screen.
-enum BoardTool: Equatable { case select, pen, line, smartLine, polygon, dynamicAngle, dynamicIsoscelesTriangle, eraser, hand }
+enum BoardTool: Equatable { case select, pen, line, smartLine, polygon, oneStroke, dynamicAngle, dynamicIsoscelesTriangle, eraser, hand }
 
 enum BoardBackground: String, CaseIterable, Identifiable {
     case white, black, darkGray, lightGray, cream
@@ -47,8 +47,6 @@ struct PageSidebar: View {
 }
 
 struct MetalInkCanvas: NSViewRepresentable {
-    /// nil means the normal standalone board owns its canvas state. A non-nil value is
-    /// used by document/page workspaces where SwiftUI is the source of truth.
     var pageState: CanvasPageState?
     @Binding var tool: BoardTool
     let penStyle: PenStyle
@@ -93,18 +91,17 @@ struct MetalInkCanvas: NSViewRepresentable {
         configure(view)
         view.onPageStateChanged = onPageStateChanged
         view.onZoomChanged = { value in zoomPercent = value }
-        // A standalone board has no external pageState. Do not reload an empty/default
-        // state on every SwiftUI refresh, otherwise lifting the pen can erase the stroke.
         if let pageState { view.loadPageState(pageState) }
         controller.attach(view)
     }
     private func configure(_ view: InkMetalView) {
-        view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine || tool == .polygon || tool == .dynamicAngle || tool == .dynamicIsoscelesTriangle
+        view.isUserInteractionEnabledForTool = tool == .pen || tool == .line || tool == .smartLine || tool == .polygon || tool == .oneStroke || tool == .dynamicAngle || tool == .dynamicIsoscelesTriangle
         view.isSelectionTool = tool == .select
         view.isPanTool = tool == .hand
         view.isLineTool = tool == .line
         view.isSmartLineTool = tool == .smartLine
         view.isPolygonTool = tool == .polygon
+        view.isOneStrokeTool = tool == .oneStroke
         view.isDynamicAngleTool = tool == .dynamicAngle
         view.isDynamicIsoscelesTriangleTool = tool == .dynamicIsoscelesTriangle
         view.isEraserTool = tool == .eraser
