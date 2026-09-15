@@ -1,0 +1,3 @@
+Mosuan 0.1.4 stable baseline.
+Created from the last known-good DMG build line before the later smart-line packaging changes.
+Do not merge packaging experiments into this branch until the baseline DMG is verified on macOS.
