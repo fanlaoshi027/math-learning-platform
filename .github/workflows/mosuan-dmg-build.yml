@@ -1,0 +1,50 @@
+name: Mosuan DMG Build
+on:
+  push:
+    branches:
+      - smart-line-v1
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Resolve packages
+        run: swift package resolve
+      - name: Build app
+        run: swift build -c release
+      - name: Create macOS app bundle and DMG
+        run: |
+          set -e
+          APP="Mosuan Board.app"
+          mkdir -p "$APP/Contents/MacOS"
+          cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
+          chmod +x "$APP/Contents/MacOS/MosuanBoard"
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDisplayName</key><string>墨算</string>
+              <key>CFBundleExecutable</key><string>MosuanBoard</string>
+              <key>CFBundleIdentifier</key><string>com.fanlaoshi.mosuanboard</string>
+              <key>CFBundleName</key><string>墨算</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>CFBundleShortVersionString</key><string>0.1.0</string>
+              <key>CFBundleVersion</key><string>${GITHUB_RUN_NUMBER}</string>
+              <key>LSMinimumSystemVersion</key><string>14.0</string>
+              <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          mkdir -p DMG
+          cp -R "$APP" DMG/
+          ln -s /Applications DMG/Applications
+          hdiutil create -volname "墨算" -srcfolder DMG -ov -format UDZO "MosuanBoard-${GITHUB_REF_NAME}.dmg"
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: MosuanBoard-${{ github.ref_name }}-dmg
+          path: MosuanBoard-${{ github.ref_name }}.dmg
