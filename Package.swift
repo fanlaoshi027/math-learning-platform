@@ -6,7 +6,6 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [.executable(name: "MosuanBoard", targets: ["MosuanBoard"])],
     dependencies: [
-        // Apache-2.0 Abseil C++ dependency used by Google's Ink Stroke Modeler.
         .package(
             url: "https://github.com/firebase/abseil-cpp-SwiftPM.git",
             branch: "main"
@@ -52,9 +51,7 @@ let package = Package(
                 "ink_stroke_modeler/internal/prediction/kalman_filter/matrix.h"
             ],
             publicHeadersPath: "ink_stroke_modeler",
-            cxxSettings: [
-                .headerSearchPath(".")
-            ]
+            cxxSettings: [.headerSearchPath(".")]
         ),
         .executableTarget(
             name: "MosuanBoard",
