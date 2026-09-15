@@ -1,0 +1,39 @@
+name: One-time Typecheck Fix 2
+on:
+  push:
+    branches:
+      - smart-line-v1
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: smart-line-v1
+          fetch-depth: 0
+      - name: Apply compiler fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('Sources/MosuanBoard/Metal/InkRenderer.swift')
+          s = p.read_text()
+          old = 'let step = delta / CGFloat(segments)'
+          new = 'let step = delta / Float(segments)'
+          if old not in s:
+              raise SystemExit('target expression not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Build and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          swift build -c release
+          git add Sources/MosuanBoard/Metal/InkRenderer.swift
+          git commit -m "fix: correct dynamic angle Float division"
+          git push origin smart-line-v1
+          rm -f .github/workflows/fix-typecheck-2.yml
+          git add .github/workflows/fix-typecheck-2.yml
+          git commit -m "ci: remove one-time typecheck helper"
+          git push origin smart-line-v1
