@@ -1,4 +1,4 @@
-name: Apply Ink Realtime V3
+name: Apply Ink Latency V2
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   patch-and-build:
-    if: ${{ !startsWith(github.event.head_commit.message, 'perf: ink realtime v3') }}
+    if: ${{ !startsWith(github.event.head_commit.message, 'perf: ink latency v2') }}
     runs-on: macos-14
     steps:
       - name: Checkout
@@ -19,11 +19,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch realtime ink renderer
+      - name: Patch low-latency ink path
         run: |
           python3 <<'PY'
           from pathlib import Path
-
           metal = Path('Sources/MosuanBoard/Metal/InkRenderer.swift')
           text = metal.read_text()
           old = 'for p in s { disk(viewPoint(from:SIMD2(p.x,p.y)), strokeWidth(p.pressure,style), color, to:&out) }'
@@ -33,50 +32,37 @@ jobs:
           if let last = s.last, s.count > 1 {
               disk(viewPoint(from: SIMD2(last.x, last.y)), strokeWidth(last.pressure, style), color, to: &out)
           }'''
-          if old in text:
-              metal.write_text(text.replace(old, new, 1))
-          elif 'if let first = s.first {' not in text:
-              raise SystemExit('InkRenderer optimization anchor not found')
-
+          if old not in text: raise SystemExit('InkRenderer patch anchor not found')
+          metal.write_text(text.replace(old, new, 1))
           view = Path('Sources/MosuanBoard/Metal/InkMetalView.swift')
           text = view.read_text()
-          prop_anchor = '    private var polygonModel = PolygonToolModel()\n'
-          prop = '''    private var polygonModel = PolygonToolModel()
+          anchor = '    private var polygonModel = PolygonToolModel()\n'
+          insertion = '''    private var polygonModel = PolygonToolModel()
     private var inkDynamics = MosuanInkDynamics()
-'''
-          if 'private var inkDynamics = MosuanInkDynamics()' not in text:
-              if prop_anchor not in text:
-                  raise SystemExit('InkMetalView property anchor not found')
-              text = text.replace(prop_anchor, prop, 1)
 
-          helper_anchor = '    private var selectionModeActive: Bool { isSelectionTool || temporarySelectHeld }\n'
+'''
+          if anchor not in text: raise SystemExit('InkMetalView property anchor not found')
+          text = text.replace(anchor, insertion, 1)
+          anchor = '    private var selectionModeActive: Bool { isSelectionTool || temporarySelectHeld }\n'
           helper = '''    private var selectionModeActive: Bool { isSelectionTool || temporarySelectHeld }
 
     private func resolvedInkPressure(for event: NSEvent, position: SIMD2<Float>, phase: MosuanPointerEvent.Phase) -> Float {
         let raw = Float(event.pressure)
-        if raw > 0.001 && raw < 0.999 {
-            return raw
-        }
+        if raw > 0.001 && raw < 0.999 { return raw }
         return inkDynamics.syntheticPressure(position: position, timestamp: event.timestamp, phase: phase)
     }
 '''
-          if 'private func resolvedInkPressure' not in text:
-              if helper_anchor not in text:
-                  raise SystemExit('InkMetalView helper anchor not found')
-              text = text.replace(helper_anchor, helper, 1)
-
+          if anchor not in text: raise SystemExit('InkMetalView helper anchor not found')
+          text = text.replace(anchor, helper, 1)
           old = 'points = [InkPoint(x: c.x, y: c.y, pressure: event.pressure > 0 ? Float(event.pressure) : 1)]'
           new = 'points = [InkPoint(x: c.x, y: c.y, pressure: resolvedInkPressure(for: event, position: c, phase: .began))]'
-          if old in text:
-              text = text.replace(old, new, 1)
-
+          if old not in text: raise SystemExit('mouseDown pressure anchor not found')
+          text = text.replace(old, new, 1)
           old = 'let pressure = event.pressure > 0 ? Float(event.pressure) : (points.last?.pressure ?? 1)'
           new = 'let pressure = resolvedInkPressure(for: event, position: c, phase: .changed)'
-          if old in text:
-              text = text.replace(old, new)
-
+          if old not in text: raise SystemExit('mouseDragged pressure anchor not found')
+          text = text.replace(old, new)
           view.write_text(text)
-          print('patched realtime ink v3')
           PY
 
       - name: Build release
@@ -87,12 +73,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Sources/MosuanBoard/Metal/InkRenderer.swift Sources/MosuanBoard/Metal/InkMetalView.swift
-          if git diff --cached --quiet; then
-            echo "No source changes to commit"
-          else
-            git commit -m "perf: ink realtime v3"
-            git push origin HEAD:smart-line-v1
-          fi
+          git commit -m "perf: ink latency v2"
+          git push origin HEAD:smart-line-v1
 
       - name: Trigger test build
         env:
