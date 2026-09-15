@@ -32,6 +32,8 @@ final class InkMetalView: MTKView {
     private var lastRotationPoint = SIMD2<Float>(0, 0)
     private var smartLineDetected = false
     private var smartLineWorkItem: DispatchWorkItem?
+    private var pendingSmartLine: (start: SIMD2<Float>, end: SIMD2<Float>)?
+    private var inkStrokeEngine: GoogleInkStrokeEngine?
     private var polygonModel = PolygonToolModel()
 
     var isUserInteractionEnabledForTool = true
@@ -104,6 +106,10 @@ final class InkMetalView: MTKView {
         lassoActive = false
         lassoPoints.removeAll(keepingCapacity: true)
         lassoOverlay.update(points: [], visible: false)
+        pendingSmartLine = nil
+        smartLineDetected = false
+        inkStrokeEngine?.cancel()
+        inkStrokeEngine = nil
         renderer.importPageState(state)
         onHistoryChanged?()
         onSelectionChanged?()
@@ -213,6 +219,22 @@ final class InkMetalView: MTKView {
         if event.buttonNumber == 2 { middleButtonHeld = true; panDrag = true; lastPoint = p; return }
         if spaceHeld || isPanTool { panDrag = true; lastPoint = p; return }
 
+        // A smart line stays in its clean preview state after the first pen-up.
+        // The next click confirms it. This deliberately keeps the confirmation separate
+        // from pen-up, so the teacher can lift, reposition, and tap once to commit.
+        if let pending = pendingSmartLine, isSmartLineTool && !selectionModeActive {
+            renderer.commitLine(from: pending.start, to: pending.end)
+            pendingSmartLine = nil
+            points.removeAll(keepingCapacity: true)
+            active = false
+            smartLineDetected = false
+            renderer.setStroke([])
+            renderer.endHistoryTransaction()
+            notifyState()
+            draw()
+            return
+        }
+
         // Selection-tool hit targets must win over the generic "inside selection" drag.
         // When another tool is active, an existing selection owns the canvas so a stray click
         // cannot accidentally draw over the selected objects.
@@ -271,9 +293,13 @@ final class InkMetalView: MTKView {
             lassoOverlay.update(points: lassoPoints, visible: true); onSelectionChanged?(); draw(); return
         }
         guard isUserInteractionEnabledForTool else { return }
-        renderer.beginHistoryTransaction(); active = true; smartLineDetected = false; smartLineWorkItem?.cancel()
+        renderer.beginHistoryTransaction(); active = true; smartLineDetected = false; smartLineWorkItem?.cancel(); pendingSmartLine = nil
         let c = renderer.canvasPoint(from: p)
-        points = [InkPoint(x: c.x, y: c.y, pressure: event.pressure > 0 ? Float(event.pressure) : 1)]
+        let initialPressure = event.pressure > 0 ? Float(event.pressure) : 1
+        let initialPoint = InkPoint(x: c.x, y: c.y, pressure: initialPressure)
+        inkStrokeEngine = GoogleInkStrokeEngine()
+        inkStrokeEngine?.begin(at: initialPoint, time: event.timestamp)
+        points = [initialPoint]
         renderer.setStroke(points); draw()
     }
 
@@ -304,7 +330,12 @@ final class InkMetalView: MTKView {
         guard isUserInteractionEnabledForTool && active else { return }
         let c = renderer.canvasPoint(from: p)
         let pressure = event.pressure > 0 ? Float(event.pressure) : (points.last?.pressure ?? 1)
-        points.append(InkPoint(x: c.x, y: c.y, pressure: pressure))
+        let rawPoint = InkPoint(x: c.x, y: c.y, pressure: pressure)
+        if let modeled = inkStrokeEngine?.update(point: rawPoint, time: event.timestamp), !modeled.isEmpty {
+            points.append(contentsOf: modeled)
+        } else {
+            points.append(rawPoint)
+        }
         renderer.setStroke((isLineTool || (isSmartLineTool && smartLineDetected)) ? linePreview(from: points) : points)
         scheduleSmartLineDetection(); draw()
     }
@@ -340,7 +371,13 @@ final class InkMetalView: MTKView {
         guard isUserInteractionEnabledForTool && active else { return }
         let c = renderer.canvasPoint(from: p)
         let pressure = event.pressure > 0 ? Float(event.pressure) : (points.last?.pressure ?? 1)
-        points.append(InkPoint(x: c.x, y: c.y, pressure: pressure))
+        let rawPoint = InkPoint(x: c.x, y: c.y, pressure: pressure)
+        if let modeled = inkStrokeEngine?.end(point: rawPoint, time: event.timestamp), !modeled.isEmpty {
+            points.append(contentsOf: modeled)
+        } else {
+            points.append(rawPoint)
+        }
+        inkStrokeEngine = nil
 
         if isOneStrokeTool {
             switch OneStrokeRecognizer.recognize(points) {
@@ -351,9 +388,21 @@ final class InkMetalView: MTKView {
             case nil:
                 renderer.commitStroke(points)
             }
-        } else if isLineTool || (isSmartLineTool && smartLineDetected) {
+        } else if isLineTool {
             let line = linePreview(from: points)
             if line.count >= 2 { renderer.commitLine(from: SIMD2(line[0].x, line[0].y), to: SIMD2(line[1].x, line[1].y)) }
+        } else if isSmartLineTool && smartLineDetected {
+            let line = linePreview(from: points)
+            if line.count >= 2 {
+                pendingSmartLine = (SIMD2(line[0].x, line[0].y), SIMD2(line[1].x, line[1].y))
+                renderer.setStroke([points[0], points[points.count - 1]])
+            }
+            active = false
+            points.removeAll(keepingCapacity: true)
+            smartLineDetected = false
+            // Keep the history transaction open until the confirmation tap.
+            draw()
+            return
         } else {
             renderer.commitStroke(points)
         }
@@ -394,6 +443,8 @@ final class InkMetalView: MTKView {
         case .cancelled:
             smartLineWorkItem?.cancel(); active = false; points.removeAll(keepingCapacity: true); renderer.setStroke([])
             eraserPoints.removeAll(keepingCapacity: true); lastEraserPoint = nil
+            inkStrokeEngine?.cancel(); inkStrokeEngine = nil
+            pendingSmartLine = nil; smartLineDetected = false
             if dynamicTrianglePlaybackHistoryActive { dynamicTrianglePlaybackHistoryActive = false; renderer.endHistoryTransaction() } else { renderer.endHistoryTransaction() }
             dynamicTriangleParameterHistoryActive = false; polygonModel.cancel(); polygonVertexDrag = nil; lineEndpointDrag = nil; dynamicAngleDragID = nil; dynamicIsoscelesTriangleDragID = nil; lassoActive = false; lassoPoints.removeAll(keepingCapacity: true); lassoOverlay.update(points: [], visible: false); draw()
         default: break
@@ -412,8 +463,16 @@ final class InkMetalView: MTKView {
     private func scheduleSmartLineDetection() {
         guard isSmartLineTool, points.count >= 4 else { return }
         smartLineWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in guard let self, self.active, self.isSmartLineTool, self.points.count >= 4 else { return }; if LineGeometry.isLikelyStraight(points: self.points, tolerance: 8, minimumLength: 30) { self.smartLineDetected = true; self.renderer.setStroke(self.linePreview(from: self.points)); self.draw() } }
-        smartLineWorkItem = work; DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.active, self.isSmartLineTool, !self.smartLineDetected, self.points.count >= 4 else { return }
+            if LineGeometry.isLikelyStraight(points: self.points, tolerance: 8, minimumLength: 30) {
+                self.smartLineDetected = true
+                self.renderer.setStroke(self.linePreview(from: self.points))
+                self.draw()
+            }
+        }
+        smartLineWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
     private func linePreview(from p: [InkPoint]) -> [InkPoint] { guard let first = p.first, let last = p.last else { return p }; return [first, last] }
     private func eraseAlongPath(_ path: [SIMD2<Float>]) {
