@@ -1,6 +1,5 @@
 import CoreGraphics
 import MetalKit
-import simd
 
 /// Renderer-facing boundary for completed click-based geometry construction.
 /// Construction itself stays in Core/Geometry; this extension only commits the
@@ -33,14 +32,9 @@ extension InkRenderer {
             return GraphicObject.Style()
         }
         return GraphicObject.Style(
-            strokeColor: RGBAColor(
-                red: CGFloat(value.color.x),
-                green: CGFloat(value.color.y),
-                blue: CGFloat(value.color.z),
-                alpha: CGFloat(value.color.w)
-            ),
-            strokeWidth: CGFloat(value.width),
-            opacity: CGFloat(value.opacity),
+            strokeColor: value.color,
+            strokeWidth: value.width,
+            opacity: value.opacity,
             lineStyle: value.lineStyle
         )
     }
