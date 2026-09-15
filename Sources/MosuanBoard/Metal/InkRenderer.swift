@@ -164,7 +164,45 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private func appendBackground(to out:inout[InkVertex]){guard backgroundPattern != 0 else{return};let color=SIMD4(0.82,0.84,0.88,0.55);let step:Float=backgroundPattern == 3 ? 24:32;let e:Float=2000;if backgroundPattern == 1{var y:Float = -e;while y<=e{appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.55,color:color,to:&out);y+=step}}else{var x:Float = -e;while x<=e{appendLine(viewPoint(from:SIMD2(x,-e)),viewPoint(from:SIMD2(x,e)),width:0.45,color:color,to:&out);x+=step};var y:Float = -e;while y<=e{appendLine(viewPoint(from:SIMD2(-e,y)),viewPoint(from:SIMD2(e,y)),width:0.45,color:color,to:&out);y+=step}}
     private func appendStroke(_ s:[InkPoint],style:PenStyle,to out:inout[InkVertex]){guard !s.isEmpty else{return};let color=metalColor(style);if s.count>1{for i in 0..<(s.count-1){let p=s[i],q=s[i+1],dx=q.x-p.x,dy=q.y-p.y,l=max(sqrt(dx*dx+dy*dy),0.001),nx=-dy/l,ny=dx/l,w0=strokeWidth(p.pressure,style),w1=strokeWidth(q.pressure,style),a=viewPoint(from:SIMD2(p.x+nx*w0,p.y+ny*w0)),b=viewPoint(from:SIMD2(p.x-nx*w0,p.y-ny*w0)),c=viewPoint(from:SIMD2(q.x+nx*w1,q.y+ny*w1)),d=viewPoint(from:SIMD2(q.x-nx*w1,q.y-ny*w1));triangle(a,b,c,color:color,to:&out);triangle(c,b,d,color:color,to:&out)}};for p in s{disk(viewPoint(from:SIMD2(p.x,p.y)),strokeWidth(p.pressure,style),color,to:&out)}}
     private func appendSelection(_ r:CGRect,to out:inout[InkVertex]){let c=SIMD4(0.1,0.45,1,0.75),a=viewPoint(from:SIMD2(Float(r.minX),Float(r.minY))),b=viewPoint(from:SIMD2(Float(r.maxX),Float(r.maxY))),p0=SIMD2(a.x,a.y),p1=SIMD2(b.x,a.y),p2=SIMD2(b.x,b.y),p3=SIMD2(a.x,b.y);appendDashedLine(p0,p1,width:1.5,color:c,to:&out);appendDashedLine(p1,p2,width:1.5,color:c,to:&out);appendDashedLine(p2,p3,width:1.5,color:c,to:&out);appendDashedLine(p3,p0,width:1.5,color:c,to:&out);let rot=p1;disk(rot,8,c,to:&out);let scale=p2;disk(scale,8,c,to:&out);if let rc=rotationCenterViewPoint(){disk(rc,7,SIMD4(0.95,0.55,0.05,1),to:&out)}}
-    private func appendSingleSelectionControls(to out:inout[InkVertex]){guard selectionCount==1 else{return};let c=SIMD4(0.1,0.45,1,0.85);if let id=selectedObjectIDs.first,let o=objectStore.object(with:id){switch o.kind{case .line,.arrow:for q in objectStore.transformedPoints(of:o).prefix(2){disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),7,c,to:&out)};case .polygon:for q in objectStore.transformedPoints(of:o){disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out)};case .parameterizedTriangle:if let model=o.triangleModel{for q in objectStore.transformedPoints(of:o){disk(viewPoint(from:SIMD2(Float(q.x),Float(q.y))),6,c,to:&out)};let raw=transformPoint(model.angleControlPoint(),by:o.transform);disk(viewPoint(from:SIMD2(Float(raw.x),Float(raw.y))),7,SIMD4(0.95,0.55,0.05,1),to:&out);let leg=transformPoint(model.legLengthControlPoint(),by:o.transform);disk(viewPoint(from:SIMD2(Float(leg.x),Float(leg.y))),7,SIMD4(0.95,0.55,0.05,1),to:&out)};case .dynamicAngle:break;default:break}}else if let index=selectedStrokeIndex,committedStrokes.indices.contains(index),let b=bounds(committedStrokes[index].points){let a=SIMD2(Float(b.minX),Float(b.minY)),d=SIMD2(Float(b.maxX),Float(b.maxY));disk(viewPoint(from:a),6,c,to:&out);disk(viewPoint(from:d),6,c,to:&out)}}
+    private func appendSingleSelectionControls(to out:inout[InkVertex]){
+        guard selectionCount == 1 else { return }
+        let controlColor = SIMD4(0.1, 0.45, 1, 0.85)
+        if let id = selectedObjectIDs.first, let object = objectStore.object(with: id) {
+            switch object.kind {
+            case .line, .arrow:
+                for point in objectStore.transformedPoints(of: object).prefix(2) {
+                    disk(viewPoint(from: SIMD2(Float(point.x), Float(point.y))), 7, controlColor, to: &out)
+                }
+            case .polygon:
+                for point in objectStore.transformedPoints(of: object) {
+                    disk(viewPoint(from: SIMD2(Float(point.x), Float(point.y))), 6, controlColor, to: &out)
+                }
+            case .parameterizedTriangle:
+                if let model = object.triangleModel {
+                    for point in objectStore.transformedPoints(of: object) {
+                        disk(viewPoint(from: SIMD2(Float(point.x), Float(point.y))), 6, controlColor, to: &out)
+                    }
+                    let anglePoint = transformPoint(model.angleControlPoint(), by: object.transform)
+                    let legPoint = transformPoint(model.legLengthControlPoint(), by: object.transform)
+                    disk(viewPoint(from: SIMD2(Float(anglePoint.x), Float(anglePoint.y))), 7, SIMD4(0.95, 0.55, 0.05, 1), to: &out)
+                    disk(viewPoint(from: SIMD2(Float(legPoint.x), Float(legPoint.y))), 7, SIMD4(0.95, 0.55, 0.05, 1), to: &out)
+                }
+            case .dynamicAngle:
+                break
+            default:
+                break
+            }
+        } else if let index = selectedStrokeIndex, committedStrokes.indices.contains(index) {
+            // Freehand strokes are treated as one editable object: no point handles.
+            // The rotation center below is the only visible control for a single freehand stroke.
+        }
+
+        // Every single selection gets the same movable rotation-center affordance.
+        // The center is intentionally rendered last so it stays visually dominant over geometry handles.
+        if let rotationCenter = rotationCenterViewPoint() {
+            disk(rotationCenter, 7, SIMD4(0.95, 0.55, 0.05, 1), to: &out)
+        }
+    }
     private func appendDashedLine(_ a:SIMD2<Float>,_ b:SIMD2<Float>,width:Float,color:SIMD4<Float>,to out:inout[InkVertex]){let d=b-a;let l=simd_length(d);guard l>0.001 else{return};let dir=d/l;let dash:Float=8;let gap:Float=5;var start:Float=0;while start<l{let end=min(start+dash,l);appendLine(a+dir*start,a+dir*end,width:width,color:color,to:&out);start=end+gap}}
     private func bounds(_ p:[InkPoint])->CGRect?{guard let f=p.first else{return nil};var x0=f.x,x1=f.x,y0=f.y,y1=f.y;for q in p{x0=min(x0,q.x);x1=max(x1,q.x);y0=min(y0,q.y);y1=max(y1,q.y)};return CGRect(x:CGFloat(x0),y:CGFloat(y0),width:CGFloat(x1-x0),height:CGFloat(y1-y0))}
     private func strokeIntersectsLasso(_ stroke:[InkPoint],_ lasso:[CGPoint])->Bool{guard stroke.count>=2,lasso.count>=3 else{return false};if stroke.contains(where:{pointInPolygon(CGPoint(x:CGFloat($0.x),y:CGFloat($0.y)),lasso)}){return true};for pair in zip(stroke,stroke.dropFirst()){let a=CGPoint(x:CGFloat(pair.0.x),y:CGFloat(pair.0.y)),b=CGPoint(x:CGFloat(pair.1.x),y:CGFloat(pair.1.y));if segmentIntersectsPolygon(a,b,lasso){return true}};return false}
