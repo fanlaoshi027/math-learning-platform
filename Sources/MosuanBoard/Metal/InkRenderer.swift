@@ -387,7 +387,9 @@ final class InkRenderer: NSObject, MTKViewDelegate {
         var previous = v + SIMD2(cos(startAngle), sin(startAngle)) * radius
         let segments = max(12, Int((delta * 180 / .pi) / 4))
         for i in 1...segments {
-            let a = startAngle + signed * delta * CGFloat(i) / CGFloat(segments)
+            let step = delta / CGFloat(segments)
+            let index = CGFloat(i)
+            let a = startAngle + signed * step * index
             let current = v + SIMD2(cos(a), sin(a)) * radius
             appendLine(previous, current, width: Float(max(1.0, object.style.strokeWidth * 0.9)), color: color, to: &out)
             previous = current
