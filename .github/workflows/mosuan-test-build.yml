@@ -1,0 +1,29 @@
+name: Mosuan Test Build
+on:
+  push:
+    branches:
+      - mosuan-test-v1
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Swift version
+        run: swift --version
+      - name: Resolve packages
+        run: swift package resolve
+      - name: Build app
+        run: swift build -c release
+      - name: Package test build
+        run: |
+          mkdir -p MosuanTest
+          cp .build/release/MosuanBoard MosuanTest/
+          zip -r MosuanBoard-test-v1.zip MosuanTest
+      - name: Upload test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: MosuanBoard-test-v1
+          path: MosuanBoard-test-v1.zip
