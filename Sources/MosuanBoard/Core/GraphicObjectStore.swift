@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 final class GraphicObjectStore {
-    private(set) var objects: [GraphicObject] = []
+    internal(set) var objects: [GraphicObject] = []
     var isEmpty: Bool { objects.isEmpty }
     func clear() { objects.removeAll(keepingCapacity: true) }
 
@@ -23,8 +23,8 @@ final class GraphicObjectStore {
     @discardableResult func dragTriangleVertex(id:UUID,vertexIndex:Int,to point:CGPoint)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};guard GeometryInteractionEngine.dragTriangle(&m,vertexIndex:vertexIndex,to:point) else{return false};objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
     @discardableResult func setTriangleParameter(id:UUID,parameter:TriangleParameter,value:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};GeometryInteractionEngine.setTriangleParameter(&m,parameter:parameter,value:value);objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
     func triangleParameter(id:UUID)->CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.apexAngleDegrees }
-    func triangleLegLength(id: UUID) -> CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.legLength }
-    func triangleLegLengthControlPoint(id: UUID) -> CGPoint? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return transformedPoint(m.legLengthControlPoint(), in:o) }
+    func triangleLegLength(id: UUID)->CGFloat? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return m.legLength }
+    func triangleLegLengthControlPoint(id: UUID)->CGPoint? { guard let o=object(with:id),o.kind == .parameterizedTriangle,let m=o.triangleModel else{return nil}; return transformedPoint(m.legLengthControlPoint(), in:o) }
     @discardableResult func setDynamicTriangleAngle(id: UUID,degrees:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};m.setApexAngle(degrees);objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
     @discardableResult func setDynamicTriangleLegLength(id: UUID,length:CGFloat)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};m.setLegLength(length);objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
     @discardableResult func dragDynamicTriangleLegLengthControl(id: UUID,to point:CGPoint)->Bool { guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].kind == .parameterizedTriangle,var m=objects[i].triangleModel else{return false};let raw=inverseTransform(point,in:objects[i]);guard let length=m.legLength(forControlPoint:raw),length.isFinite else{return false};m.setLegLength(length);objects[i].triangleModel=m;objects[i].geometry.points=m.vertices();return true }
@@ -47,27 +47,14 @@ final class GraphicObjectStore {
     func objectsIntersectingLasso(_ lasso:[CGPoint])->[UUID]{guard lasso.count>=3 else{return[]};return objects.compactMap{guard let b=bounds(of:$0) else{return nil};let c=[CGPoint(x:b.minX,y:b.minY),CGPoint(x:b.maxX,y:b.minY),CGPoint(x:b.maxX,y:b.maxY),CGPoint(x:b.minX,y:b.maxY),CGPoint(x:b.midX,y:b.midY)];return c.contains(where:{pointInPolygon($0,lasso)}) ? $0.id:nil}}
     @discardableResult func eraseByScribble(_ path:[CGPoint],tolerance:CGFloat=12)->[UUID]{let ids=Set(objectsHitByScribble(path,tolerance:tolerance));guard !ids.isEmpty else{return[]};objects.removeAll{ids.contains($0.id)};return Array(ids)}
 
-    @discardableResult
-    func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool {
-        if let o=object(with:id),o.kind == .parameterizedTriangle && endpoint == 0 { return dragDynamicTriangleLegLengthControl(id:id,to:point) }
-        return moveLineEndpointResolved(id:id,endpoint:endpoint,to:point)
-    }
-
-    @discardableResult
-    func transform(id:UUID,position:CGPoint?=nil,scale:CGSize?=nil,rotation:CGFloat?=nil)->Bool{guard let i=objects.firstIndex(where:{$0.id==id}) else{return false};if let position{objects[i].transform.position=position};if let scale{objects[i].transform.scale=scale};if let rotation{objects[i].transform.rotation=rotation};return true}
+    @discardableResult func moveLineEndpoint(id:UUID,endpoint:Int,to point:CGPoint)->Bool { if let o=object(with:id),o.kind == .parameterizedTriangle && endpoint == 0 { return dragDynamicTriangleLegLengthControl(id:id,to:point) }; return moveLineEndpointResolved(id:id,endpoint:endpoint,to:point) }
+    @discardableResult func transform(id:UUID,position:CGPoint?=nil,scale:CGSize?=nil,rotation:CGFloat?=nil)->Bool{guard let i=objects.firstIndex(where:{$0.id==id}) else{return false};if let position{objects[i].transform.position=position};if let scale{objects[i].transform.scale=scale};if let rotation{objects[i].transform.rotation=rotation};return true}
     func exportObjects()->[GraphicObject]{objects};func importObjects(_ value:[GraphicObject]){objects=value}
 
     private func transformedPoint(_ point:CGPoint,in object:GraphicObject)->CGPoint{let c=object.transform.rotationCenter,t=CGPoint(x:point.x-c.x,y:point.y-c.y),s=CGPoint(x:t.x*object.transform.scale.width,y:t.y*object.transform.scale.height),co=cos(object.transform.rotation),si=sin(object.transform.rotation);return CGPoint(x:s.x*co-s.y*si+c.x+object.transform.position.x,y:s.x*si+s.y*co+c.y+object.transform.position.y)}
-    private func inverseTransform(_ point:CGPoint,in object:GraphicObject)->CGPoint {
-        let p=CGPoint(x:point.x-object.transform.position.x-object.transform.rotationCenter.x,y:point.y-object.transform.position.y-object.transform.rotationCenter.y)
-        let co=cos(object.transform.rotation),si=sin(object.transform.rotation)
-        let rx=p.x*co+p.y*si
-        let ry=(-p.x*si)+(p.y*co)
-        let sx=abs(object.transform.scale.width)>0.0001 ? rx/object.transform.scale.width : rx
-        let sy=abs(object.transform.scale.height)>0.0001 ? ry/object.transform.scale.height : ry
-        return CGPoint(x:sx+object.transform.rotationCenter.x,y:sy+object.transform.rotationCenter.y)
-    }
+    private func inverseTransform(_ point:CGPoint,in object:GraphicObject)->CGPoint { let p=CGPoint(x:point.x-object.transform.position.x-object.transform.rotationCenter.x,y:point.y-object.transform.position.y-object.transform.rotationCenter.y);let co=cos(object.transform.rotation),si=sin(object.transform.rotation);let rx=p.x*co+p.y*si;let ry=(-p.x*si)+(p.y*co);let sx=abs(object.transform.scale.width)>0.0001 ? rx/object.transform.scale.width : rx;let sy=abs(object.transform.scale.height)>0.0001 ? ry/object.transform.scale.height : ry;return CGPoint(x:sx+object.transform.rotationCenter.x,y:sy+object.transform.rotationCenter.y) }
     private func segmentBounds(_ a:CGPoint,_ b:CGPoint)->CGRect{CGRect(x:min(a.x,b.x),y:min(a.y,b.y),width:abs(b.x-a.x),height:abs(b.y-a.y))}
-    private func distance(_ p:CGPoint,toSegment a:CGPoint,_ b:CGPoint)->CGFloat{let dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;if l==0{return hypot(p.x-a.x,p.y-a.y)};let t=max(0,min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l)),q=CGPoint(x:a.x+t*dx,y:a.y+t*dy);return hypot(p.x-q.x,p.y-q.y)}
-    private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool{guard poly.count>=3 else{return false};var inside=false;var j=poly.count-1;for i in poly.indices{let a=poly[i],b=poly[j];if(a.y>p.y) != (b.y>p.y){let d=b.y-a.y;if d != 0{let x=(b.x-a.x)*(p.y-a.y)/d+a.x;if p.x<x{inside.toggle()}}};j=i};return inside}
+    private func distance(_ p:CGPoint,toSegment a:CGPoint,_ b:CGPoint)->CGFloat{let dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;if l2<0.0001{return hypot(p.x-a.x,p.y-a.y)};let t=max(0,min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));return hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy))}
+    private func pointInPolygon(_ p:CGPoint,_ poly:[CGPoint])->Bool{var inside=false;var j=poly.count-1;for i in poly.indices{let a=poly[i],b=poly[j];if(a.y>p.y) != (b.y>p.y){let d=b.y-a.y;if d != 0{let x=(b.x-a.x)*(p.y-a.y)/d+a.x;if p.x<x{inside.toggle()}}};j=i};return inside}
+    private func moveLineEndpointResolved(id:UUID,endpoint:Int,to point:CGPoint)->Bool{guard let i=objects.firstIndex(where:{$0.id==id}),objects[i].geometry.points.indices.contains(endpoint),objects[i].kind == .line else{return false};objects[i].geometry.points[endpoint]=inverseTransform(point,in:objects[i]);return true}
 }
