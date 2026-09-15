@@ -4,7 +4,6 @@ import simd
 
 extension InkRenderer {
     /// Object-editing commands used by the selection context menu.
-    /// These operate on the renderer's canonical GraphicObjectStore.
     @discardableResult
     func toggleSelectedObjectLock() -> Bool {
         guard !selectedObjectIDs.isEmpty else { return false }
@@ -62,9 +61,6 @@ extension InkRenderer {
     }
 
     private var objectStoreForEditing: GraphicObjectStore {
-        // Swift keeps the renderer's store private. Reflection is used only
-        // as a temporary compatibility seam until the renderer/store boundary
-        // is made explicitly internal in the next integration pass.
         for child in Mirror(reflecting: self).children {
             if child.label == "objectStore", let store = child.value as? GraphicObjectStore {
                 return store
@@ -74,10 +70,19 @@ extension InkRenderer {
     }
 
     private func requestRedrawAfterEditing() {
+        // setBackgroundPattern is already a renderer-owned rebuild entry point.
+        // Re-applying the current value refreshes Metal geometry without
+        // duplicating the renderer's private rebuild pipeline here.
+        for child in Mirror(reflecting: self).children {
+            if child.label == "backgroundPattern", let pattern = child.value as? Int {
+                setBackgroundPattern(pattern)
+                break
+            }
+        }
         for child in Mirror(reflecting: self).children {
             if child.label == "attachedView", let view = child.value as? MTKView {
                 view.draw()
-                return
+                break
             }
         }
     }
