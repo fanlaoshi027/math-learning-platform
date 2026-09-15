@@ -74,6 +74,10 @@ final class CanvasController: ObservableObject {
     }
     func endDynamicTrianglePlaybackHistory() { dynamicTrianglePlayback.stop(); canvas?.endDynamicTrianglePlaybackHistory(); refreshState() }
 
+    /// Allows feature extensions to resynchronize published UI state without exposing
+    /// the individual setters.
+    func refreshPublishedState() { refreshState() }
+
     private func stopEditing() {
         dynamicTrianglePlayback.stop()
         canvas?.stopDynamicAnglePlayback()
