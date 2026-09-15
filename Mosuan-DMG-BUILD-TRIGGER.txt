@@ -1,0 +1,1 @@
+This commit intentionally triggers the macOS DMG build for smart-line-v1 after the icon/resource-bundle packaging fixes.
