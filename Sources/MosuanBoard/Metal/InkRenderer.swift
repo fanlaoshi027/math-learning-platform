@@ -21,12 +21,41 @@ final class InkRenderer: NSObject, MTKViewDelegate {
     private var displayInverted = false
     private var backgroundPattern = 0
     private var panOffset = SIMD2<Float>(0, 0)
+
     init?(device: any MTLDevice) {
-        guard let commandQueue = device.makeCommandQueue(), let library = try? device.makeDefaultLibrary(bundle: Bundle.module), let vertexFunction = library.makeFunction(name: "inkVertex"), let fragmentFunction = library.makeFunction(name: "inkFragment") else { return nil }
-        let descriptor = MTLRenderPipelineDescriptor(); descriptor.vertexFunction = vertexFunction; descriptor.fragmentFunction = fragmentFunction; descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm; descriptor.colorAttachments[0].isBlendingEnabled = true; descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha; descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha; descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha; descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        guard let commandQueue = device.makeCommandQueue() else { return nil }
+
+        // Do not use Bundle.module here. The app is assembled manually into a .app
+        // bundle, and SwiftPM's generated Bundle.module accessor can trap when its
+        // expected resource-bundle location does not exactly match the final app.
+        // The known-good app stores the resource bundle in Contents/Resources.
+        let resourceBundleName = "MosuanBoard_MosuanBoard.bundle"
+        let resourceBundleURL = Bundle.main.resourceURL?.appendingPathComponent(resourceBundleName)
+        let resourceBundle = resourceBundleURL.flatMap { Bundle(url: $0) }
+
+        guard let resourceBundle,
+              let library = try? device.makeDefaultLibrary(bundle: resourceBundle),
+              let vertexFunction = library.makeFunction(name: "inkVertex"),
+              let fragmentFunction = library.makeFunction(name: "inkFragment") else {
+            return nil
+        }
+
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.vertexFunction = vertexFunction
+        descriptor.fragmentFunction = fragmentFunction
+        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         guard let pipelineState = try? device.makeRenderPipelineState(descriptor: descriptor) else { return nil }
-        self.device = device; self.commandQueue = commandQueue; self.pipelineState = pipelineState; super.init()
+        self.device = device
+        self.commandQueue = commandQueue
+        self.pipelineState = pipelineState
+        super.init()
     }
+
     var canUndo: Bool { !committedStrokes.isEmpty }
     var canRedo: Bool { !redoStrokes.isEmpty }
     var hasSelection: Bool { selectedStrokeIndex != nil }
