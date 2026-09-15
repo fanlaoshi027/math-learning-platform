@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 final class GraphicObjectStore {
-    private(set) var objects: [GraphicObject] = []
+    var objects: [GraphicObject] = []
     var isEmpty: Bool { objects.isEmpty }
     func clear() { objects.removeAll(keepingCapacity: true) }
 
