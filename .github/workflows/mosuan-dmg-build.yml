@@ -17,8 +17,9 @@ jobs:
         run: swift build -c release
       - name: Create macOS app bundle and DMG
         run: |
-          set -e
+          set -euo pipefail
           APP="Mosuan Board.app"
+          rm -rf "$APP" DMG "Mosuan-${GITHUB_REF_NAME}.dmg"
           mkdir -p "$APP/Contents/MacOS"
           cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
           chmod +x "$APP/Contents/MacOS/MosuanBoard"
@@ -39,12 +40,21 @@ jobs:
           </dict>
           </plist>
           PLIST
+
+          # Ad-hoc sign the app so Gatekeeper does not treat the unsigned bundle
+          # as a corrupted application. Proper Developer ID signing/notarization
+          # can be added later without changing the bundle layout.
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv --verbose=2 "$APP" 2>&1 | head -n 20 || true
+
           mkdir -p DMG
           cp -R "$APP" DMG/
           ln -s /Applications DMG/Applications
-          hdiutil create -volname "墨算" -srcfolder DMG -ov -format UDZO "MosuanBoard-${GITHUB_REF_NAME}.dmg"
+          hdiutil create -volname "墨算" -srcfolder DMG -ov -format UDZO "Mosuan-${GITHUB_REF_NAME}.dmg"
+          hdiutil verify "Mosuan-${GITHUB_REF_NAME}.dmg"
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: MosuanBoard-${{ github.ref_name }}-dmg
-          path: MosuanBoard-${{ github.ref_name }}.dmg
+          path: Mosuan-${{ github.ref_name }}.dmg
