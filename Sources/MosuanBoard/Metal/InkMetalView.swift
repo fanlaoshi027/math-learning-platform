@@ -182,8 +182,8 @@ final class InkMetalView: MTKView {
     }
     func scaleSelected(by factor: Float) { renderer.beginHistoryTransaction(); renderer.scaleSelected(by: factor); renderer.endHistoryTransaction(); notifyState(); draw() }
     func reflectSelected(horizontal: Bool) { renderer.beginHistoryTransaction(); renderer.reflectSelected(horizontal: horizontal); renderer.endHistoryTransaction(); notifyState(); draw() }
-    func setRotationCenterToSelectionCenter() { if let c = renderer.selectionCenter() { renderer.setRotationCenter(to: renderer.viewPoint(from: c)); onSelectionChanged?(); draw() } }
-    func setRotationCenter(view point: SIMD2<Float>) { renderer.setRotationCenter(to: point); onSelectionChanged?(); draw() }
+    func setRotationCenterToSelectionCenter() { if let c = renderer.selectionCenter() { setRotationCenter(view: renderer.viewPoint(from: c)) } }
+    func setRotationCenter(view point: SIMD2<Float>) { renderer.setSelectionRotationCenter(to: point); onSelectionChanged?(); draw() }
     func resetZoom() { renderer.resetZoom(centeredIn: bounds.size); onZoomChanged?(renderer.zoomPercent); draw() }
     func zoomIn() { renderer.zoom(by: 1.2, around: SIMD2(Float(bounds.midX), Float(bounds.midY))); onZoomChanged?(renderer.zoomPercent); draw() }
     func zoomOut() { renderer.zoom(by: 1 / 1.2, around: SIMD2(Float(bounds.midX), Float(bounds.midY))); onZoomChanged?(renderer.zoomPercent); draw() }
@@ -318,7 +318,7 @@ final class InkMetalView: MTKView {
         if selectionModeActive {
             if let vertex = polygonVertexDrag { _ = renderer.moveSelectedPolygonVertex(id: vertex.id, vertexIndex: vertex.vertexIndex, to: p); onSelectionChanged?(); draw(); return }
             if let endpoint = lineEndpointDrag { _ = renderer.moveSelectedLineEndpoint(id: endpoint.id, endpoint: endpoint.endpoint, to: p); onSelectionChanged?(); draw(); return }
-            if rotationCenterDrag { renderer.setRotationCenter(to: p); onSelectionChanged?(); draw(); return }
+            if rotationCenterDrag { renderer.setSelectionRotationCenter(to: p); onSelectionChanged?(); draw(); return }
             if rotationDrag { renderer.rotateSelected(to: p, from: lastRotationPoint); lastRotationPoint = p; onSelectionChanged?(); draw(); return }
             if let handle = resizeHandle { renderer.resizeSelected(handle: handle, to: p); onSelectionChanged?(); draw(); return }
             if lassoActive { appendLassoPoint(p); lassoOverlay.update(points: lassoPoints, visible: true); draw(); return }
