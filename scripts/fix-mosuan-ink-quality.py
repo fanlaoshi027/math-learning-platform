@@ -41,12 +41,14 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
 
         // Gentle minimum-width ramp prevents a pressure spike from producing a
         // dot at the beginning or an abrupt heavy tail at the end.
+        // Keep the taper subtle: the normal pen should still feel continuous,
+        // with only a small nib/收笔 cue rather than a calligraphic effect.
         if widths.count >= 4 {
-            let minimumWidth = Float(style.width) * 0.68
-            widths[0] = max(widths[0] * 0.78, minimumWidth)
-            widths[1] = max(widths[1] * 0.90, minimumWidth)
-            widths[widths.count - 1] = max(widths[widths.count - 1] * 0.78, minimumWidth)
-            widths[widths.count - 2] = max(widths[widths.count - 2] * 0.90, minimumWidth)
+            let minimumWidth = Float(style.width) * 0.72
+            widths[0] = max(widths[0] * 0.82, minimumWidth)
+            widths[1] = max(widths[1] * 0.93, minimumWidth)
+            widths[widths.count - 1] = max(widths[widths.count - 1] * 0.82, minimumWidth)
+            widths[widths.count - 2] = max(widths[widths.count - 2] * 0.93, minimumWidth)
         }
 
         for i in 0..<(smooth.count - 1) {
