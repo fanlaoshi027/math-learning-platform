@@ -1,0 +1,3 @@
+[submodule "ThirdParty/ink-stroke-modeler"]
+	path = ThirdParty/ink-stroke-modeler
+	url = https://github.com/google/ink-stroke-modeler.git
