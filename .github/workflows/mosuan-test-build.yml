@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - mosuan-test-v1
+      - smart-line-v1
 jobs:
   build:
     runs-on: macos-14
@@ -21,9 +22,9 @@ jobs:
         run: |
           mkdir -p MosuanTest
           cp .build/release/MosuanBoard MosuanTest/
-          zip -r MosuanBoard-test-v1.zip MosuanTest
+          zip -r MosuanBoard-test.zip MosuanTest
       - name: Upload test build
         uses: actions/upload-artifact@v4
         with:
-          name: MosuanBoard-test-v1
-          path: MosuanBoard-test-v1.zip
+          name: MosuanBoard-${{ github.ref_name }}
+          path: MosuanBoard-test.zip
