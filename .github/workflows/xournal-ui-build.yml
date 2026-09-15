@@ -1,0 +1,24 @@
+name: Xournal UI Build
+
+on:
+  push:
+    branches:
+      - xournal-drawboard-ui
+  pull_request:
+    branches:
+      - xournal-drawboard-ui
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Swift version
+        run: swift --version
+      - name: Resolve packages
+        run: swift package resolve
+      - name: Build
+        run: swift build -c debug
