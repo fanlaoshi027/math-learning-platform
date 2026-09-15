@@ -57,10 +57,12 @@ struct GraphicObject: Identifiable, Codable, Equatable {
     var geometryPointID: UUID?
     var triangleModel: ParameterizedTriangle?
     var dynamicAngleModel: DynamicAngle?
+    /// Locked objects stay visible, but editing commands should ignore them.
+    var isLocked: Bool
 
-    init(id: UUID = UUID(), kind: Kind, transform: Transform = Transform(), style: Style = Style(), geometry: Geometry = Geometry(), children: [GraphicObject] = [], geometryModel: GeometryModel? = nil, geometryPointID: UUID? = nil, triangleModel: ParameterizedTriangle? = nil, dynamicAngleModel: DynamicAngle? = nil) {
+    init(id: UUID = UUID(), kind: Kind, transform: Transform = Transform(), style: Style = Style(), geometry: Geometry = Geometry(), children: [GraphicObject] = [], geometryModel: GeometryModel? = nil, geometryPointID: UUID? = nil, triangleModel: ParameterizedTriangle? = nil, dynamicAngleModel: DynamicAngle? = nil, isLocked: Bool = false) {
         self.id=id; self.kind=kind; self.transform=transform; self.style=style; self.geometry=geometry
-        self.children=children; self.geometryModel=geometryModel; self.geometryPointID=geometryPointID; self.triangleModel=triangleModel; self.dynamicAngleModel=dynamicAngleModel
+        self.children=children; self.geometryModel=geometryModel; self.geometryPointID=geometryPointID; self.triangleModel=triangleModel; self.dynamicAngleModel=dynamicAngleModel; self.isLocked=isLocked
     }
 }
 
