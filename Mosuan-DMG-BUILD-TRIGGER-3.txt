@@ -1,0 +1,1 @@
+Trigger macOS DMG build after final packaging fixes.
