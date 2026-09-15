@@ -38,6 +38,39 @@ struct BoardScreen: View {
                     ZStack {
                         MetalInkCanvas(tool:$tool, penStyle:preset.style, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
                             .padding(24)
+                            .contextMenu {
+                                Section("编辑") {
+                                    Button { controller.copySelection() } label: { Label("复制", systemImage: "doc.on.doc") }
+                                        .disabled(!controller.hasSelection)
+                                    Button { _ = controller.cutSelection() } label: { Label("剪切", systemImage: "scissors") }
+                                        .disabled(!controller.hasSelection || controller.selectedObjectsAreAnyLocked)
+                                    Button { _ = controller.pasteSelection() } label: { Label("粘贴", systemImage: "doc.on.clipboard") }
+                                    Divider()
+                                    Button(role: .destructive) { controller.deleteSelected() } label: { Label("删除", systemImage: "trash") }
+                                        .disabled(!controller.hasSelection || controller.selectedObjectsAreAnyLocked)
+                                }
+                                Section("对象") {
+                                    Button { controller.toggleSelectedLock() } label: {
+                                        Label(controller.selectedObjectsAreAllLocked ? "解锁对象" : "锁定对象", systemImage: controller.selectedObjectsAreAllLocked ? "lock.open" : "lock")
+                                    }.disabled(!controller.hasSelection)
+                                    Button { controller.bringSelectedToFront() } label: { Label("置于顶层", systemImage: "square.stack.3d.up") }
+                                        .disabled(!controller.hasSelection)
+                                    Button { controller.sendSelectedToBack() } label: { Label("置于底层", systemImage: "square.stack.3d.down") }
+                                        .disabled(!controller.hasSelection)
+                                    Button { controller.bringSelectedForward() } label: { Label("上移一层", systemImage: "arrow.up") }
+                                        .disabled(!controller.hasSelection)
+                                    Button { controller.sendSelectedBackward() } label: { Label("下移一层", systemImage: "arrow.down") }
+                                        .disabled(!controller.hasSelection)
+                                }
+                                Section("变换") {
+                                    Button { controller.resetRotationCenter() } label: { Label("旋转中心回到选区中心", systemImage: "scope") }
+                                        .disabled(!controller.hasSelection)
+                                    Button { controller.reflectHorizontal() } label: { Label("水平翻转", systemImage: "arrow.left.and.right") }
+                                        .disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+                                    Button { controller.reflectVertical() } label: { Label("垂直翻转", systemImage: "arrow.up.and.down") }
+                                        .disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+                                }
+                            }
                         toolbar(in: proxy.size)
                             .frame(maxWidth:toolbarIsVertical ? 96 : .infinity, maxHeight:toolbarIsVertical ? .infinity : 76)
                             .background(.regularMaterial)
@@ -117,19 +150,19 @@ struct BoardScreen: View {
         }
         Menu { ForEach(BoardInterfaceTheme.allCases) { item in Button { interfaceTheme=item } label: { Label(item.title,systemImage:item.systemImage) } } } label: { Label(interfaceTheme.title,systemImage:interfaceTheme.systemImage) }.menuStyle(.borderlessButton)
         if controller.hasSelection { TextField("角度",text:Binding(get:{rotationText},set:{rotationText=$0})).frame(width:58).textFieldStyle(.roundedBorder).onSubmit { if let d=Double(rotationText) { controller.setRotationDegrees(d) } }; Text("°") }
-        Button { controller.deleteSelected() } label: { Label("删除",systemImage:"trash") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+        Button { controller.deleteSelected() } label: { Label("删除",systemImage:"trash") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAnyLocked)
         Menu {
             Section("对象") {
                 Button { controller.toggleSelectedLock() } label: { Label(controller.selectedObjectsAreAllLocked ? "解锁对象" : "锁定对象", systemImage: controller.selectedObjectsAreAllLocked ? "lock.open" : "lock") }.disabled(!controller.hasSelection)
-                Button { controller.bringSelectedToFront() } label: { Label("置于顶层", systemImage:"square.3.layers.3d.top.filled") }.disabled(!controller.hasSelection)
-                Button { controller.sendSelectedToBack() } label: { Label("置于底层", systemImage:"square.3.layers.3d.bottom.filled") }.disabled(!controller.hasSelection)
+                Button { controller.bringSelectedToFront() } label: { Label("置于顶层", systemImage:"square.stack.3d.up") }.disabled(!controller.hasSelection)
+                Button { controller.sendSelectedToBack() } label: { Label("置于底层", systemImage:"square.stack.3d.down") }.disabled(!controller.hasSelection)
                 Button { controller.bringSelectedForward() } label: { Label("上移一层", systemImage:"arrow.up") }.disabled(!controller.hasSelection)
                 Button { controller.sendSelectedBackward() } label: { Label("下移一层", systemImage:"arrow.down") }.disabled(!controller.hasSelection)
             }
             Section("变换") {
                 Button { controller.resetRotationCenter() } label: { Label("旋转中心回到选区中心", systemImage:"scope") }.disabled(!controller.hasSelection)
-                Button { controller.reflectHorizontal() } label: { Label("水平翻转", systemImage:"arrow.left.and.right") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
-                Button { controller.reflectVertical() } label: { Label("垂直翻转", systemImage:"arrow.up.and.down") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+                Button { controller.reflectHorizontal() } label: { Label("水平翻转", systemImage:"arrow.left.and.right") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAnyLocked)
+                Button { controller.reflectVertical() } label: { Label("垂直翻转", systemImage:"arrow.up.and.down") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAnyLocked)
             }
         } label: { Label("更多", systemImage:"ellipsis.circle") }.menuStyle(.borderlessButton)
         Button { controller.undo() } label: { Label("撤销",systemImage:"arrow.uturn.backward") }.disabled(!controller.canUndo)
