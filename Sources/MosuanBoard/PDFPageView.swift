@@ -3,14 +3,13 @@ import PDFKit
 import CoreImage
 
 /// PDF page renderer with Mosuan's eye-comfort inversion.
-///
-/// This is intentionally not a photographic negative. The transform operates
-/// primarily on luminance, mapping paper white toward a dark gray background
-/// while preserving the hue tendency of colored teaching material.
+/// This is intentionally not a photographic negative: paper luminance is
+/// inverted while the original hue tendency of colored material is retained.
 final class MosuanPDFPageView: NSView {
     var document: PDFDocument? { didSet { needsDisplay = true } }
     var pageIndex: Int = 0 { didSet { needsDisplay = true } }
     var eyeComfortInverted: Bool = false { didSet { needsDisplay = true } }
+    var eyeComfortStrength: CGFloat = 1 { didSet { needsDisplay = true } }
 
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
@@ -47,7 +46,9 @@ final class MosuanPDFPageView: NSView {
 
         guard let image = bitmap.makeImage() else { return }
         let source = CIImage(cgImage: image)
-        let output = eyeComfortInverted ? MosuanPDFEyeComfortFilter.apply(to: source) : source
+        let output = eyeComfortInverted
+            ? MosuanPDFEyeComfortFilter.apply(to: source, strength: eyeComfortStrength)
+            : source
         guard let outputImage = ciContext.createCGImage(output, from: output.extent) else { return }
 
         let drawWidth = pageBounds.width * scale
@@ -63,31 +64,37 @@ final class MosuanPDFPageView: NSView {
     }
 }
 
-/// Adaptive paper-to-night transform:
-/// white -> ~10% luminance, black -> ~90% luminance, gray values reverse,
-/// while chroma is retained instead of performing an RGB negative.
+/// Adaptive paper-to-night transform.
+/// At full strength: white -> ~10% luminance, black -> ~90% luminance.
+/// The result is blended with the original image so the user can choose a
+/// gentler setting without ever turning the page into an RGB negative.
 private enum MosuanPDFEyeComfortFilter {
     private static let kernel: CIColorKernel? = CIColorKernel(source: """
-        kernel vec4 mosuanEyeComfort(__sample pixel) {
+        kernel vec4 mosuanEyeComfort(__sample pixel, float strength) {
             float r = pixel.r;
             float g = pixel.g;
             float b = pixel.b;
             float luminance = dot(vec3(r, g, b), vec3(0.2126, 0.7152, 0.0722));
 
-            // White paper becomes a dark neutral rather than pure black.
-            // Black ink becomes light, while chroma stays around the original hue.
+            // Paper white becomes a dark neutral rather than pure black.
+            // Black ink becomes light. Chroma remains close to the source hue.
             float targetLuminance = 0.90 - 0.80 * luminance;
             float chromaScale = 0.88;
-            vec3 target = vec3(targetLuminance) +
+            vec3 transformed = vec3(targetLuminance) +
                 (vec3(r, g, b) - vec3(luminance)) * chromaScale;
-            target = clamp(target, 0.0, 1.0);
+            transformed = clamp(transformed, 0.0, 1.0);
+
+            vec3 target = mix(vec3(r, g, b), transformed, clamp(strength, 0.0, 1.0));
             return vec4(target, pixel.a);
         }
     """)
 
-    static func apply(to image: CIImage) -> CIImage {
+    static func apply(to image: CIImage, strength: CGFloat) -> CIImage {
         guard let kernel else { return image }
-        return kernel.apply(extent: image.extent, arguments: [image]) ?? image
+        return kernel.apply(
+            extent: image.extent,
+            arguments: [image, max(0, min(1, strength))]
+        ) ?? image
     }
 }
 
@@ -95,12 +102,14 @@ struct PDFPageView: NSViewRepresentable {
     let document: PDFDocument
     let pageIndex: Int
     let eyeComfortInverted: Bool
+    let eyeComfortStrength: CGFloat
 
     func makeNSView(context: Context) -> MosuanPDFPageView {
         let view = MosuanPDFPageView()
         view.document = document
         view.pageIndex = pageIndex
         view.eyeComfortInverted = eyeComfortInverted
+        view.eyeComfortStrength = eyeComfortStrength
         view.wantsLayer = true
         return view
     }
@@ -109,5 +118,6 @@ struct PDFPageView: NSViewRepresentable {
         nsView.document = document
         nsView.pageIndex = pageIndex
         nsView.eyeComfortInverted = eyeComfortInverted
+        nsView.eyeComfortStrength = eyeComfortStrength
     }
 }
