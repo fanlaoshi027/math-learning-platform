@@ -30,7 +30,14 @@ jobs:
           fi
           test -n "$RESOURCE_BUNDLE"
           test -d "$RESOURCE_BUNDLE"
+          # SwiftPM's generated Bundle.module accessor searches the app's
+          # Resources directory first and may fall back to the app root.
           cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
+          cp -R "$RESOURCE_BUNDLE" "$APP/"
+          cp -R "$RESOURCE_BUNDLE" "$APP/Contents/MacOS/"
+          test -d "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+          test -d "$APP/MosuanBoard_MosuanBoard.bundle"
+          test -d "$APP/Contents/MacOS/MosuanBoard_MosuanBoard.bundle"
           cat > /tmp/make-mosuan-icon.swift <<'SWIFT'
           import AppKit
           import CoreGraphics
@@ -97,6 +104,8 @@ jobs:
           trap 'hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true; rm -rf "$MOUNT_POINT"' EXIT
           hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_POINT" "$DMG"
           test -d "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+          test -d "$MOUNT_POINT/Mosuan Board.app/MosuanBoard_MosuanBoard.bundle"
+          test -d "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard_MosuanBoard.bundle"
           test -f "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/AppIcon.icns"
           test -x "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard"
           hdiutil detach "$MOUNT_POINT"
