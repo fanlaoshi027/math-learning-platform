@@ -18,34 +18,25 @@ extension InkRenderer {
         return changed
     }
 
-    /// Delete only editable objects. Locked objects remain selected so the user can
-    /// immediately unlock them without losing the selection context.
+    /// The renderer's mature delete path is used unchanged. We only add the lock
+    /// policy at its boundary so no locked object can be removed accidentally.
     @discardableResult
     func deleteSelectedRespectingLocks() -> Bool {
-        let objectIDsToDelete = selectedObjectIDs.filter {
-            editingObjectStore?.object(with: $0)?.isLocked != true
-        }
-        let strokeIndicesToDelete = selectedStrokeIndices.sorted(by: >)
-        guard !objectIDsToDelete.isEmpty || !strokeIndicesToDelete.isEmpty else { return false }
-
-        recordMutation()
-        if let store = editingObjectStore {
-            for id in objectIDsToDelete { store.remove(id: id) }
-        }
-        for index in strokeIndicesToDelete where committedStrokes.indices.contains(index) {
-            committedStrokes.remove(at: index)
-        }
-
-        selectedObjectIDs.removeAll { objectIDsToDelete.contains($0) }
-        selectedStrokeIndices.removeAll { strokeIndicesToDelete.contains($0) }
-        rebuildGeometry()
+        guard !selectedObjectIDs.contains(where: {
+            editingObjectStore?.object(with: $0)?.isLocked == true
+        }) else { return false }
+        guard hasSelection else { return false }
+        deleteSelected()
         return true
     }
 
-    var selectedObjectsAreEditable: Bool {
-        !selectedObjectIDs.isEmpty && selectedObjectIDs.contains {
-            editingObjectStore?.object(with: $0)?.isLocked != true
-        }
+    func makeSelectionClipboardDataForEditing() -> Data? {
+        makeSelectionClipboardData()
+    }
+
+    @discardableResult
+    func pasteSelectionClipboardDataForEditing(_ data: Data) -> Bool {
+        pasteSelectionClipboardData(data)
     }
 
     /// Rotation-center snapping is deliberately scoped to the current selection.
