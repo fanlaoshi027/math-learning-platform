@@ -19,10 +19,22 @@ jobs:
         run: |
           set -euo pipefail
           APP="Mosuan Board.app"
-          rm -rf "$APP" DMG "Mosuan-${GITHUB_REF_NAME}.dmg"
-          mkdir -p "$APP/Contents/MacOS"
+          DMG="Mosuan-${GITHUB_REF_NAME}.dmg"
+          rm -rf "$APP" DMG "$DMG"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
           chmod +x "$APP/Contents/MacOS/MosuanBoard"
+
+          # SwiftPM's Bundle.module resources are emitted as a resource bundle.
+          # Keep that bundle inside the app so Bundle.module can resolve it at runtime.
+          RESOURCE_BUNDLE=".build/release/MosuanBoard_MosuanBoard.bundle"
+          if [ ! -d "$RESOURCE_BUNDLE" ]; then
+            RESOURCE_BUNDLE="$(find .build -type d -name 'MosuanBoard_MosuanBoard.bundle' -print -quit)"
+          fi
+          test -n "$RESOURCE_BUNDLE"
+          test -d "$RESOURCE_BUNDLE"
+          cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
+
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -41,9 +53,7 @@ jobs:
           </plist>
           PLIST
 
-          # Ad-hoc sign the app so Gatekeeper does not treat the unsigned bundle
-          # as a corrupted application. Proper Developer ID signing/notarization
-          # can be added later without changing the bundle layout.
+          # Ad-hoc sign after all executable/resource contents are in place.
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dv --verbose=2 "$APP" 2>&1 | head -n 20 || true
@@ -51,8 +61,18 @@ jobs:
           mkdir -p DMG
           cp -R "$APP" DMG/
           ln -s /Applications DMG/Applications
-          hdiutil create -volname "墨算" -srcfolder DMG -ov -format UDZO "Mosuan-${GITHUB_REF_NAME}.dmg"
-          hdiutil verify "Mosuan-${GITHUB_REF_NAME}.dmg"
+          hdiutil create -volname "墨算" -srcfolder DMG -ov -format UDZO "$DMG"
+          hdiutil verify "$DMG"
+
+          # Mount the image once in CI to verify the distributed app is present.
+          MOUNT_POINT="$(mktemp -d)"
+          trap 'hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true; rm -rf "$MOUNT_POINT"' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_POINT" "$DMG"
+          test -d "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+          test -x "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard"
+          hdiutil detach "$MOUNT_POINT"
+          trap - EXIT
+          rm -rf "$MOUNT_POINT"
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
