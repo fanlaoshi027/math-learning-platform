@@ -82,6 +82,10 @@ final class InkMetalView: MTKView {
         framebufferOnly = true
         colorPixelFormat = .bgra8Unorm
         clearColor = MTLClearColor(red: 1, green: 1, blue: 1, alpha: 1)
+        // Drawing apps need the highest-fidelity mouse/tablet event stream.
+        // AppKit coalesces mouse-drag events by default; disable that here so
+        // fast handwriting does not arrive as visibly separated chunks.
+        NSEvent.isMouseCoalescingEnabled = false
         lassoOverlay.isHidden = true
         lassoOverlay.autoresizingMask = [.width, .height]
         addSubview(lassoOverlay)
@@ -151,9 +155,6 @@ final class InkMetalView: MTKView {
         window?.makeFirstResponder(self)
         let p = makePoint(from: event)
 
-        // Smart line adjustment can be confirmed without starting a new stroke.
-        // A secondary mouse button can confirm while the primary button remains held;
-        // after a normal release, the next click also confirms for trackpads/mice.
         if isSmartLineTool && smartLineAdjusting {
             if event.buttonNumber == 1 {
                 confirmSmartLine()
@@ -308,10 +309,6 @@ final class InkMetalView: MTKView {
 
         guard isUserInteractionEnabledForTool && active else { return }
 
-        // Once smart-line mode has entered adjustment, releasing the primary
-        // button does not commit the line. This leaves the preview in place so
-        // a subsequent click can confirm it; a secondary click can confirm it
-        // while the primary button is still held.
         if isSmartLineTool && smartLineAdjusting {
             let c = renderer.canvasPoint(from: p)
             let pressure = event.pressure > 0 ? Float(event.pressure) : (points.last?.pressure ?? 1)
@@ -359,10 +356,7 @@ final class InkMetalView: MTKView {
             }
         }
         if event.keyCode == 53 && isPolygonTool && polygonModel.isConstructing { polygonModel.cancel(); renderer.setStroke([]); renderer.endHistoryTransaction(); draw(); return }
-        if event.keyCode == 53 && smartLineAdjusting {
-            cancelSmartLine()
-            return
-        }
+        if event.keyCode == 53 && smartLineAdjusting { cancelSmartLine(); return }
         if event.keyCode == 56 || event.keyCode == 60 { temporarySelectHeld = true; return }
         if event.keyCode == 49 { spaceHeld = true; return }
         if selectionModeActive && event.keyCode == 51 { deleteSelected(); return }
