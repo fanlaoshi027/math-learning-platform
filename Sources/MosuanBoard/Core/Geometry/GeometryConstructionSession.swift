@@ -18,7 +18,7 @@ struct GeometryConstructionSession {
     }
 
     enum Result: Equatable {
-        case line(start: CGPoint, end: CGPoint)
+        case line(kind: Tool, start: CGPoint, end: CGPoint)
         case circle(center: CGPoint, radius: CGFloat)
         case polygon(points: [CGPoint])
     }
@@ -64,7 +64,7 @@ struct GeometryConstructionSession {
                 return nil
             }
             guard distance(first, point) > 0.5 else { return nil }
-            return finish(.line(start: first, end: point))
+            return finish(.line(kind: tool, start: first, end: point))
 
         case .circleThreePoint:
             let updated = current + [point]
@@ -94,7 +94,7 @@ struct GeometryConstructionSession {
 
         switch tool {
         case .line, .segment, .ray:
-            return .line(start: first, end: point)
+            return .line(kind: tool, start: first, end: point)
         case .circleThreePoint:
             guard current.count == 2,
                   let circle = Self.circleThrough(first, current[1], point) else { return nil }
