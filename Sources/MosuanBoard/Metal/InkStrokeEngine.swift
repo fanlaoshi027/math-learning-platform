@@ -9,15 +9,16 @@ protocol InkStrokeEngine {
     mutating func begin(at point: InkPoint, time: TimeInterval)
     mutating func update(point: InkPoint, time: TimeInterval) -> [InkPoint]
     mutating func end(point: InkPoint, time: TimeInterval) -> [InkPoint]
+    mutating func predicted() -> [InkPoint]
     mutating func cancel()
 }
 
-/// Isolated adapter boundary. It deliberately performs no smoothing.
-/// The upstream C++ target is linked in Package.swift; the next change is to
-/// replace this adapter's internals with the upstream StrokeModeler calls.
+/// Isolated adapter boundary. It deliberately performs no smoothing or
+/// prediction. The production adapter supplies both from Google Ink.
 struct PassthroughInkStrokeEngine: InkStrokeEngine {
     mutating func begin(at point: InkPoint, time: TimeInterval) {}
     mutating func update(point: InkPoint, time: TimeInterval) -> [InkPoint] { [point] }
     mutating func end(point: InkPoint, time: TimeInterval) -> [InkPoint] { [point] }
+    mutating func predicted() -> [InkPoint] { [] }
     mutating func cancel() {}
 }
