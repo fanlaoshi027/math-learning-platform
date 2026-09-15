@@ -37,7 +37,7 @@ final class CanvasController: ObservableObject {
 
     func undo() { stopEditing(); canvas?.undo(); refreshState() }
     func redo() { stopEditing(); canvas?.redo(); refreshState() }
-    func deleteSelected() { stopEditing(); canvas?.deleteSelected(); refreshState() }
+    func deleteSelected() { stopEditing(); canvas?.deleteSelectedRespectingLocks(); refreshState() }
     func setRotationDegrees(_ d: Double) { canvas?.setSelectedRotationDegrees(d); refreshState() }
     func scaleSelected(by f: Float) { canvas?.scaleSelected(by: f); refreshState() }
     func reflectHorizontal() { canvas?.reflectSelected(horizontal: true); refreshState() }
