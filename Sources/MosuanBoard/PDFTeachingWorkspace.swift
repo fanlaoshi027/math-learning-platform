@@ -9,6 +9,7 @@ struct PDFTeachingWorkspace: View {
     @State private var tool: BoardTool = .pen
     @State private var zoomPercent = 100
     @State private var showLayers = true
+    @State private var eyeComfortInverted = false
 
     init(document: PDFDocument?) {
         self.document = document
@@ -20,8 +21,10 @@ struct PDFTeachingWorkspace: View {
             topBar
             HStack(spacing: 0) {
                 ZStack {
-                    if let document { PDFPageView(document: document, pageIndex: pageIndex) }
-                    MetalInkCanvas(pageState: layers.compositeState(page: pageIndex + 1), tool: $tool, penStyle: PenPreset.defaults[0].style, controller: controller, background: SIMD4<Float>(0, 0, 0, 0), inverted: false, pattern: .blank, zoomPercent: $zoomPercent, onPageStateChanged: { state in layers.saveCurrentLayerState(state, page: pageIndex + 1) })
+                    if let document {
+                        PDFPageView(document: document, pageIndex: pageIndex, eyeComfortInverted: eyeComfortInverted)
+                    }
+                    MetalInkCanvas(pageState: layers.compositeState(page: pageIndex + 1), tool: $tool, penStyle: PenPreset.defaults[0].style, controller: controller, background: SIMD4<Float>(0, 0, 0, 0), inverted: eyeComfortInverted, pattern: .blank, zoomPercent: $zoomPercent, onPageStateChanged: { state in layers.saveCurrentLayerState(state, page: pageIndex + 1) })
                 }
                 if showLayers { BoardLayerView(store: layers).background(.regularMaterial).overlay(alignment: .leading) { Divider() } }
             }
@@ -42,7 +45,17 @@ struct PDFTeachingWorkspace: View {
             Spacer()
             Button("上一页") { pageIndex = max(0, pageIndex - 1) }
             Text("第 \(pageIndex + 1) 页")
-            Button("下一页") { pageIndex += 1 }
+            Button("下一页") {
+                guard let document else { return }
+                pageIndex = min(max(0, document.pageCount - 1), pageIndex + 1)
+            }
+            Button {
+                eyeComfortInverted.toggle()
+            } label: {
+                Label("反色", systemImage: eyeComfortInverted ? "sun.max.fill" : "moon.fill")
+            }
+            .help("护眼反色：白底教材变深色，彩色内容保留色彩倾向")
+            .buttonStyle(.bordered)
             Toggle("图层", isOn: $showLayers).toggleStyle(.switch)
         }.padding(10)
     }
