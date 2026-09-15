@@ -2,7 +2,7 @@ import Foundation
 import InkStrokeModelerBridge
 
 /// Thin Swift adapter around Google's upstream Ink Stroke Modeler.
-/// No smoothing algorithm is implemented in Swift.
+/// No smoothing or prediction algorithm is implemented in Swift.
 final class GoogleInkStrokeEngine: InkStrokeEngine {
     private var handle: UnsafeMutablePointer<MosuanInkStrokeModeler>?
     private var buffer = [MosuanInkResult](repeating: MosuanInkResult(x: 0, y: 0, pressure: 1, tilt: -1, orientation: -1, time: 0), count: 128)
@@ -25,6 +25,17 @@ final class GoogleInkStrokeEngine: InkStrokeEngine {
 
     func end(point: InkPoint, time: TimeInterval) -> [InkPoint] {
         updateInternal(eventType: 2, point: point, time: time)
+    }
+
+    func predicted() -> [InkPoint] {
+        guard let handle else { return [] }
+        let count = buffer.withUnsafeMutableBufferPointer { storage in
+            mosuan_ink_predict(handle, storage.baseAddress, Int32(storage.count))
+        }
+        guard count > 0 else { return [] }
+        return buffer.prefix(Int(count)).map {
+            InkPoint(x: $0.x, y: $0.y, pressure: $0.pressure >= 0 ? $0.pressure : 1)
+        }
     }
 
     func cancel() {
