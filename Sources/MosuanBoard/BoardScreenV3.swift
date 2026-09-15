@@ -99,10 +99,6 @@ struct BoardScreen: View {
         if toolbarIsVertical { VStack(spacing:8) { toolbarDragHandle; toolbarContents }.padding(8) }
         else { HStack(spacing:10) { toolbarDragHandle; toolbarContents }.padding(.horizontal,12).padding(.vertical,8) }
     }
-    private var toolbarDragHandle: some View {
-        Image(systemName:"circle.grid.2x2").font(.system(size:14, weight:.semibold)).foregroundStyle(.secondary).frame(width:28, height:28).contentShape(Rectangle()).help("拖动工具栏到上、下、左、右")
-            .gesture(DragGesture(minimumDistance:3).onChanged { value in toolbarDragOffset = value.translation }.onEnded { value in finishToolbarDrag(value.translation, in: NSScreen.main?.visibleFrame.size ?? CGSize(width:1100,height:700)); toolbarDragOffset = .zero })
-    }
     @ViewBuilder private var toolbarContents:some View {
         ToolButton(title:"选区",systemImage:"lasso",selected:tool == .select) { tool = .select }
         ToolButton(title:"抓手",systemImage:"hand.draw",selected:tool == .hand) { tool = .hand }
@@ -121,9 +117,27 @@ struct BoardScreen: View {
         }
         Menu { ForEach(BoardInterfaceTheme.allCases) { item in Button { interfaceTheme=item } label: { Label(item.title,systemImage:item.systemImage) } } } label: { Label(interfaceTheme.title,systemImage:interfaceTheme.systemImage) }.menuStyle(.borderlessButton)
         if controller.hasSelection { TextField("角度",text:Binding(get:{rotationText},set:{rotationText=$0})).frame(width:58).textFieldStyle(.roundedBorder).onSubmit { if let d=Double(rotationText) { controller.setRotationDegrees(d) } }; Text("°") }
-        Button { controller.deleteSelected() } label: { Label("删除",systemImage:"trash") }.disabled(!controller.hasSelection)
+        Button { controller.deleteSelected() } label: { Label("删除",systemImage:"trash") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+        Menu {
+            Section("对象") {
+                Button { controller.toggleSelectedLock() } label: { Label(controller.selectedObjectsAreAllLocked ? "解锁对象" : "锁定对象", systemImage: controller.selectedObjectsAreAllLocked ? "lock.open" : "lock") }.disabled(!controller.hasSelection)
+                Button { controller.bringSelectedToFront() } label: { Label("置于顶层", systemImage:"square.3.layers.3d.top.filled") }.disabled(!controller.hasSelection)
+                Button { controller.sendSelectedToBack() } label: { Label("置于底层", systemImage:"square.3.layers.3d.bottom.filled") }.disabled(!controller.hasSelection)
+                Button { controller.bringSelectedForward() } label: { Label("上移一层", systemImage:"arrow.up") }.disabled(!controller.hasSelection)
+                Button { controller.sendSelectedBackward() } label: { Label("下移一层", systemImage:"arrow.down") }.disabled(!controller.hasSelection)
+            }
+            Section("变换") {
+                Button { controller.resetRotationCenter() } label: { Label("旋转中心回到选区中心", systemImage:"scope") }.disabled(!controller.hasSelection)
+                Button { controller.reflectHorizontal() } label: { Label("水平翻转", systemImage:"arrow.left.and.right") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+                Button { controller.reflectVertical() } label: { Label("垂直翻转", systemImage:"arrow.up.and.down") }.disabled(!controller.hasSelection || controller.selectedObjectsAreAllLocked)
+            }
+        } label: { Label("更多", systemImage:"ellipsis.circle") }.menuStyle(.borderlessButton)
         Button { controller.undo() } label: { Label("撤销",systemImage:"arrow.uturn.backward") }.disabled(!controller.canUndo)
         Button { controller.redo() } label: { Label("重做",systemImage:"arrow.uturn.forward") }.disabled(!controller.canRedo)
         Text("\(zoomPercent)%").font(.caption).monospacedDigit()
+    }
+    private var toolbarDragHandle: some View {
+        Image(systemName:"circle.grid.2x2").font(.system(size:14, weight:.semibold)).foregroundStyle(.secondary).frame(width:28, height:28).contentShape(Rectangle()).help("拖动工具栏到上、下、左、右")
+            .gesture(DragGesture(minimumDistance:3).onChanged { value in toolbarDragOffset = value.translation }.onEnded { value in finishToolbarDrag(value.translation, in: NSScreen.main?.visibleFrame.size ?? CGSize(width:1100,height:700)); toolbarDragOffset = .zero })
     }
 }
