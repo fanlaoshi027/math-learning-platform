@@ -143,3 +143,5 @@ jobs:
         with:
           name: MosuanBoard-${{ github.ref_name }}-dmg
           path: Mosuan-${{ github.ref_name }}.dmg
+
+# Packaging verification trigger: 2026-09-16
