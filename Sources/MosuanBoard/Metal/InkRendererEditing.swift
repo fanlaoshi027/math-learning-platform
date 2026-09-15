@@ -18,6 +18,36 @@ extension InkRenderer {
         return changed
     }
 
+    /// Delete only editable objects. Locked objects remain selected so the user can
+    /// immediately unlock them without losing the selection context.
+    @discardableResult
+    func deleteSelectedRespectingLocks() -> Bool {
+        let objectIDsToDelete = selectedObjectIDs.filter {
+            editingObjectStore?.object(with: $0)?.isLocked != true
+        }
+        let strokeIndicesToDelete = selectedStrokeIndices.sorted(by: >)
+        guard !objectIDsToDelete.isEmpty || !strokeIndicesToDelete.isEmpty else { return false }
+
+        recordMutation()
+        if let store = editingObjectStore {
+            for id in objectIDsToDelete { store.remove(id: id) }
+        }
+        for index in strokeIndicesToDelete where committedStrokes.indices.contains(index) {
+            committedStrokes.remove(at: index)
+        }
+
+        selectedObjectIDs.removeAll { objectIDsToDelete.contains($0) }
+        selectedStrokeIndices.removeAll { strokeIndicesToDelete.contains($0) }
+        rebuildGeometry()
+        return true
+    }
+
+    var selectedObjectsAreEditable: Bool {
+        !selectedObjectIDs.isEmpty && selectedObjectIDs.contains {
+            editingObjectStore?.object(with: $0)?.isLocked != true
+        }
+    }
+
     /// Rotation-center snapping is deliberately scoped to the current selection.
     /// The existing renderer owns the actual center state, so we temporarily expose
     /// only selected objects to its mature snapping implementation, then restore the
