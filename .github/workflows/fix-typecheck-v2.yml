@@ -1,0 +1,35 @@
+name: One-time Typecheck Fix V2
+on:
+  push:
+    branches:
+      - smart-line-v1
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: smart-line-v1
+          fetch-depth: 0
+      - name: Apply compiler fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
+          s = p.read_text()
+          old = "let step = delta / CGFloat(segments)\n            let index = CGFloat(i)\n            let a = startAngle + signed * step * index"
+          new = "let step = delta / Float(segments)\n            let index = Float(i)\n            let a = startAngle + signed * step * index"
+          if old not in s:
+              raise SystemExit("target expression not found")
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit fix and remove helper workflow
+        run: |
+          rm -f .github/workflows/fix-typecheck-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Sources/MosuanBoard/Metal/InkRenderer.swift .github/workflows/fix-typecheck-v2.yml
+          git commit -m "fix: resolve dynamic angle Float type mismatch"
+          git push origin HEAD:smart-line-v1
