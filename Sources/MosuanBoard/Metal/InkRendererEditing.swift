@@ -18,6 +18,20 @@ extension InkRenderer {
         return changed
     }
 
+    /// Rotation-center snapping is deliberately scoped to the current selection.
+    /// The existing renderer owns the actual center state, so we temporarily expose
+    /// only selected objects to its mature snapping implementation, then restore the
+    /// full object list immediately.
+    func setSelectionRotationCenter(to point: SIMD2<Float>) {
+        guard let store = editingObjectStore, !selectedObjectIDs.isEmpty else { return }
+        let original = store.objects
+        let selected = original.filter { selectedObjectIDs.contains($0.id) }
+        guard !selected.isEmpty else { return }
+        store.objects = selected
+        setRotationCenter(to: point)
+        store.objects = original
+    }
+
     @discardableResult
     func bringSelectedObjectsToFront() -> Bool {
         guard let store = editingObjectStore else { return false }
@@ -71,8 +85,6 @@ extension InkRenderer {
     }
 
     private func redrawAfterEditing() {
-        // Refresh through an existing renderer-owned setting entry point.
-        // This avoids introducing a second rendering pipeline in the UI layer.
         if let pattern = Mirror(reflecting: self).children.first(where: { $0.label == "backgroundPattern" })?.value as? Int {
             setBackgroundPattern(pattern)
         }
