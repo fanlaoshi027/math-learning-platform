@@ -5,7 +5,6 @@ on:
       - smart-line-v1
 jobs:
   build:
-    if: ${{ !startsWith(github.event.head_commit.message, 'perf: ink realtime v3') }}
     runs-on: macos-14
     steps:
       - name: Checkout
