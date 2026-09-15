@@ -1,0 +1,51 @@
+import CoreGraphics
+import MetalKit
+import simd
+
+/// Renderer-facing boundary for completed click-based geometry construction.
+/// Construction itself stays in Core/Geometry; this extension only commits the
+/// finished object and deliberately leaves selection empty.
+extension InkRenderer {
+    @discardableResult
+    func commitGeometryConstruction(
+        _ result: GeometryConstructionSession.Result,
+        style: GraphicObject.Style? = nil
+    ) -> UUID? {
+        guard let store = geometryConstructionObjectStore else { return nil }
+        let resolvedStyle = style ?? geometryConstructionStyle
+        let id = GeometryConstructionCommitter.commit(result, to: store, style: resolvedStyle)
+        guard id != nil else { return nil }
+        selectedObjectIDs.removeAll(keepingCapacity: true)
+        selectedStrokeIndices.removeAll(keepingCapacity: true)
+        customRotationCenter = nil
+        rebuildGeometry()
+        editingAttachedView?.draw()
+        return id
+    }
+
+    private var geometryConstructionObjectStore: GraphicObjectStore? {
+        Mirror(reflecting: self).children.first(where: { $0.label == "objectStore" })?.value as? GraphicObjectStore
+    }
+
+    private var geometryConstructionStyle: GraphicObject.Style {
+        let mirror = Mirror(reflecting: self)
+        guard let value = mirror.children.first(where: { $0.label == "penStyle" })?.value as? PenStyle else {
+            return GraphicObject.Style()
+        }
+        return GraphicObject.Style(
+            strokeColor: RGBAColor(
+                red: CGFloat(value.color.x),
+                green: CGFloat(value.color.y),
+                blue: CGFloat(value.color.z),
+                alpha: CGFloat(value.color.w)
+            ),
+            strokeWidth: CGFloat(value.width),
+            opacity: CGFloat(value.opacity),
+            lineStyle: value.lineStyle
+        )
+    }
+
+    private var editingAttachedView: MTKView? {
+        Mirror(reflecting: self).children.first(where: { $0.label == "attachedView" })?.value as? MTKView
+    }
+}
