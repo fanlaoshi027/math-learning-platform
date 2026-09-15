@@ -14,7 +14,19 @@ jobs:
       - name: Resolve packages
         run: swift package resolve
       - name: Build app
-        run: swift build -c release
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
+          text = path.read_text()
+          old = "device.makeDefaultLibrary(bundle: Bundle.module)"
+          new = 'device.makeDefaultLibrary(bundle: Bundle(path: Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/MosuanBoard_MosuanBoard.bundle").path) ?? Bundle.main)'
+          if old not in text:
+              raise SystemExit("expected Metal resource lookup was not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          swift build -c release
       - name: Create macOS app bundle and DMG
         run: |
           set -euo pipefail
@@ -30,14 +42,8 @@ jobs:
           fi
           test -n "$RESOURCE_BUNDLE"
           test -d "$RESOURCE_BUNDLE"
-          # SwiftPM's generated Bundle.module accessor searches the app's
-          # Resources directory first and may fall back to the app root.
           cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
-          cp -R "$RESOURCE_BUNDLE" "$APP/"
-          cp -R "$RESOURCE_BUNDLE" "$APP/Contents/MacOS/"
           test -d "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
-          test -d "$APP/MosuanBoard_MosuanBoard.bundle"
-          test -d "$APP/Contents/MacOS/MosuanBoard_MosuanBoard.bundle"
           cat > /tmp/make-mosuan-icon.swift <<'SWIFT'
           import AppKit
           import CoreGraphics
@@ -104,8 +110,6 @@ jobs:
           trap 'hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true; rm -rf "$MOUNT_POINT"' EXIT
           hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_POINT" "$DMG"
           test -d "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
-          test -d "$MOUNT_POINT/Mosuan Board.app/MosuanBoard_MosuanBoard.bundle"
-          test -d "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard_MosuanBoard.bundle"
           test -f "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/AppIcon.icns"
           test -x "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard"
           hdiutil detach "$MOUNT_POINT"
