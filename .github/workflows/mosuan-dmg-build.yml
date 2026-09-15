@@ -40,10 +40,17 @@ jobs:
           test -d "$RESOURCE_BUNDLE"
           echo "Using SwiftPM resource bundle: $RESOURCE_BUNDLE"
           find "$RESOURCE_BUNDLE" -maxdepth 3 -print
+
+          # SwiftPM's Bundle.module for an executable target resolves the
+          # resource bundle relative to the executable. Keep the bundle beside
+          # Contents/MacOS/MosuanBoard, not only inside Contents/Resources.
+          cp -R "$RESOURCE_BUNDLE" "$APP/Contents/MacOS/"
+          # Keep a second copy in the normal app resource directory as a
+          # defensive fallback for future runtime resource loading.
           cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
 
-          # Also keep the shader source in the normal app resource directory as a
-          # recovery path for runtime resource loading.
+          # Also keep the shader source in the normal app resource directory as
+          # a recovery/debug path for runtime resource loading.
           cp Sources/MosuanBoard/Metal/InkShaders.metal "$APP/Contents/Resources/InkShaders.metal"
 
           cat > /tmp/make-mosuan-icon.swift <<'SWIFT'
@@ -121,6 +128,10 @@ jobs:
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
 
+          # Verify both resource-bundle locations before producing the DMG.
+          test -d "$APP/Contents/MacOS/MosuanBoard_MosuanBoard.bundle"
+          test -d "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+
           mkdir -p DMG
           cp -R "$APP" DMG/
           ln -s /Applications DMG/Applications
@@ -130,6 +141,7 @@ jobs:
           MOUNT_POINT="$(mktemp -d)"
           trap 'hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true; rm -rf "$MOUNT_POINT"' EXIT
           hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_POINT" "$DMG"
+          test -d "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard_MosuanBoard.bundle"
           test -d "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
           test -f "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/InkShaders.metal"
           test -f "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/AppIcon.icns"
