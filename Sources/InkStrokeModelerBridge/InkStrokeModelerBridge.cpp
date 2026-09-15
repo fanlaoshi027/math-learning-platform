@@ -30,9 +30,6 @@ struct MosuanInkStrokeModeler {
                 .end_of_stroke_stopping_distance = .001,
                 .end_of_stroke_max_iterations = 20
             },
-            .stylus_state_modeler_params{
-                .max_input_samples = 20
-            },
             .prediction_params = StrokeEndPredictorParams()
         };
         initialized = modeler.Reset(params).ok();
@@ -50,7 +47,7 @@ extern "C" void mosuan_ink_destroy(MosuanInkStrokeModeler *modeler) {
 
 extern "C" void mosuan_ink_reset(MosuanInkStrokeModeler *modeler) {
     if (!modeler) return;
-    modeler->modeler.Reset();
+    static_cast<void>(modeler->modeler.Reset());
     modeler->buffer.clear();
 }
 
