@@ -2,7 +2,8 @@ name: Mosuan DMG Build
 on:
   push:
     branches:
-      - mosuan-0.1.4-stable
+      - mosuan-launch-fix
+  workflow_dispatch:
 jobs:
   build:
     runs-on: macos-14
@@ -16,16 +17,6 @@ jobs:
       - name: Build app
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("Sources/MosuanBoard/Metal/InkRenderer.swift")
-          text = path.read_text()
-          old = "device.makeDefaultLibrary(bundle: Bundle.module)"
-          new = 'device.makeDefaultLibrary(bundle: Bundle(path: Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/MosuanBoard_MosuanBoard.bundle").path) ?? Bundle.main)'
-          if old not in text:
-              raise SystemExit("expected Metal resource lookup was not found")
-          path.write_text(text.replace(old, new, 1))
-          PY
           swift build -c release
       - name: Create macOS app bundle and DMG
         run: |
@@ -36,6 +27,7 @@ jobs:
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
           chmod +x "$APP/Contents/MacOS/MosuanBoard"
+
           RESOURCE_BUNDLE=".build/release/MosuanBoard_MosuanBoard.bundle"
           if [ ! -d "$RESOURCE_BUNDLE" ]; then
             RESOURCE_BUNDLE="$(find .build -type d -name 'MosuanBoard_MosuanBoard.bundle' -print -quit)"
@@ -44,6 +36,7 @@ jobs:
           test -d "$RESOURCE_BUNDLE"
           cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
           test -d "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+
           cat > /tmp/make-mosuan-icon.swift <<'SWIFT'
           import AppKit
           import CoreGraphics
@@ -80,6 +73,7 @@ jobs:
           xcrun swift /tmp/make-mosuan-icon.swift
           iconutil -c icns AppIcon.iconset -o AppIcon.icns
           cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -87,31 +81,35 @@ jobs:
           <dict>
               <key>CFBundleDisplayName</key><string>墨算</string>
               <key>CFBundleExecutable</key><string>MosuanBoard</string>
-              <key>CFBundleIconFile</key><string>AppIcon</string>
+              <key>CFBundleIconFile</key><string>AppIcon.icns</string>
               <key>CFBundleIconName</key><string>AppIcon</string>
-              <key>CFBundleIdentifier</key><string>com.fanlaoshi.mosuanboard</string>
-              <key>CFBundleName</key><string>墨算</string>
+              <key>CFBundleIdentifier</key><string>com.fanlaoshi.mosuan-board</string>
+              <key>CFBundleName</key><string>Mosuan Board</string>
               <key>CFBundlePackageType</key><string>APPL</string>
-              <key>CFBundleShortVersionString</key><string>0.1.0</string>
+              <key>CFBundleShortVersionString</key><string>0.1.4</string>
               <key>CFBundleVersion</key><string>${GITHUB_RUN_NUMBER}</string>
               <key>LSMinimumSystemVersion</key><string>14.0</string>
               <key>NSHighResolutionCapable</key><true/>
           </dict>
           </plist>
           PLIST
+
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
+
           mkdir -p DMG
           cp -R "$APP" DMG/
           ln -s /Applications DMG/Applications
           hdiutil create -volname "墨算" -srcfolder DMG -ov -format UDZO "$DMG"
           hdiutil verify "$DMG"
+
           MOUNT_POINT="$(mktemp -d)"
           trap 'hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true; rm -rf "$MOUNT_POINT"' EXIT
           hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_POINT" "$DMG"
           test -d "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
           test -f "$MOUNT_POINT/Mosuan Board.app/Contents/Resources/AppIcon.icns"
           test -x "$MOUNT_POINT/Mosuan Board.app/Contents/MacOS/MosuanBoard"
+          codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/Mosuan Board.app"
           hdiutil detach "$MOUNT_POINT"
           trap - EXIT
           rm -rf "$MOUNT_POINT"
