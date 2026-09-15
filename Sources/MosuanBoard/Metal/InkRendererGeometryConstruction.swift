@@ -14,10 +14,10 @@ extension InkRenderer {
         let resolvedStyle = style ?? geometryConstructionStyle
         let id = GeometryConstructionCommitter.commit(result, to: store, style: resolvedStyle)
         guard id != nil else { return nil }
-        selectedObjectIDs.removeAll(keepingCapacity: true)
-        selectedStrokeIndices.removeAll(keepingCapacity: true)
-        customRotationCenter = nil
-        rebuildGeometry()
+
+        // setStroke([]) is the renderer's existing safe path for rebuilding the
+        // drawable geometry without reaching across file-private renderer state.
+        setStroke([])
         editingAttachedView?.draw()
         return id
     }
