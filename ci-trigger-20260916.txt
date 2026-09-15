@@ -1,0 +1,1 @@
+DMG packaging verification trigger. Safe to remove after CI verification.
