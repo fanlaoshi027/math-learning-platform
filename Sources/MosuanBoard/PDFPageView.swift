@@ -1,7 +1,6 @@
 import AppKit
 import PDFKit
 import CoreImage
-import CoreImage.CIFilterBuiltins
 
 /// PDF page renderer with Mosuan's eye-comfort inversion.
 ///
@@ -13,57 +12,54 @@ final class MosuanPDFPageView: NSView {
     var pageIndex: Int = 0 { didSet { needsDisplay = true } }
     var eyeComfortInverted: Bool = false { didSet { needsDisplay = true } }
 
-    private let context = CIContext(options: [.useSoftwareRenderer: false])
+    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let context = NSGraphicsContext.current?.cgContext,
+        guard let cgContext = NSGraphicsContext.current?.cgContext,
               let page = document?.page(at: pageIndex) else { return }
 
-        let bounds = page.bounds(for: .mediaBox)
-        guard bounds.width > 0, bounds.height > 0 else { return }
+        let pageBounds = page.bounds(for: .mediaBox)
+        guard pageBounds.width > 0, pageBounds.height > 0 else { return }
 
-        let scale = min(dirtyRect.width / bounds.width, dirtyRect.height / bounds.height)
+        let scale = min(bounds.width / pageBounds.width, bounds.height / pageBounds.height)
         guard scale.isFinite, scale > 0 else { return }
 
-        let width = max(1, Int(ceil(bounds.width * scale)))
-        let height = max(1, Int(ceil(bounds.height * scale)))
+        let pixelWidth = max(1, Int(ceil(pageBounds.width * scale)))
+        let pixelHeight = max(1, Int(ceil(pageBounds.height * scale)))
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let bitmap = CGContext(
             data: nil,
-            width: width,
-            height: height,
+            width: pixelWidth,
+            height: pixelHeight,
             bitsPerComponent: 8,
-            bytesPerRow: width * 4,
+            bytesPerRow: pixelWidth * 4,
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return }
 
         bitmap.setFillColor(NSColor.white.cgColor)
-        bitmap.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        bitmap.fill(CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
         bitmap.saveGState()
-        bitmap.translateBy(x: 0, y: CGFloat(height))
+        bitmap.translateBy(x: 0, y: CGFloat(pixelHeight))
         bitmap.scaleBy(x: scale, y: -scale)
         page.draw(with: .mediaBox, to: bitmap)
         bitmap.restoreGState()
 
         guard let image = bitmap.makeImage() else { return }
         let source = CIImage(cgImage: image)
-        let output: CIImage
+        let output = eyeComfortInverted ? MosuanPDFEyeComfortFilter.apply(to: source) : source
+        guard let outputImage = ciContext.createCGImage(output, from: output.extent) else { return }
 
-        if eyeComfortInverted {
-            output = MosuanPDFEyeComfortFilter.apply(to: source)
-        } else {
-            output = source
-        }
-
-        guard let outputImage = context.createCGImage(output, from: output.extent) else { return }
-
-        let drawRect = AVMakeRect(
-            aspectRatio: CGSize(width: bounds.width, height: bounds.height),
-            insideRect: dirtyRect
+        let drawWidth = pageBounds.width * scale
+        let drawHeight = pageBounds.height * scale
+        let drawRect = CGRect(
+            x: bounds.midX - drawWidth * 0.5,
+            y: bounds.midY - drawHeight * 0.5,
+            width: drawWidth,
+            height: drawHeight
         )
-        NSGraphicsContext.current?.cgContext.interpolationQuality = .high
-        context.draw(outputImage, in: drawRect, from: output.extent)
+        cgContext.interpolationQuality = .high
+        cgContext.draw(outputImage, in: drawRect, from: output.extent)
     }
 }
 
@@ -78,8 +74,8 @@ private enum MosuanPDFEyeComfortFilter {
             float b = pixel.b;
             float luminance = dot(vec3(r, g, b), vec3(0.2126, 0.7152, 0.0722));
 
-            // Keep a small amount of light in paper white so the page is not
-            // pure black, matching the long-writing eye-comfort target.
+            // White paper becomes a dark neutral rather than pure black.
+            // Black ink becomes light, while chroma stays around the original hue.
             float targetLuminance = 0.90 - 0.80 * luminance;
             float chromaScale = 0.88;
             vec3 target = vec3(targetLuminance) +
