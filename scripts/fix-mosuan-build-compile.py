@@ -64,25 +64,8 @@ for signature in [
     r = keep_first_function(r, signature)
 renderer_path.write_text(r)
 
-# Split BoardScreen's large root expression without changing its contents.
-board_path = ROOT / "Sources/MosuanBoard/BoardScreenV3.swift"
-b = board_path.read_text()
-if "private var boardRoot: some View" not in b:
-    marker = "    var body: some View {"
-    start = b.find(marker)
-    if start < 0:
-        raise SystemExit("BoardScreen body marker not found")
-    block = find_function_block(b, marker)
-    if block is None:
-        raise SystemExit("BoardScreen body end not found")
-    end = block[1]
-    original = b[start:end]
-    # Keep the original body expression exactly intact; only move it behind a
-    # computed ViewBuilder property. The property declaration must include '{'.
-    prefix_len = len(marker)
-    inner = original[prefix_len:].strip()
-    replacement = "    var body: some View { boardRoot }\n\n    @ViewBuilder\n    private var boardRoot: some View {\n" + inner[1:-1] + "\n    }"
-    b = b[:start] + replacement + b[end:]
-    board_path.write_text(b)
+# IMPORTANT: do not rewrite BoardScreen's body automatically. The previous
+# transformation was fragile and produced invalid declarations. The original
+# BoardScreen implementation is known-good and should remain untouched here.
 
-print("Normalized injected helpers and split BoardScreen root type-checking.")
+print("Normalized injected helpers without rewriting BoardScreen.")
