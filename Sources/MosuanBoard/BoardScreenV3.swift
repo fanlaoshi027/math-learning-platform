@@ -3,6 +3,34 @@ import AppKit
 
 struct BoardScreen: View {
     private enum ToolbarDock: String { case top, bottom, left, right }
+    private enum CanvasBackground: String, CaseIterable, Identifiable {
+        case white, lightGray, warmWhite, paleBlue, paleGreen, paleYellow, darkGray, black
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .white: return "白色"
+            case .lightGray: return "浅灰"
+            case .warmWhite: return "米白"
+            case .paleBlue: return "淡蓝"
+            case .paleGreen: return "淡绿"
+            case .paleYellow: return "淡黄"
+            case .darkGray: return "深灰"
+            case .black: return "黑色"
+            }
+        }
+        var metal: SIMD4<Float> {
+            switch self {
+            case .white: return SIMD4(1, 1, 1, 1)
+            case .lightGray: return SIMD4(0.94, 0.94, 0.94, 1)
+            case .warmWhite: return SIMD4(0.98, 0.97, 0.92, 1)
+            case .paleBlue: return SIMD4(0.93, 0.96, 1.0, 1)
+            case .paleGreen: return SIMD4(0.93, 0.98, 0.94, 1)
+            case .paleYellow: return SIMD4(1.0, 0.98, 0.88, 1)
+            case .darkGray: return SIMD4(0.16, 0.17, 0.18, 1)
+            case .black: return SIMD4(0, 0, 0, 1)
+            }
+        }
+    }
     @StateObject private var controller = CanvasController()
     @StateObject private var pageController = PageController()
     @State private var tool: BoardTool = .pen
@@ -16,6 +44,7 @@ struct BoardScreen: View {
     @State private var toolbarDock: ToolbarDock = .top
     @State private var toolbarDragOffset = CGSize.zero
     @State private var background: BoardBackground = .white
+    @State private var canvasBackground: CanvasBackground = .white
     @State private var inverted = false
     @State private var eyeComfortBackground: EyeComfortBackground = .black90
     @State private var customHex = "1A1A1A"
@@ -36,6 +65,7 @@ struct BoardScreen: View {
         if inverted && background == .white { return eyeComfortBackground == .custom ? customColor : eyeComfortBackground.color }
         return background.metal
     }
+    private var effectiveCanvasBackground: SIMD4<Float> { canvasBackground.metal }
     private var customColor: SIMD4<Float> {
         let value = customHex.replacingOccurrences(of: "#", with: "")
         guard value.count == 6, let rgb = UInt64(value, radix: 16) else { return EyeComfortBackground.black90.color }
@@ -49,7 +79,7 @@ struct BoardScreen: View {
                 HStack(spacing:0) {
                     PageSidebar(controller: pageController).overlay(alignment:.trailing) { Divider() }
                     ZStack {
-                        MetalInkCanvas(tool:$tool, penStyle:effectivePenStyle, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
+                        MetalInkCanvas(tool:$tool, penStyle:effectivePenStyle, controller:controller, background:effectiveCanvasBackground, inverted:false, pattern:.blank, zoomPercent:$zoomPercent)
                             .padding(24)
 
                         if let degrees = controller.dynamicAngleDegrees, tool == .select {
@@ -103,6 +133,7 @@ struct BoardScreen: View {
                 if let saved=UserDefaults.standard.object(forKey:"mosuan.pressureSensitivity") as? Double { pressureSensitivity=min(max(saved,0.5),1.5) }
                 globalDashed=UserDefaults.standard.bool(forKey:"mosuan.globalDashed")
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.eraserMode"), let saved=EraserMode(rawValue:raw) { eraserMode=saved }
+                if let raw=UserDefaults.standard.string(forKey:"mosuan.canvasBackground"), let saved=CanvasBackground(rawValue:raw) { canvasBackground=saved }
             }
             .onChange(of:toolbarDock) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.toolbarDock") }
             .onChange(of:eyeComfortBackground) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.eyeComfortBackground") }
@@ -112,6 +143,7 @@ struct BoardScreen: View {
             .onChange(of:pressureSensitivity) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.pressureSensitivity") }
             .onChange(of:globalDashed) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.globalDashed") }
             .onChange(of:eraserMode) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.eraserMode") }
+            .onChange(of:canvasBackground) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.canvasBackground") }
         }
         .frame(minWidth:1100,minHeight:700)
         .preferredColorScheme(interfaceTheme.colorScheme)
@@ -201,6 +233,7 @@ struct BoardScreen: View {
             }.buttonStyle(.plain).help(item.name)
         }
         Menu { ForEach(BoardBackground.allCases) { item in Button(item.title) { background=item; if item != .white { inverted=false } } } } label: { Label("背景",systemImage:"rectangle.fill") }.menuStyle(.borderlessButton)
+        Menu { ForEach(CanvasBackground.allCases) { item in Button(item.title) { canvasBackground=item } } } label: { Label("画布",systemImage:"rectangle.dashed") }.menuStyle(.borderlessButton)
         if background == .white {
             Toggle("反色",isOn:$inverted).toggleStyle(.checkbox)
             if inverted { Menu { ForEach(EyeComfortBackground.allCases) { item in Button(item.title) { eyeComfortBackground=item } } } label: { Label(eyeComfortBackground.title,systemImage:"moon.fill") }.menuStyle(.borderlessButton) }
