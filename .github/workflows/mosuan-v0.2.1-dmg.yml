@@ -85,6 +85,20 @@ jobs:
           sips -z 512 512 /tmp/icon1024.png --out AppIcon.iconset/icon_512x512.png >/dev/null
           cp /tmp/icon1024.png AppIcon.iconset/icon_512x512@2x.png
           iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+      - name: Compile Metal library
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="Mosuan Board.app"
+          BUNDLE="$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle"
+          test -d "$BUNDLE"
+          METAL_SOURCE="Sources/MosuanBoard/Metal/InkShaders.metal"
+          AIR="/tmp/MosuanBoard-InkShaders.air"
+          METALLIB="$BUNDLE/default.metallib"
+          xcrun -sdk macosx metal -mmacosx-version-min=14.0 -c "$METAL_SOURCE" -o "$AIR"
+          xcrun -sdk macosx metallib "$AIR" -o "$METALLIB"
+          test -s "$METALLIB"
+          echo "Metal library: $METALLIB"
       - name: Ad-hoc sign and verify
         shell: bash
         run: |
