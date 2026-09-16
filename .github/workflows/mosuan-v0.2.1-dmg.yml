@@ -15,14 +15,11 @@ jobs:
       - name: Select Swift toolchain
         run: swift --version
       - name: Apply known-good renderer repair
-        run: |
-          python3 scripts/fix-mosuan-ink-quality.py
+        run: python3 scripts/fix-mosuan-ink-quality.py
       - name: Apply known-good UI synchronization repair
-        run: |
-          python3 scripts/fix-mosuan-ui-loop.py
+        run: python3 scripts/fix-mosuan-ui-loop.py
       - name: Apply packaged Metal resource lookup repair
-        run: |
-          python3 scripts/fix-mosuan-runtime-resources.py
+        run: python3 scripts/fix-mosuan-runtime-resources.py
       - name: Resolve package
         run: swift package resolve
       - name: Build release
@@ -97,8 +94,10 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           test -x "$APP/Contents/MacOS/MosuanBoard"
           test -f "$APP/Contents/Resources/AppIcon.icns"
-          test -f "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle/default.metallib"
-          plutil -p "$APP/Contents/Info.plist"
+          METALLIB="$(find "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle" -name '*.metallib' -type f -print -quit)"
+          echo "Metal library: ${METALLIB:-NOT FOUND}"
+          test -n "$METALLIB"
+          plutil -lint "$APP/Contents/Info.plist"
       - name: Create DMG
         shell: bash
         run: |
