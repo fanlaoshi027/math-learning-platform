@@ -7,6 +7,10 @@ struct BoardScreen: View {
     @StateObject private var pageController = PageController()
     @State private var tool: BoardTool = .pen
     @State private var presetID = PenPreset.defaults[0].id
+    @State private var penWidth: Double = 2.0
+    @State private var pressureSensitivity: Double = 1.0
+    @State private var globalDashed = false
+    @State private var eraserMode: EraserMode = .stroke
     @State private var rotationText = "0"
     @State private var zoomPercent = 100
     @State private var toolbarDock: ToolbarDock = .top
@@ -18,6 +22,15 @@ struct BoardScreen: View {
     @State private var interfaceTheme: BoardInterfaceTheme = .light
 
     private var preset: PenPreset { PenPreset.defaults.first { $0.id == presetID } ?? PenPreset.defaults[0] }
+    private var effectivePenStyle: PenStyle {
+        var style = preset.style
+        style.width = CGFloat(penWidth)
+        // PenStyle's pressureCurve is inverse to the user-facing sensitivity:
+        // a lower curve makes light pressure respond sooner.
+        style.pressureCurve = CGFloat(1.4 - 0.6 * pressureSensitivity)
+        style.lineStyle = globalDashed ? .dashed : .solid
+        return style
+    }
     private var toolbarIsVertical: Bool { toolbarDock == .left || toolbarDock == .right }
     private var effectiveBackground: SIMD4<Float> {
         if inverted && background == .white { return eyeComfortBackground == .custom ? customColor : eyeComfortBackground.color }
@@ -36,7 +49,7 @@ struct BoardScreen: View {
                 HStack(spacing:0) {
                     PageSidebar(controller: pageController).overlay(alignment:.trailing) { Divider() }
                     ZStack {
-                        MetalInkCanvas(tool:$tool, penStyle:preset.style, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
+                        MetalInkCanvas(tool:$tool, penStyle:effectivePenStyle, controller:controller, background:effectiveBackground, inverted:inverted, pattern:.blank, zoomPercent:$zoomPercent)
                             .padding(24)
 
                         if let degrees = controller.dynamicAngleDegrees, tool == .select {
@@ -86,11 +99,19 @@ struct BoardScreen: View {
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.eyeComfortBackground"), let saved=EyeComfortBackground(rawValue:raw) { eyeComfortBackground=saved }
                 if let saved=UserDefaults.standard.string(forKey:"mosuan.customHex") { customHex=saved }
                 if let raw=UserDefaults.standard.string(forKey:"mosuan.interfaceTheme"), let saved=BoardInterfaceTheme(rawValue:raw) { interfaceTheme=saved }
+                if let saved=UserDefaults.standard.object(forKey:"mosuan.penWidth") as? Double { penWidth=min(max(saved,0.75),8) }
+                if let saved=UserDefaults.standard.object(forKey:"mosuan.pressureSensitivity") as? Double { pressureSensitivity=min(max(saved,0.5),1.5) }
+                globalDashed=UserDefaults.standard.bool(forKey:"mosuan.globalDashed")
+                if let raw=UserDefaults.standard.string(forKey:"mosuan.eraserMode"), let saved=EraserMode(rawValue:raw) { eraserMode=saved }
             }
             .onChange(of:toolbarDock) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.toolbarDock") }
             .onChange(of:eyeComfortBackground) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.eyeComfortBackground") }
             .onChange(of:customHex) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.customHex") }
             .onChange(of:interfaceTheme) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.interfaceTheme") }
+            .onChange(of:penWidth) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.penWidth") }
+            .onChange(of:pressureSensitivity) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.pressureSensitivity") }
+            .onChange(of:globalDashed) { _,v in UserDefaults.standard.set(v, forKey:"mosuan.globalDashed") }
+            .onChange(of:eraserMode) { _,v in UserDefaults.standard.set(v.rawValue, forKey:"mosuan.eraserMode") }
         }
         .frame(minWidth:1100,minHeight:700)
         .preferredColorScheme(interfaceTheme.colorScheme)
@@ -133,9 +154,51 @@ struct BoardScreen: View {
         ToolButton(title:"多边形",systemImage:"triangle",selected:tool == .polygon) { tool = .polygon }
         ToolButton(title:"动态角",systemImage:"angle",selected:tool == .dynamicAngle) { tool = .dynamicAngle }
         ToolButton(title:"等腰三角",systemImage:"triangle",selected:tool == .dynamicIsoscelesTriangle) { tool = .dynamicIsoscelesTriangle }
-        ToolButton(title:"橡皮",systemImage:"eraser",selected:tool == .eraser) { tool = .eraser }
+
+        // Primary click selects the eraser. Secondary interaction (including long press)
+        // opens the three requested eraser actions.
+        Menu {
+            Button { eraserMode = .stroke; tool = .eraser } label: { Label("整根删除", systemImage:"eraser.line.dashed") }
+            Button { eraserMode = .partial; tool = .eraser } label: { Label("局部删除", systemImage:"eraser") }
+            Divider()
+            Button(role: .destructive) { controller.clearCurrentPage() } label: { Label("清屏", systemImage:"rectangle.dashed.and.paperclip") }
+        } label: {
+            Label("橡皮", systemImage:"eraser")
+                .padding(.horizontal,8)
+        } primaryAction: {
+            tool = .eraser
+        }
+        .menuStyle(.borderedButton)
+        .tint(tool == .eraser ? .accentColor : .secondary)
+
+        Menu {
+            Menu("笔粗细") {
+                ForEach([1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0], id:\.self) { value in
+                    Button("\(value, specifier: "%.1f") px") { penWidth = value; tool = .pen }
+                }
+            }
+            Menu("压感敏感度") {
+                ForEach([0.5, 0.75, 1.0, 1.25, 1.5], id:\.self) { value in
+                    Button("\(value, specifier: "%.2f")") { pressureSensitivity = value }
+                }
+            }
+            Toggle("全局虚线", isOn:$globalDashed)
+            Divider()
+            Text("当前笔宽：\(penWidth, specifier: "%.1f") px")
+            Text("压感：\(pressureSensitivity, specifier: "%.2f")")
+        } label: {
+            Label("笔设置", systemImage:"slider.horizontal.3")
+        }
+        .menuStyle(.borderlessButton)
+
         ForEach(PenPreset.defaults) { item in
-            Button { presetID=item.id; tool = .pen } label: { Circle().fill(Color(red:item.style.color.red, green:item.style.color.green, blue:item.style.color.blue)).frame(width:18,height:18) }.buttonStyle(.plain).help(item.name)
+            Button {
+                presetID=item.id
+                penWidth=Double(item.style.width)
+                tool = .pen
+            } label: {
+                Circle().fill(Color(red:item.style.color.red, green:item.style.color.green, blue:item.style.color.blue)).frame(width:18,height:18)
+            }.buttonStyle(.plain).help(item.name)
         }
         Menu { ForEach(BoardBackground.allCases) { item in Button(item.title) { background=item; if item != .white { inverted=false } } } } label: { Label("背景",systemImage:"rectangle.fill") }.menuStyle(.borderlessButton)
         if background == .white {
