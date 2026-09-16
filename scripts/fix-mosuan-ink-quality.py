@@ -20,33 +20,48 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
         let color = metalColor(style)
         guard s.count > 1 else {
             let p = s[0]
-            // A short entry cap avoids the visible pressure-heavy dot while the
-            // first real segment has not arrived yet.
-            disk(viewPoint(from: SIMD2(p.x, p.y)), strokeWidth(p.pressure, style) * 0.72, color, to: &out)
+            // Keep the touchdown cap deliberately smaller than the normal stroke.
+            // This prevents the pressure spike reported at the start of a stroke.
+            disk(viewPoint(from: SIMD2(p.x, p.y)), strokeWidth(p.pressure, style) * 0.66, color, to: &out)
             return
         }
 
-        // Smooth pressure first. The first/last samples are deliberately kept
-        // closer to the normal pen width so a hard tablet touchdown does not
-        // create a bulb at the beginning of a stroke.
-        var smoothPressure = s.map { $0.pressure }
-        if smoothPressure.count >= 3 {
-            for i in 1..<(smoothPressure.count - 1) {
-                smoothPressure[i] = (smoothPressure[i - 1] + 2.0 * smoothPressure[i] + smoothPressure[i + 1]) * 0.25
+        // Pressure is intentionally filtered in both directions. A tablet can
+        // report a short pressure spike at touchdown or during a fast gesture;
+        // those spikes should not become visible blobs in classroom handwriting.
+        let rawPressure = s.map { max(0, min(1, $0.pressure)) }
+        var smoothPressure = rawPressure
+        if rawPressure.count >= 3 {
+            for i in rawPressure.indices {
+                var weighted: Float = 0
+                var weight: Float = 0
+                for d in -2...2 {
+                    let j = i + d
+                    guard j >= 0 && j < rawPressure.count else { continue }
+                    let w: Float = (d == 0) ? 4 : (abs(d) == 1 ? 2 : 1)
+                    weighted += rawPressure[j] * w
+                    weight += w
+                }
+                smoothPressure[i] = weighted / max(weight, 1)
             }
-        }
-        if smoothPressure.count >= 2 {
-            smoothPressure[0] = min(smoothPressure[0], smoothPressure[1] * 0.85 + 0.15)
-            smoothPressure[smoothPressure.count - 1] = min(smoothPressure[smoothPressure.count - 1], smoothPressure[smoothPressure.count - 2] * 0.85 + 0.15)
+            // A short controlled entry ramp makes the first few pixels feel like
+            // one continuous pen stroke instead of a dot followed by a stroke.
+            smoothPressure[0] = min(smoothPressure[0], smoothPressure[1] * 0.72 + 0.28)
+            if smoothPressure.count > 2 {
+                smoothPressure[1] = min(smoothPressure[1], smoothPressure[2] * 0.86 + 0.14)
+            }
+            let n = smoothPressure.count
+            smoothPressure[n - 1] = min(smoothPressure[n - 1], smoothPressure[n - 2] * 0.90 + 0.10)
         }
 
-        // Catmull-Rom interpolation fills the large gaps produced by fast mouse/
-        // tablet events. Eight samples per source segment keeps arcs continuous
-        // without turning the stroke into a visibly delayed vector curve.
+        // Build a dense curve in render space. The subdivision count is adaptive:
+        // long input gaps from fast tablet/mouse events receive more intermediate
+        // samples, while slow writing stays lightweight. This adds no input delay
+        // because all interpolation happens during geometry generation.
         var curve: [(SIMD2<Float>, Float)] = []
         let count = s.count
-        let subdivisions = 8
-        curve.reserveCapacity((count - 1) * subdivisions + 1)
+        curve.reserveCapacity(count * 12)
+
         func sample(_ i: Int, _ t: Float) -> (SIMD2<Float>, Float) {
             let i0 = max(0, i - 1), i1 = i, i2 = min(count - 1, i + 1), i3 = min(count - 1, i + 2)
             let p0 = SIMD2(s[i0].x, s[i0].y), p1 = SIMD2(s[i1].x, s[i1].y)
@@ -56,12 +71,21 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             let pressure = smoothPressure[i1] + (smoothPressure[i2] - smoothPressure[i1]) * t
             return (position, pressure)
         }
+
         for i in 0..<(count - 1) {
-            for step in 0..<subdivisions { curve.append(sample(i, Float(step) / Float(subdivisions))) }
+            let dx = s[i + 1].x - s[i].x
+            let dy = s[i + 1].y - s[i].y
+            let distance = sqrt(dx * dx + dy * dy)
+            let subdivisions = max(8, min(48, Int(ceil(distance / 1.75))))
+            for step in 0..<subdivisions {
+                curve.append(sample(i, Float(step) / Float(subdivisions)))
+            }
         }
         let last = s[count - 1]
         curve.append((SIMD2(last.x, last.y), smoothPressure[count - 1]))
 
+        // Use one continuous strip between every adjacent curve sample. Dense,
+        // overlapping geometry removes the visible "beads"/segments on fast arcs.
         for i in 0..<(curve.count - 1) {
             let p = curve[i].0, q = curve[i + 1].0
             let dx = q.x - p.x, dy = q.y - p.y
@@ -76,20 +100,20 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             triangle(c, b, d, color: color, to: &out)
         }
 
-        // Only add round caps at the two ends. Adding a disk at every raw input
-        // sample was the main source of the small beads seen on fast handwriting.
+        // Only the ends receive round caps. No disk is placed at input samples,
+        // which is what previously made fast handwriting look segmented.
         let first = curve[0]
         let lastCurve = curve[curve.count - 1]
-        disk(viewPoint(from: first.0), strokeWidth(first.1, style) * 0.82, color, to: &out)
-        disk(viewPoint(from: lastCurve.0), strokeWidth(lastCurve.1, style) * 0.92, color, to: &out)
+        disk(viewPoint(from: first.0), strokeWidth(first.1, style) * 0.68, color, to: &out)
+        disk(viewPoint(from: lastCurve.0), strokeWidth(lastCurve.1, style) * 0.84, color, to: &out)
     }
 '''
 r = r[:start] + new_stroke + r[end:]
 
-# Softer pressure response: pressure remains visible, but it no longer dominates
-# the visual weight of a classroom pen stroke.
+# More restrained pressure response, closer to a classroom pen: pressure remains
+# visible but does not turn a normal stroke into a heavy marker line.
 old_width = '    private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float{let p=max(0,min(1,pressure));let c=style.pressureEnabled ? pow(p,max(0.25,Float(style.pressureCurve))):0.75;return Float(style.width)*(0.45+0.75*c)}'
-new_width = '    private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float{let p=max(0,min(1,pressure));let c=style.pressureEnabled ? pow(p,max(0.25,Float(style.pressureCurve))):0.5;return Float(style.width)*(0.70+0.45*c)}'
+new_width = '    private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float{let p=max(0,min(1,pressure));let normalized=0.28+0.72*p;let c=style.pressureEnabled ? pow(normalized,max(0.55,Float(style.pressureCurve)*0.85)):0.5;return Float(style.width)*(0.74+0.36*c)}'
 if old_width not in r:
     raise SystemExit("strokeWidth target not found")
 r = r.replace(old_width, new_width, 1)
@@ -120,4 +144,4 @@ v = v.replace(
 )
 v = v.replace('tolerance: 8, minimumLength: 30', 'tolerance: 18, minimumLength: 20', 1)
 view.write_text(v)
-print("Applied pressure-softened ink, anti-bulb entry caps, Catmull-Rom fast-stroke smoothing, 4x MSAA, and forgiving smart-line detection.")
+print("Applied Noteful-targeted pressure filtering, controlled entry caps, adaptive fast-stroke interpolation, continuous geometry, and restrained pressure response.")
