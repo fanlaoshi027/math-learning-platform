@@ -39,12 +39,29 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
         let count = s.count
         curve.reserveCapacity(count * 12)
 
+        // Centripetal Catmull-Rom interpolation is more stable than the uniform
+        // form when tablet samples are unevenly spaced. It reduces overshoot and
+        // the small kinks/flat spots that can appear during fast curved writing.
         func sample(_ i: Int, _ t: Float) -> (SIMD2<Float>, Float) {
             let i0 = max(0, i - 1), i1 = i, i2 = min(count - 1, i + 1), i3 = min(count - 1, i + 2)
             let p0 = SIMD2(s[i0].x, s[i0].y), p1 = SIMD2(s[i1].x, s[i1].y)
             let p2 = SIMD2(s[i2].x, s[i2].y), p3 = SIMD2(s[i3].x, s[i3].y)
-            let t2 = t * t, t3 = t2 * t
-            let position = 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+
+            func knot(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ previous: Float) -> Float {
+                previous + pow(max(simd_distance(a, b), 0.0001), 0.5)
+            }
+            let t0: Float = 0
+            let t1 = knot(p0, p1, t0)
+            let t2 = knot(p1, p2, t1)
+            let t3 = knot(p2, p3, t2)
+            let u = t1 + (t2 - t1) * t
+
+            let A1 = (t1 - u) / max(t1 - t0, 0.0001) * p0 + (u - t0) / max(t1 - t0, 0.0001) * p1
+            let A2 = (t2 - u) / max(t2 - t1, 0.0001) * p1 + (u - t1) / max(t2 - t1, 0.0001) * p2
+            let A3 = (t3 - u) / max(t3 - t2, 0.0001) * p2 + (u - t2) / max(t3 - t2, 0.0001) * p3
+            let B1 = (t2 - u) / max(t2 - t0, 0.0001) * A1 + (u - t0) / max(t2 - t0, 0.0001) * A2
+            let B2 = (t3 - u) / max(t3 - t1, 0.0001) * A2 + (u - t1) / max(t3 - t1, 0.0001) * A3
+            let position = (t2 - u) / max(t2 - t1, 0.0001) * B1 + (u - t1) / max(t2 - t1, 0.0001) * B2
             let pressure = smoothPressure[i1] + (smoothPressure[i2] - smoothPressure[i1]) * t
             return (position, pressure)
         }
@@ -59,6 +76,37 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
             }
         }
         curve.append((SIMD2(s[count - 1].x, s[count - 1].y), smoothPressure[count - 1]))
+
+        // Re-sample the interpolated curve at a nearly uniform arc-length spacing.
+        // This prevents dense and sparse triangle strips from appearing as visible
+        // changes of curvature when the pen moves quickly or the event rate varies.
+        var uniformCurve: [(SIMD2<Float>, Float)] = []
+        uniformCurve.reserveCapacity(curve.count)
+        let targetSpacing: Float = 1.15
+        uniformCurve.append(curve[0])
+        var carryDistance: Float = 0
+        var previous = curve[0]
+        for current in curve.dropFirst() {
+            var a = previous.0
+            let b = current.0
+            var segment = simd_distance(a, b)
+            if segment < 0.0001 { previous = current; continue }
+            while carryDistance + segment >= targetSpacing {
+                let need = targetSpacing - carryDistance
+                let f = need / segment
+                a += (b - a) * f
+                let pressure = previous.1 + (current.1 - previous.1) * f
+                uniformCurve.append((a, pressure))
+                segment -= need
+                carryDistance = 0
+            }
+            carryDistance += segment
+            previous = current
+        }
+        if simd_distance(uniformCurve.last?.0 ?? curve[0].0, curve.last!.0) > 0.01 {
+            uniformCurve.append(curve.last!)
+        }
+        curve = uniformCurve
 
         var cumulative: [Float] = Array(repeating: 0, count: curve.count)
         if curve.count > 1 {
@@ -124,9 +172,11 @@ new_stroke = r'''    private func appendStroke(_ s: [InkPoint], style: PenStyle,
 r = r[:start] + new_stroke + r[end:]
 
 old = '    private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float{let p=max(0,min(1,pressure));let normalized=0.28+0.72*p;let c=style.pressureEnabled ? pow(normalized,max(0.55,Float(style.pressureCurve)*0.85)):0.5;return Float(style.width)*(0.74+0.36*c)}'
+if old not in r:
+    old = '    private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float{let p=max(0,min(1,pressure));let normalized=0.28+0.72*p;let c=style.pressureEnabled ? pow(normalized,max(0.55,Float(style.pressureCurve)*0.85)):0.5;return Float(style.width)*(0.70+0.46*c)}'
 new = '    private func strokeWidth(_ pressure:Float,_ style:PenStyle)->Float{let p=max(0,min(1,pressure));let normalized=0.28+0.72*p;let c=style.pressureEnabled ? pow(normalized,max(0.55,Float(style.pressureCurve)*0.85)):0.5;return Float(style.width)*(0.70+0.46*c)}'
 if old not in r:
     raise SystemExit("strokeWidth target not found")
 r = r.replace(old, new, 1)
 renderer.write_text(r)
-print("Applied independent entry/exit taper, smooth join normals, round turn joins, and slightly more responsive pressure.")
+print("Applied centripetal Catmull-Rom interpolation, uniform arc-length resampling, smooth join normals, and responsive pressure.")
