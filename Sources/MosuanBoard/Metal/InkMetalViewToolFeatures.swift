@@ -2,25 +2,6 @@ import Foundation
 import simd
 
 extension InkMetalView {
-    /// Exposes the renderer's coordinate conversion to tool extensions.
-    func canvasPoint(from viewPoint: SIMD2<Float>) -> SIMD2<Float> {
-        renderer.canvasPoint(from: viewPoint)
-    }
-
-    /// Replaces the current page model and notifies the document layer.
-    func replacePageState(_ state: CanvasPageState) {
-        renderer.importPageState(state)
-        onHistoryChanged?()
-        onSelectionChanged?()
-        onPageStateChanged?(state)
-        draw()
-    }
-
-    /// Clears only the current page's ink/object contents; the PDF/background layer is untouched.
-    func clearPageContents() {
-        replacePageState(CanvasPageState(strokes: [], objects: []))
-    }
-
     /// Erases only the portions of freehand strokes touched by the eraser path.
     /// The existing object/whole-stroke eraser remains unchanged for the default mode.
     func erasePartialAlongPath(_ path: [SIMD2<Float>]) {
