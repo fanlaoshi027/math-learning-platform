@@ -24,6 +24,8 @@ jobs:
         run: python3 scripts/fix-mosuan-runtime-resources.py
       - name: Apply Swift type-check repair
         run: python3 scripts/fix-mosuan-swift-typecheck.py
+      - name: Apply tool feature repair
+        run: python3 scripts/fix-mosuan-tool-features.py
       - name: Resolve package
         run: swift package resolve
       - name: Build release
