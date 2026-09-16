@@ -21,16 +21,13 @@ extension InkMetalView {
                 continue
             }
 
-            var strokeChanged = false
+            var runs: [[InkPoint]] = []
             var run: [InkPoint] = []
             run.reserveCapacity(stroke.points.count)
+            var strokeChanged = false
 
             func flushRun() {
-                guard run.count >= 2 else {
-                    run.removeAll(keepingCapacity: true)
-                    return
-                }
-                rebuilt.append(CanvasStroke(id: UUID(), points: run, style: stroke.style, rotation: stroke.rotation))
+                if run.count >= 2 { runs.append(run) }
                 run.removeAll(keepingCapacity: true)
             }
 
@@ -54,7 +51,11 @@ extension InkMetalView {
             }
             flushRun()
 
-            if !strokeChanged {
+            if strokeChanged {
+                for segment in runs {
+                    rebuilt.append(CanvasStroke(id: UUID(), points: segment, style: stroke.style, rotation: stroke.rotation))
+                }
+            } else {
                 rebuilt.append(stroke)
             }
         }
