@@ -12,6 +12,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Select Swift toolchain
+        run: swift --version
+      - name: Apply known-good renderer repair
+        run: |
+          python3 scripts/fix-mosuan-ink-quality.py
+      - name: Apply known-good UI synchronization repair
+        run: |
+          python3 scripts/fix-mosuan-ui-loop.py
+      - name: Apply packaged Metal resource lookup repair
+        run: |
+          python3 scripts/fix-mosuan-runtime-resources.py
       - name: Resolve package
         run: swift package resolve
       - name: Build release
@@ -25,6 +36,9 @@ jobs:
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" DMG
           cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
           chmod +x "$APP/Contents/MacOS/MosuanBoard"
+          RESOURCE_BUNDLE="$(find .build -type d -name 'MosuanBoard_MosuanBoard.bundle' -print -quit)"
+          test -n "$RESOURCE_BUNDLE"
+          cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -83,6 +97,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           test -x "$APP/Contents/MacOS/MosuanBoard"
           test -f "$APP/Contents/Resources/AppIcon.icns"
+          test -f "$APP/Contents/Resources/MosuanBoard_MosuanBoard.bundle/default.metallib"
           plutil -p "$APP/Contents/Info.plist"
       - name: Create DMG
         shell: bash
@@ -93,6 +108,7 @@ jobs:
           cp -R "$APP" DMG/
           ln -s /Applications DMG/Applications
           hdiutil create -volname "墨算 0.2.1" -srcfolder DMG -ov -format UDZO "MosuanBoard-0.2.1-${GITHUB_RUN_NUMBER}.dmg"
+          hdiutil verify "MosuanBoard-0.2.1-${GITHUB_RUN_NUMBER}.dmg"
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
