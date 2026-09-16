@@ -82,7 +82,7 @@ final class PenCanvasNSView: NSView {
 
     private func point(from event: NSEvent) -> PenPoint {
         let location = convert(event.locationInWindow, from: nil)
-        let pressure = event.pressure > 0 ? event.pressure : 1.0
+        let pressure = event.pressure > 0 ? CGFloat(event.pressure) : 1.0
 
         return PenPoint(
             location: location,
