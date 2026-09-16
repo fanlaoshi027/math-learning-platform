@@ -5,13 +5,13 @@ extension InkMetalView {
     /// Erases only the portions of freehand strokes touched by the eraser path.
     /// The existing object/whole-stroke eraser remains unchanged for the default mode.
     func erasePartialAlongPath(_ path: [SIMD2<Float>]) {
-        guard path.count >= 1 else { return }
+        guard !path.isEmpty else { return }
         let state = currentPageState()
         guard !state.strokes.isEmpty else { return }
 
         let canvasPath = path.map { canvasPoint(from: $0) }
         let tolerance: Float = 14 / max(Float(zoomPercent) / 100, 0.25)
-        var changed = false
+        var anyChanged = false
         var rebuilt: [CanvasStroke] = []
         rebuilt.reserveCapacity(state.strokes.count + 8)
 
@@ -21,11 +21,15 @@ extension InkMetalView {
                 continue
             }
 
+            var strokeChanged = false
             var run: [InkPoint] = []
             run.reserveCapacity(stroke.points.count)
 
             func flushRun() {
-                guard run.count >= 2 else { run.removeAll(keepingCapacity: true); return }
+                guard run.count >= 2 else {
+                    run.removeAll(keepingCapacity: true)
+                    return
+                }
                 rebuilt.append(CanvasStroke(id: UUID(), points: run, style: stroke.style, rotation: stroke.rotation))
                 run.removeAll(keepingCapacity: true)
             }
@@ -42,19 +46,20 @@ extension InkMetalView {
 
                 if nearSegment {
                     flushRun()
-                    changed = true
+                    strokeChanged = true
+                    anyChanged = true
                 } else {
                     run.append(stroke.points[i])
                 }
             }
             flushRun()
 
-            if !changed && rebuilt.last?.id == stroke.id {
-                // Kept above only as a fast path marker; no mutation is needed.
+            if !strokeChanged {
+                rebuilt.append(stroke)
             }
         }
 
-        guard changed else { return }
+        guard anyChanged else { return }
         replacePageState(CanvasPageState(strokes: rebuilt, objects: state.objects))
     }
 
