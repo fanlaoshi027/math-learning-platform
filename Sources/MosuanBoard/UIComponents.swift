@@ -5,11 +5,38 @@ import AppKit
 enum BoardTool: Equatable { case select, pen, line, smartLine, polygon, dynamicAngle, dynamicIsoscelesTriangle, eraser, hand }
 
 enum BoardBackground: String, CaseIterable, Identifiable {
-    case white, black, darkGray, lightGray, cream
+    case white, black, darkGray, lightGray, cream, paleBlue, paleGreen, paleYellow
     var id: String { rawValue }
-    var title: String { switch self { case .white: "白色"; case .black: "黑色"; case .darkGray: "深灰"; case .lightGray: "浅灰"; case .cream: "米白" } }
-    var color: Color { switch self { case .white: .white; case .black: .black; case .darkGray: Color(white: 0.18); case .lightGray: Color(white: 0.92); case .cream: Color(red: 0.98, green: 0.96, blue: 0.88) } }
-    var metal: SIMD4<Float> { switch self { case .white: SIMD4(1,1,1,1); case .black: SIMD4(0,0,0,1); case .darkGray: SIMD4(0.18,0.18,0.18,1); case .lightGray: SIMD4(0.92,0.92,0.92,1); case .cream: SIMD4(0.98,0.96,0.88,1) } }
+    var title: String { switch self {
+        case .white: "白色"
+        case .black: "黑色"
+        case .darkGray: "深灰"
+        case .lightGray: "浅灰"
+        case .cream: "米白"
+        case .paleBlue: "淡蓝"
+        case .paleGreen: "淡绿"
+        case .paleYellow: "淡黄"
+    } }
+    var color: Color { switch self {
+        case .white: .white
+        case .black: .black
+        case .darkGray: Color(white: 0.18)
+        case .lightGray: Color(white: 0.92)
+        case .cream: Color(red: 0.98, green: 0.96, blue: 0.88)
+        case .paleBlue: Color(red: 0.91, green: 0.95, blue: 0.99)
+        case .paleGreen: Color(red: 0.91, green: 0.97, blue: 0.93)
+        case .paleYellow: Color(red: 0.99, green: 0.97, blue: 0.86)
+    } }
+    var metal: SIMD4<Float> { switch self {
+        case .white: SIMD4(1,1,1,1)
+        case .black: SIMD4(0,0,0,1)
+        case .darkGray: SIMD4(0.18,0.18,0.18,1)
+        case .lightGray: SIMD4(0.92,0.92,0.92,1)
+        case .cream: SIMD4(0.98,0.96,0.88,1)
+        case .paleBlue: SIMD4(0.91,0.95,0.99,1)
+        case .paleGreen: SIMD4(0.91,0.97,0.93,1)
+        case .paleYellow: SIMD4(0.99,0.97,0.86,1)
+    } }
 }
 
 enum BoardPattern: Int, CaseIterable, Identifiable {
