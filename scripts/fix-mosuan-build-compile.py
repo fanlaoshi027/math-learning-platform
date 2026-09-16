@@ -4,7 +4,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def find_braced_block(text: str, start: int):
-    """Return (opening_brace, closing_brace) for the brace at/after start."""
     opening = text.find("{", start)
     if opening < 0:
         return None
@@ -47,6 +46,14 @@ def keep_first_function(text: str, signature: str):
 # declarations in the generated workspace.
 view_path = ROOT / "Sources/MosuanBoard/Metal/InkMetalView.swift"
 v = view_path.read_text()
+
+# These bridge methods are intentionally kept on InkMetalView (not the feature
+# extension) because renderer is a private stored property of the view.
+bridge_methods = """    func replacePageState(_ state: CanvasPageState) { renderer.importPageState(state); notifyState(); draw() }
+    func clearPageContents() { renderer.beginHistoryTransaction(); renderer.importPageState(CanvasPageState(strokes: [], objects: [])); renderer.endHistoryTransaction(); notifyState(); draw() }
+    func canvasPoint(from point: SIMD2<Float>) -> SIMD2<Float> { renderer.canvasPoint(from: point) }
+"""
+
 for signature in [
     "    func replacePageState(_ state: CanvasPageState)",
     "    func clearPageContents()",
@@ -54,15 +61,15 @@ for signature in [
 ]:
     v = keep_first_function(v, signature)
 
-# ToolFeatures needs the coordinate conversion, but renderer remains private.
-if "    func canvasPoint(from point: SIMD2<Float>)" not in v:
+if "    func replacePageState(_ state: CanvasPageState)" not in v:
     marker = "    private func notifyState()"
-    wrapper = "    func canvasPoint(from point: SIMD2<Float>) -> SIMD2<Float> { renderer.canvasPoint(from: point) }\n"
     if marker not in v:
         raise SystemExit("InkMetalView notifyState marker not found")
-    v = v.replace(marker, wrapper + marker, 1)
+    v = v.replace(marker, bridge_methods + marker, 1)
 view_path.write_text(v)
 
+# Remove any accidental duplicate renderer declarations, but do not rewrite
+# renderer implementation or its drawing algorithms.
 renderer_path = ROOT / "Sources/MosuanBoard/Metal/InkRenderer.swift"
 r = renderer_path.read_text()
 for signature in [
@@ -73,10 +80,7 @@ for signature in [
 renderer_path.write_text(r)
 
 # Swift 5.10 can time out while type-checking the very large BoardScreen body.
-# Move the GeometryReader's large ZStack into a separate computed ViewBuilder.
-# This transformation is deliberately brace-aware and preserves the original
-# body contents byte-for-byte inside boardWorkspace, avoiding the fragile
-# string slicing used by the earlier failed repair.
+# Move the GeometryReader's large expression into a separate ViewBuilder.
 board_path = ROOT / "Sources/MosuanBoard/BoardScreenV3.swift"
 b = board_path.read_text()
 
@@ -89,20 +93,11 @@ if "private func boardWorkspace(proxy: GeometryProxy) -> some View" not in b:
     if pair is None:
         raise SystemExit("BoardScreen body braces not found")
     opening, closing = pair
-    original_block = b[start:closing + 1]
     inner = b[opening + 1:closing]
 
-    # The original body has the form:
-    #   GeometryReader { proxy in ... }
-    #   .frame(...)
-    #   .preferredColorScheme(...)
-    # Keep those outer modifiers in body, while extracting only the large
-    # GeometryReader expression into boardWorkspace.
     geom_start = inner.find("GeometryReader {")
     if geom_start < 0:
         raise SystemExit("GeometryReader not found in BoardScreen body")
-
-    # Find the GeometryReader closure's matching brace.
     geom_open = inner.find("{", geom_start)
     geom_depth = 0
     geom_close = None
@@ -119,10 +114,8 @@ if "private func boardWorkspace(proxy: GeometryProxy) -> some View" not in b:
 
     geometry_expression = inner[geom_start:geom_close + 1]
     suffix = inner[geom_close + 1:]
-
-    # Preserve the outer body modifiers exactly, but make GeometryReader call
-    # the extracted view. This creates a real compiler boundary.
     suffix_stripped = suffix.strip()
+
     body_replacement = (
         "    var body: some View {\n"
         "        GeometryReader { proxy in\n"
@@ -135,8 +128,7 @@ if "private func boardWorkspace(proxy: GeometryProxy) -> some View" not in b:
         + geometry_expression
         + "\n    }"
     )
-
     b = b[:start] + body_replacement + b[closing + 1:]
     board_path.write_text(b)
 
-print("Normalized injected helpers and safely split BoardScreen for Swift type-checking.")
+print("Restored InkMetalView state bridges and kept BoardScreen transformation brace-safe.")
