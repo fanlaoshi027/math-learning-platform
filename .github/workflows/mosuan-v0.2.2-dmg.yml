@@ -26,6 +26,8 @@ jobs:
         run: python3 scripts/fix-mosuan-swift-typecheck.py
       - name: Apply tool feature repair
         run: python3 scripts/fix-mosuan-tool-features.py
+      - name: Normalize Swift build workspace
+        run: python3 scripts/fix-mosuan-build-compile.py
       - name: Resolve package
         run: swift package resolve
       - name: Build release
