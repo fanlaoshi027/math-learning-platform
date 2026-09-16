@@ -1,0 +1,101 @@
+name: Mosuan Board v0.2.1 DMG
+
+on:
+  push:
+    branches:
+      - mosuan-v0.2.1-from-working-base
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Resolve package
+        run: swift package resolve
+      - name: Build release
+        run: swift build -c release
+      - name: Create app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="Mosuan Board.app"
+          rm -rf "$APP" DMG AppIcon.iconset
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" DMG
+          cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
+          chmod +x "$APP/Contents/MacOS/MosuanBoard"
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+              <key>CFBundleDisplayName</key><string>墨算</string>
+              <key>CFBundleExecutable</key><string>MosuanBoard</string>
+              <key>CFBundleIdentifier</key><string>com.fanlaoshi.mosuan-board</string>
+              <key>CFBundleName</key><string>Mosuan Board</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>CFBundleShortVersionString</key><string>0.2.1</string>
+              <key>CFBundleVersion</key><string>${GITHUB_RUN_NUMBER}</string>
+              <key>CFBundleIconFile</key><string>AppIcon</string>
+              <key>LSMinimumSystemVersion</key><string>14.0</string>
+              <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+      - name: Generate app icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="Mosuan Board.app"
+          mkdir -p AppIcon.iconset
+          cat > /tmp/make_icon.swift <<'SWIFT'
+          import AppKit
+          let out = CommandLine.arguments[1]
+          let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bitmapFormat: [], bytesPerRow: 0, bitsPerPixel: 0)!
+          NSGraphicsContext.saveGraphicsState()
+          let ctx = NSGraphicsContext(bitmapImageRep: rep)!
+          NSGraphicsContext.current = ctx
+          NSColor(calibratedWhite: 0.08, alpha: 1).setFill()
+          NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: 1024, height: 1024), xRadius: 210, yRadius: 210).fill()
+          NSColor.white.setStroke()
+          let p = NSBezierPath(); p.lineWidth = 54; p.lineCapStyle = .round
+          p.move(to: NSPoint(x: 220, y: 300)); p.line(to: NSPoint(x: 510, y: 760)); p.line(to: NSPoint(x: 805, y: 300)); p.stroke()
+          NSGraphicsContext.restoreGraphicsState()
+          try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+          SWIFT
+          swift /tmp/make_icon.swift /tmp/icon1024.png
+          sips -z 16 16 /tmp/icon1024.png --out AppIcon.iconset/icon_16x16.png >/dev/null
+          sips -z 32 32 /tmp/icon1024.png --out AppIcon.iconset/icon_16x16@2x.png >/dev/null
+          sips -z 32 32 /tmp/icon1024.png --out AppIcon.iconset/icon_32x32.png >/dev/null
+          sips -z 64 64 /tmp/icon1024.png --out AppIcon.iconset/icon_32x32@2x.png >/dev/null
+          sips -z 128 128 /tmp/icon1024.png --out AppIcon.iconset/icon_128x128.png >/dev/null
+          sips -z 256 256 /tmp/icon1024.png --out AppIcon.iconset/icon_128x128@2x.png >/dev/null
+          sips -z 256 256 /tmp/icon1024.png --out AppIcon.iconset/icon_256x256.png >/dev/null
+          sips -z 512 512 /tmp/icon1024.png --out AppIcon.iconset/icon_256x256@2x.png >/dev/null
+          sips -z 512 512 /tmp/icon1024.png --out AppIcon.iconset/icon_512x512.png >/dev/null
+          cp /tmp/icon1024.png AppIcon.iconset/icon_512x512@2x.png
+          iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+      - name: Ad-hoc sign and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="Mosuan Board.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          test -x "$APP/Contents/MacOS/MosuanBoard"
+          test -f "$APP/Contents/Resources/AppIcon.icns"
+          plutil -p "$APP/Contents/Info.plist"
+      - name: Create DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="Mosuan Board.app"
+          rm -rf DMG && mkdir -p DMG
+          cp -R "$APP" DMG/
+          ln -s /Applications DMG/Applications
+          hdiutil create -volname "墨算 0.2.1" -srcfolder DMG -ov -format UDZO "MosuanBoard-0.2.1-${GITHUB_RUN_NUMBER}.dmg"
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: MosuanBoard-0.2.1-dmg
+          path: MosuanBoard-0.2.1-${{ github.run_number }}.dmg
+          if-no-files-found: error
