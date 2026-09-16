@@ -16,6 +16,8 @@ jobs:
         run: swift --version
       - name: Apply Noteful-targeted ink repair
         run: python3 scripts/fix-mosuan-ink-quality.py
+      - name: Apply final Noteful stroke finish
+        run: python3 scripts/fix-mosuan-noteful-finish.py
       - name: Apply UI synchronization repair
         run: python3 scripts/fix-mosuan-ui-loop.py
       - name: Apply packaged Metal resource lookup repair
