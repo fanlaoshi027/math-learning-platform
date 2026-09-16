@@ -12,13 +12,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Resolve package
         run: swift package resolve
-
       - name: Build release
         run: swift build -c release
-
       - name: Create app bundle
         shell: bash
         run: |
@@ -28,12 +25,10 @@ jobs:
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" DMG
           cp .build/release/MosuanBoard "$APP/Contents/MacOS/MosuanBoard"
           chmod +x "$APP/Contents/MacOS/MosuanBoard"
-
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
+          <plist version="1.0"><dict>
               <key>CFBundleDisplayName</key><string>墨算</string>
               <key>CFBundleExecutable</key><string>MosuanBoard</string>
               <key>CFBundleIdentifier</key><string>com.fanlaoshi.mosuan-board</string>
@@ -44,21 +39,16 @@ jobs:
               <key>CFBundleIconFile</key><string>AppIcon</string>
               <key>LSMinimumSystemVersion</key><string>14.0</string>
               <key>NSHighResolutionCapable</key><true/>
-          </dict>
-          </plist>
+          </dict></plist>
           PLIST
-
       - name: Generate app icon
         shell: bash
         run: |
           set -euo pipefail
+          APP="Mosuan Board.app"
           mkdir -p AppIcon.iconset
           cat > /tmp/make_icon.swift <<'SWIFT'
           import AppKit
-          import CoreGraphics
-          import ImageIO
-
-          let sizes = [16, 32, 128, 256, 512, 1024]
           let out = CommandLine.arguments[1]
           let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bitmapFormat: [], bytesPerRow: 0, bitsPerPixel: 0)!
           NSGraphicsContext.saveGraphicsState()
@@ -72,8 +62,7 @@ jobs:
           p.lineCapStyle = .round
           p.move(to: NSPoint(x: 220, y: 300)); p.line(to: NSPoint(x: 510, y: 760)); p.line(to: NSPoint(x: 805, y: 300)); p.stroke()
           NSGraphicsContext.restoreGraphicsState()
-          let png = rep.representation(using: .png, properties: [:])!
-          try! png.write(to: URL(fileURLWithPath: out))
+          try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
           SWIFT
           swift /tmp/make_icon.swift /tmp/icon1024.png
           sips -z 16 16 /tmp/icon1024.png --out AppIcon.iconset/icon_16x16.png >/dev/null
@@ -87,7 +76,6 @@ jobs:
           sips -z 512 512 /tmp/icon1024.png --out AppIcon.iconset/icon_512x512.png >/dev/null
           cp /tmp/icon1024.png AppIcon.iconset/icon_512x512@2x.png
           iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
-
       - name: Ad-hoc sign and verify
         shell: bash
         run: |
@@ -98,7 +86,6 @@ jobs:
           test -x "$APP/Contents/MacOS/MosuanBoard"
           test -f "$APP/Contents/Resources/AppIcon.icns"
           plutil -p "$APP/Contents/Info.plist"
-
       - name: Create DMG
         shell: bash
         run: |
@@ -109,7 +96,6 @@ jobs:
           cp -R "$APP" DMG/
           ln -s /Applications DMG/Applications
           hdiutil create -volname "墨算 0.2.0" -srcfolder DMG -ov -format UDZO "MosuanBoard-0.2.0-${GITHUB_RUN_NUMBER}.dmg"
-
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
